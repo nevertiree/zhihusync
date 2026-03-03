@@ -124,10 +124,11 @@ class ZhihuSyncService:
             logger.error("未配置用户ID，请在 config.yaml 中设置 zhihu.user_id")
             return
 
-        log_id = self.db.create_sync_log()
+        # 创建同步日志，标记为定时同步
+        log_id = self.db.create_sync_log(sync_type="scheduled")
 
         try:
-            logger.info("开始同步任务...")
+            logger.info("开始定时同步任务...")
 
             async with ZhihuCrawler(
                 user_id=self.config.zhihu.user_id,
