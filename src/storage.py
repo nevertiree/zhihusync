@@ -822,27 +822,32 @@ body {{
             return None
 
         try:
+            # 将缩略图URL转为高清图URL (_l.jpg -> .jpg)
+            hd_avatar_url = avatar_url.replace("_l.jpg", ".jpg")
+            if hd_avatar_url != avatar_url:
+                logger.debug(f"使用高清头像URL: {hd_avatar_url[:60]}...")
+
             # 使用用户ID作为文件名，避免重复下载同一用户
             safe_user_id = hashlib.md5(user_id.encode()).hexdigest()[:16]
-            ext = Path(urlparse(avatar_url).path).suffix or ".jpg"
+            ext = ".jpg"  # 强制使用.jpg
             local_filename = f"avatar_{safe_user_id}{ext}"
             local_path = self.images_path / local_filename
 
-            # 检查是否已存在且文件有效(大于1KB)
-            if local_path.exists() and local_path.stat().st_size > 1024:
+            # 检查是否已存在且文件有效(大于5KB)
+            if local_path.exists() and local_path.stat().st_size > 5120:
                 logger.debug(f"头像已存在: {local_path} ({local_path.stat().st_size} bytes)")
                 return f"/data/static/images/{local_filename}"
 
-            # 下载头像
+            # 下载高清头像
             async with aiohttp.ClientSession() as session:
                 async with session.get(
-                    avatar_url, timeout=aiohttp.ClientTimeout(total=30)
+                    hd_avatar_url, timeout=aiohttp.ClientTimeout(total=30)
                 ) as response:
                     if response.status == 200:
                         content = await response.read()
                         # 检查下载的内容是否有效
-                        if len(content) < 100:
-                            logger.warning(f"头像下载内容太小 ({len(content)} bytes): {avatar_url}")
+                        if len(content) < 1000:
+                            logger.warning(f"头像下载内容太小 ({len(content)} bytes): {hd_avatar_url}")
                             return None
                         async with aiofiles.open(local_path, "wb") as f:
                             await f.write(content)
