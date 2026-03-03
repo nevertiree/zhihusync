@@ -139,28 +139,20 @@
     gap: 6px;
 }
 
-/* 作者头像 - 使用更具体的选择器确保优先级 */
-.detail-table .author-cell .author-avatar-small,
-.author-cell .author-avatar-small {
-    width: 16px;
-    height: 16px;
-    border-radius: 50%;
-    object-fit: cover;
-    flex-shrink: 0;
-    display: inline-block;
+/* 作者单元格 */
+.author-cell {
+    display: flex;
+    align-items: center;
+    gap: 4px;
 }
 
-.detail-table .author-cell .author-avatar-placeholder,
-.author-cell .author-avatar-placeholder {
-    width: 16px;
-    height: 16px;
-    border-radius: 50%;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 9px;
-    flex-shrink: 0;
+.author-name {
+    font-weight: 500;
+    color: var(--text-primary);
+    max-width: 80px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .author-name {
@@ -316,8 +308,8 @@ async function loadAnswers(page = 1) {
             const userTag = escapeHtml(item.user_id ? item.user_id.substring(0, 6) : '未知');
             
             const authorAvatar = item.author_avatar_url
-                ? `<img src="${item.author_avatar_url}" class="author-avatar-small" alt="">`
-                : '<span class="author-avatar-placeholder">👤</span>';
+                ? `<img src="${item.author_avatar_url}" class="author-avatar-small" alt="" style="width:16px;height:16px;border-radius:50%;object-fit:cover;display:inline-block;vertical-align:middle;">`
+                : '<span class="author-avatar-placeholder" style="width:16px;height:16px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:9px;vertical-align:middle;">👤</span>';
             
             const htmlFileName = item.html_path ? item.html_path.split('/').pop() : '';
 
