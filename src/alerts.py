@@ -207,6 +207,7 @@ class AlertManager:
             title: 告警标题.
             message: 告警消息.
         """
+        assert self._config is not None  # noqa: S101
         try:
             msg = MIMEMultipart("alternative")
             msg["Subject"] = f"[zhihusync] {title}"
