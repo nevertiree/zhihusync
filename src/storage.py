@@ -760,11 +760,11 @@ body {{
             original_url: 原始图片 URL.
 
         Returns:
-            str: 相对路径.
+            str: 绝对路径.
         """
         url_hash = hashlib.md5(original_url.encode()).hexdigest()[:16]
         ext = Path(urlparse(original_url).path).suffix or ".jpg"
-        return f"../static/images/{url_hash}{ext}"
+        return f"/data/static/images/{url_hash}{ext}"
 
     async def _download_image(self, url: str, answer_id: str) -> str | None:
         """下载单张图片.
@@ -830,7 +830,7 @@ body {{
 
             # 检查是否已存在
             if local_path.exists():
-                return f"../static/images/{local_filename}"
+                return f"/data/static/images/{local_filename}"
 
             # 下载头像
             async with aiohttp.ClientSession() as session:
@@ -842,7 +842,7 @@ body {{
                         async with aiofiles.open(local_path, "wb") as f:
                             await f.write(content)
                         logger.debug(f"下载头像: {user_id} -> {local_path}")
-                        return f"../static/images/{local_filename}"
+                        return f"/data/static/images/{local_filename}"
         except Exception as e:
             logger.warning(f"下载头像失败 {user_id}: {e}")
 
