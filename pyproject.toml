@@ -89,23 +89,22 @@ multi_line_output = 3
 
 [tool.mypy]
 python_version = "3.10"
-warn_return_any = false
-warn_unused_configs = false
-disallow_untyped_defs = false
-disallow_incomplete_defs = false
-check_untyped_defs = false
-disallow_untyped_decorators = false
-no_implicit_optional = false
-warn_redundant_casts = false
-warn_unused_ignores = false
-warn_no_return = false
-warn_unreachable = false
-strict_equality = false
+# 启用核心严格检查
+warn_return_any = false  # SQLAlchemy 返回 Any，暂时放宽
+warn_unused_configs = true
+check_untyped_defs = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+strict_equality = true
 show_error_codes = true
 ignore_missing_imports = true
-
-# 忽略特定的错误类型（逐步修复）
-# 所有文件类型检查已启用
+# 暂时保留的宽松选项（未来启用）
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+disallow_untyped_decorators = false
+warn_unreachable = false
 
 [[tool.mypy.overrides]]
 module = ["src.storage"]

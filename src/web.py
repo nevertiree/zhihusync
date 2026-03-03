@@ -22,7 +22,7 @@ from timezone_utils import get_beijing_now
 
 # 全局状态
 app_state: dict[str, Any] = {
-    "sync_task": None,  # type: ignore[typeddict-item]
+    "sync_task": None,
     "sync_status": "idle",  # idle, running, success, failed
     "sync_progress": 0,
     "sync_message": "",

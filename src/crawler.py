@@ -210,6 +210,7 @@ class ZhihuCrawler:
                 return
 
             # 创建页面访问知乎以便添加 cookie
+            assert self.context is not None  # noqa: S101
             self.page = await self.context.new_page()
             assert self.page is not None  # noqa: S101
             await self.page.goto("https://www.zhihu.com", wait_until="domcontentloaded", timeout=10000)

@@ -29,7 +29,7 @@ def get_beijing_now() -> datetime:
     return dt.replace(tzinfo=None)
 
 
-def get_beijing_time(dt: datetime = None) -> datetime:
+def get_beijing_time(dt: datetime | None = None) -> datetime:
     """将时间转换为北京时间.
 
     Args:
@@ -53,7 +53,7 @@ def get_beijing_time(dt: datetime = None) -> datetime:
     return dt.replace(tzinfo=BEIJING_TZ)
 
 
-def format_beijing_time(dt: datetime = None, fmt: str = "%Y-%m-%d %H:%M:%S") -> str:
+def format_beijing_time(dt: datetime | None = None, fmt: str = "%Y-%m-%d %H:%M:%S") -> str:
     """格式化北京时间为字符串.
 
     Args:
