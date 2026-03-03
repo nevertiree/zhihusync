@@ -139,24 +139,28 @@
     gap: 6px;
 }
 
+/* 作者头像 - 使用 !important 防止被覆盖 */
 .author-avatar-small {
-    width: 24px;
-    height: 24px;
-    border-radius: 50%;
-    object-fit: cover;
-    flex-shrink: 0;
+    width: 20px !important;
+    height: 20px !important;
+    border-radius: 50% !important;
+    object-fit: cover !important;
+    flex-shrink: 0 !important;
+    display: inline-block !important;
+    max-width: 20px !important;
+    max-height: 20px !important;
 }
 
 .author-avatar-placeholder {
-    width: 24px;
-    height: 24px;
-    border-radius: 50%;
+    width: 20px !important;
+    height: 20px !important;
+    border-radius: 50% !important;
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    display: flex;
+    display: flex !important;
     align-items: center;
     justify-content: center;
-    font-size: 12px;
-    flex-shrink: 0;
+    font-size: 10px;
+    flex-shrink: 0 !important;
 }
 
 .author-name {
