@@ -703,7 +703,7 @@ class ZhihuCrawler:
                     if badge:
                         author_headline = badge.get_text(strip=True)
 
-                # 获取赞同数
+                # 获取赞同数和评论数
                 voteup_count = 0
                 comment_count = 0
                 actions = content_item.find("div", class_="ContentItem-actions")
@@ -718,6 +718,20 @@ class ZhihuCrawler:
                         numbers = re.findall(r"\d+", text)
                         if numbers:
                             voteup_count = int(numbers[0])
+
+                    # 查找评论按钮/链接
+                    comment_btn = actions.find("a", class_="ContentItem-action") or actions.find(
+                        "button", class_="ContentItem-action"
+                    )
+                    if comment_btn:
+                        text = comment_btn.get_text(strip=True)
+                        # 提取数字，如 "10 条评论" 或 "评论"
+                        numbers = re.findall(r"\d+", text)
+                        if numbers:
+                            comment_count = int(numbers[0])
+                        elif "评论" in text:
+                            # 有评论按钮但没有数字，可能是0或有评论但数字未显示
+                            comment_count = 0
 
                 # 解析时间字符串为时间戳
                 created_time = 0
