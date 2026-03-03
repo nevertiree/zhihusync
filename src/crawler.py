@@ -929,7 +929,8 @@ class ZhihuCrawler:
         logger.info(f"开始扫描用户 {self.user_id} 的点赞内容...")
 
         # 确保用户记录在数据库中存在
-        self.db.add_user(self.user_id, self.user_id)
+        user_created = self.db.add_user(self.user_id, self.user_id)
+        logger.info(f"用户记录检查: user_id={self.user_id}, created={user_created}")
 
         self.new_items = 0
         self.updated_items = 0
@@ -977,6 +978,9 @@ class ZhihuCrawler:
         # 更新用户同步时间和次数
         if self.new_items > 0 or self.updated_items > 0:
             self.db.update_user_sync_time(self.user_id)
+            logger.info(f"已更新用户同步时间: {self.user_id}")
+        else:
+            logger.info("没有新内容，跳过更新用户同步时间")
 
         return self.new_items, self.updated_items
 
