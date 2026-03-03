@@ -217,6 +217,8 @@ async def get_users():
                 {
                     "user_id": user.id,
                     "name": user.name or user.id,
+                    "avatar_url": user.avatar_url,
+                    "headline": user.headline,
                     "created_at": user.created_at.isoformat() if user.created_at else None,
                     "last_sync": user.last_sync_at.isoformat() if user.last_sync_at else None,
                     "sync_count": user.sync_count,
@@ -507,6 +509,8 @@ async def get_answers(page: int = 1, page_size: int = 20, search: str = ""):
                     "id": a.id,
                     "question_title": a.question_title,
                     "author_name": a.author_name or "匿名用户",
+                    "author_avatar_url": a.author_avatar_url,
+                    "author_headline": a.author_headline,
                     "voteup_count": a.voteup_count,
                     "comment_count": a.comment_count,
                     "synced_at": a.synced_at.isoformat() if a.synced_at else "",

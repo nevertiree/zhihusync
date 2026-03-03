@@ -12,13 +12,12 @@ Examples:
 
 import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from loguru import logger
+from models import AlertConfig, Answer, Base, Comment, SyncLog, User
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
-
-from models import AlertConfig, Answer, Base, Comment, SyncLog, User
 
 
 class DatabaseManager:
@@ -68,7 +67,7 @@ class DatabaseManager:
 
     # ========== 用户管理 ==========
 
-    def add_user(self, user_id: str, name: Optional[str] = None) -> bool:
+    def add_user(self, user_id: str, name: str | None = None) -> bool:
         """添加监控用户.
 
         Args:
@@ -97,7 +96,7 @@ class DatabaseManager:
         finally:
             session.close()
 
-    def get_user(self, user_id: str) -> Optional[User]:
+    def get_user(self, user_id: str) -> User | None:
         """获取用户信息.
 
         Args:
@@ -112,7 +111,7 @@ class DatabaseManager:
         finally:
             session.close()
 
-    def get_all_users(self, active_only: bool = True) -> List[User]:
+    def get_all_users(self, active_only: bool = True) -> list[User]:
         """获取所有用户.
 
         Args:
@@ -146,6 +145,37 @@ class DatabaseManager:
         finally:
             session.close()
 
+    def update_user_info(
+        self, user_id: str, name: str = None, avatar_url: str = None, headline: str = None
+    ) -> bool:
+        """更新用户信息.
+
+        Args:
+            user_id: 用户ID.
+            name: 用户名称.
+            avatar_url: 头像URL.
+            headline: 个性签名.
+
+        Returns:
+            bool: 更新成功返回True.
+        """
+        session = self.get_session()
+        try:
+            user = session.query(User).filter_by(id=user_id).first()
+            if user:
+                if name:
+                    user.name = name
+                if avatar_url:
+                    user.avatar_url = avatar_url
+                if headline:
+                    user.headline = headline
+                session.commit()
+                logger.info(f"更新用户信息: {user_id}, name={name}")
+                return True
+            return False
+        finally:
+            session.close()
+
     def delete_user(self, user_id: str) -> bool:
         """删除用户.
 
@@ -173,7 +203,7 @@ class DatabaseManager:
 
     # ========== 回答管理 ==========
 
-    def save_answer(self, answer_data: Dict[str, Any]) -> bool:
+    def save_answer(self, answer_data: dict[str, Any]) -> bool:
         """保存或更新回答元数据.
 
         Args:
@@ -209,7 +239,7 @@ class DatabaseManager:
         finally:
             session.close()
 
-    def get_answer_by_id(self, answer_id: str) -> Optional[Answer]:
+    def get_answer_by_id(self, answer_id: str) -> Answer | None:
         """根据ID获取回答.
 
         Args:
@@ -224,7 +254,7 @@ class DatabaseManager:
         finally:
             session.close()
 
-    def get_user_answers(self, user_id: str, limit: Optional[int] = None) -> List[Answer]:
+    def get_user_answers(self, user_id: str, limit: int | None = None) -> list[Answer]:
         """获取用户的所有回答.
 
         Args:
@@ -246,8 +276,8 @@ class DatabaseManager:
             session.close()
 
     def get_all_answers(
-        self, limit: Optional[int] = None, offset: int = 0, user_id: Optional[str] = None
-    ) -> List[Answer]:
+        self, limit: int | None = None, offset: int = 0, user_id: str | None = None
+    ) -> list[Answer]:
         """获取所有回答.
 
         Args:
@@ -270,7 +300,7 @@ class DatabaseManager:
         finally:
             session.close()
 
-    def get_answers_without_comments(self, user_id: Optional[str] = None) -> List[Answer]:
+    def get_answers_without_comments(self, user_id: str | None = None) -> list[Answer]:
         """获取尚未保存评论的回答.
 
         Args:
@@ -305,7 +335,7 @@ class DatabaseManager:
 
     # ========== 评论管理 ==========
 
-    def save_comment(self, comment_data: Dict[str, Any]) -> bool:
+    def save_comment(self, comment_data: dict[str, Any]) -> bool:
         """保存评论元数据.
 
         Args:
@@ -334,7 +364,7 @@ class DatabaseManager:
 
     # ========== 同步日志 ==========
 
-    def create_sync_log(self, user_id: Optional[str] = None) -> int:
+    def create_sync_log(self, user_id: str | None = None) -> int:
         """创建同步日志.
 
         Args:
@@ -372,7 +402,7 @@ class DatabaseManager:
         finally:
             session.close()
 
-    def get_sync_history(self, user_id: Optional[str] = None, limit: int = 50) -> List[SyncLog]:
+    def get_sync_history(self, user_id: str | None = None, limit: int = 50) -> list[SyncLog]:
         """获取同步历史.
 
         Args:
@@ -393,7 +423,7 @@ class DatabaseManager:
 
     # ========== 统计 ==========
 
-    def get_stats(self, user_id: Optional[str] = None) -> Dict[str, int]:
+    def get_stats(self, user_id: str | None = None) -> dict[str, int]:
         """获取统计信息.
 
         Args:
@@ -420,7 +450,7 @@ class DatabaseManager:
 
     # ========== 告警配置 ==========
 
-    def get_alert_config(self) -> Optional[AlertConfig]:
+    def get_alert_config(self) -> AlertConfig | None:
         """获取告警配置.
 
         Returns:

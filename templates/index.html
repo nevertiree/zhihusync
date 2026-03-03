@@ -345,6 +345,12 @@
     color: var(--text-secondary);
 }
 
+.user-info .sync-time {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 2px;
+}
+
 .user-status {
     display: flex;
     align-items: center;
@@ -489,10 +495,13 @@ async function loadUsers() {
 
         container.innerHTML = data.users.map(user => `
             <div class="user-item">
-                <div class="user-avatar">👤</div>
+                <div class="user-avatar" style="${user.avatar_url ? `background-image: url(${user.avatar_url}); background-size: cover;` : ''}">
+                    ${user.avatar_url ? '' : '👤'}
+                </div>
                 <div class="user-info">
                     <h4>${user.name || user.user_id}</h4>
-                    <p>上次同步: ${user.last_sync || '从未'}</p>
+                    <p>${user.headline || '暂无个性签名'}</p>
+                    <p class="sync-time">上次同步: ${user.last_sync || '从未'}</p>
                 </div>
                 <div class="user-status">
                     <span class="status-badge ${user.status === 'active' ? 'status-active' : 'status-error'}">

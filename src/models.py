@@ -26,6 +26,7 @@ class User(Base):
         id: 用户ID，主键.
         name: 用户名称.
         avatar_url: 头像URL.
+        headline: 个性签名.
         is_active: 是否激活.
         created_at: 添加时间.
         updated_at: 更新时间.
@@ -40,6 +41,7 @@ class User(Base):
     id = Column(String(50), primary_key=True, comment="用户ID")
     name = Column(String(255), nullable=True, comment="用户名称")
     avatar_url = Column(String(500), nullable=True, comment="头像URL")
+    headline = Column(String(500), nullable=True, comment="个性签名")
     is_active = Column(Boolean, default=True, comment="是否激活")
     created_at = Column(DateTime, default=datetime.now, comment="添加时间")
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")
@@ -90,6 +92,8 @@ class Answer(Base):
     question_title = Column(Text, nullable=False, comment="问题标题")
     author_id = Column(String(50), nullable=True, comment="作者ID")
     author_name = Column(String(255), nullable=True, comment="作者名称")
+    author_avatar_url = Column(String(500), nullable=True, comment="作者头像URL")
+    author_headline = Column(String(500), nullable=True, comment="作者个性签名")
     author_url = Column(String(500), nullable=True, comment="作者主页URL")
 
     # 内容元数据
@@ -153,6 +157,7 @@ class Comment(Base):
     # 评论作者
     author_id = Column(String(50), nullable=True, comment="评论者ID")
     author_name = Column(String(255), nullable=True, comment="评论者名称")
+    author_avatar_url = Column(String(500), nullable=True, comment="评论者头像URL")
 
     # 内容
     content = Column(Text, nullable=False, comment="评论内容")
