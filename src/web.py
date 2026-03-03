@@ -88,11 +88,39 @@ app.mount(
 class ConfigUpdate(BaseModel):
     """配置更新请求模型."""
 
+    # 知乎设置
     user_id: str
     scan_interval: int = 60
     max_items_per_scan: int = 50
     save_comments: bool = True
+    max_comments: int = 100
+    sync_likes: bool = True
+    sync_created: bool = False
+    skip_video: bool = True
+    min_voteup: int = 0
+
+    # 浏览器设置
     headless: bool = True
+    browser_type: str = "chromium"
+    timeout: int = 30
+    request_delay: float = 2.0
+    proxy: str = ""
+    window_width: int = 1920
+    window_height: int = 1080
+    scroll_delay: int = 800
+    max_scroll_rounds: int = 20
+
+    # 存储设置
+    download_images: bool = True
+    download_avatars: bool = True
+    compress_html: bool = False
+    backup_enabled: bool = False
+    backup_interval_days: int = 7
+
+    # 日志设置
+    log_level: str = "INFO"
+    console_output: bool = True
+    log_sql: bool = False
 
 
 class CookieUpdate(BaseModel):
@@ -236,13 +264,38 @@ async def get_users():
 async def get_config():
     """获取当前配置"""
     return {
+        # 知乎设置
         "user_id": config.zhihu.user_id,
         "scan_interval": config.zhihu.scan_interval,
         "max_items_per_scan": config.zhihu.max_items_per_scan,
         "save_comments": config.zhihu.save_comments,
+        "max_comments": config.zhihu.max_comments,
+        "sync_likes": config.zhihu.sync_likes,
+        "sync_created": config.zhihu.sync_created,
+        "skip_video": config.zhihu.skip_video,
+        "min_voteup": config.zhihu.min_voteup,
+        # 浏览器设置
         "headless": config.browser.headless,
+        "browser_type": config.browser.browser_type,
+        "timeout": config.browser.timeout,
+        "request_delay": config.browser.request_delay,
+        "proxy": config.browser.proxy,
+        "window_width": config.browser.window_width,
+        "window_height": config.browser.window_height,
+        "scroll_delay": config.browser.scroll_delay,
+        "max_scroll_rounds": config.browser.max_scroll_rounds,
+        # 存储设置
         "html_path": config.storage.html_path,
         "db_path": config.storage.db_path,
+        "download_images": config.storage.download_images,
+        "download_avatars": config.storage.download_avatars,
+        "compress_html": config.storage.compress_html,
+        "backup_enabled": config.storage.backup_enabled,
+        "backup_interval_days": config.storage.backup_interval_days,
+        # 日志设置
+        "log_level": config.logging.level,
+        "console_output": config.logging.console_output,
+        "log_sql": config.logging.log_sql,
     }
 
 
@@ -263,16 +316,53 @@ async def update_config(config_update: ConfigUpdate):
         else:
             config_data = {}
 
-        # 更新配置
+        # 更新知乎配置
         config_data["zhihu"] = {
             "user_id": config_update.user_id,
             "scan_interval": config_update.scan_interval,
             "max_items_per_scan": config_update.max_items_per_scan,
             "save_comments": config_update.save_comments,
+            "max_comments": config_update.max_comments,
+            "sync_likes": config_update.sync_likes,
+            "sync_created": config_update.sync_created,
+            "skip_video": config_update.skip_video,
+            "min_voteup": config_update.min_voteup,
         }
+
+        # 更新浏览器配置
         config_data["browser"] = {
             "headless": config_update.headless,
+            "browser_type": config_update.browser_type,
+            "timeout": config_update.timeout,
+            "request_delay": config_update.request_delay,
+            "proxy": config_update.proxy,
+            "window_width": config_update.window_width,
+            "window_height": config_update.window_height,
+            "scroll_delay": config_update.scroll_delay,
+            "max_scroll_rounds": config_update.max_scroll_rounds,
         }
+
+        # 更新存储配置
+        config_data["storage"] = config_data.get("storage", {})
+        config_data["storage"].update(
+            {
+                "download_images": config_update.download_images,
+                "download_avatars": config_update.download_avatars,
+                "compress_html": config_update.compress_html,
+                "backup_enabled": config_update.backup_enabled,
+                "backup_interval_days": config_update.backup_interval_days,
+            }
+        )
+
+        # 更新日志配置
+        config_data["logging"] = config_data.get("logging", {})
+        config_data["logging"].update(
+            {
+                "level": config_update.log_level,
+                "console_output": config_update.console_output,
+                "log_sql": config_update.log_sql,
+            }
+        )
 
         # 保存
         config_path.parent.mkdir(parents=True, exist_ok=True)
