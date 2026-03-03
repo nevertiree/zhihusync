@@ -4,6 +4,12 @@ set -e
 # 创建数据目录
 mkdir -p /app/data/html /app/data/meta /app/data/static/images
 
+# 清空日志文件（重启后重新开始记录）
+if [ -f "/app/data/meta/zhihusync.log" ]; then
+    echo "📝 清空旧日志文件..."
+    > /app/data/meta/zhihusync.log
+fi
+
 echo "=============================================="
 echo "🚀 zhihusync 启动中..."
 echo "=============================================="
