@@ -479,6 +479,9 @@ async function loadUsers() {
 
         const container = document.getElementById('users-list');
 
+        // 更新监控用户数量（无论是否为空）
+        document.getElementById('stat-users').textContent = data.users.length;
+
         if (data.users.length === 0) {
             container.innerHTML = '<div class="empty-state">暂无监控用户</div>';
             return;
@@ -498,10 +501,9 @@ async function loadUsers() {
                 </div>
             </div>
         `).join('');
-
-        document.getElementById('stat-users').textContent = data.users.length;
     } catch (e) {
         console.error('加载用户列表失败:', e);
+        document.getElementById('stat-users').textContent = '0';
     }
 }
 
