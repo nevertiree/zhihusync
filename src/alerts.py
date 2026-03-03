@@ -158,29 +158,32 @@ class AlertManager:
 
             headers = {"Content-Type": "application/json", **(self._config.webhook_headers or {})}
 
-            async with aiohttp.ClientSession() as session:
-                async with session.post(
+            timeout = aiohttp.ClientTimeout(total=30)
+            async with (
+                aiohttp.ClientSession() as session,
+                session.post(
                     self._config.webhook_url,
                     json=payload,
                     headers=headers,
-                    timeout=aiohttp.ClientTimeout(total=30),
-                ) as resp:
-                    success = resp.status < 400
+                    timeout=timeout,
+                ) as resp,
+            ):
+                success = resp.status < 400
 
-                    # 记录历史
-                    self._record_history(
-                        alert_type=alert_type,
-                        title=title,
-                        message=message,
-                        channel="webhook",
-                        status="success" if success else "failed",
-                        error_info=None if success else f"HTTP {resp.status}",
-                    )
+                # 记录历史
+                self._record_history(
+                    alert_type=alert_type,
+                    title=title,
+                    message=message,
+                    channel="webhook",
+                    status="success" if success else "failed",
+                    error_info=None if success else f"HTTP {resp.status}",
+                )
 
-                    if success:
-                        logger.info(f"Webhook 告警发送成功: {title}")
-                    else:
-                        logger.warning(f"Webhook 告警发送失败: HTTP {resp.status}")
+                if success:
+                    logger.info(f"Webhook 告警发送成功: {title}")
+                else:
+                    logger.warning(f"Webhook 告警发送失败: HTTP {resp.status}")
 
         except Exception as e:
             logger.error(f"Webhook 告警发送异常: {e}")

@@ -796,15 +796,18 @@ body {{
                 return self._get_local_image_path(url)
 
             # 下载图片
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url, timeout=aiohttp.ClientTimeout(total=30)) as response:
-                    if response.status == 200:
-                        content = await response.read()
-                        async with aiofiles.open(local_path, "wb") as f:
-                            await f.write(content)
-                        self._downloaded_images.add(url)
-                        logger.debug(f"下载图片: {url} -> {local_path}")
-                        return self._get_local_image_path(url)
+            timeout = aiohttp.ClientTimeout(total=30)
+            async with (
+                aiohttp.ClientSession() as session,
+                session.get(url, timeout=timeout) as response,
+                aiofiles.open(local_path, "wb") as f,
+            ):
+                if response.status == 200:
+                    content = await response.read()
+                    await f.write(content)
+                    self._downloaded_images.add(url)
+                    logger.debug(f"下载图片: {url} -> {local_path}")
+                    return self._get_local_image_path(url)
         except Exception as e:
             logger.warning(f"下载图片失败 {url}: {e}")
 
@@ -841,16 +844,19 @@ body {{
                 return f"/data/static/images/{local_filename}"
 
             # 下载高清头像
-            async with aiohttp.ClientSession() as session:
-                async with session.get(hd_avatar_url, timeout=aiohttp.ClientTimeout(total=30)) as response:
-                    if response.status == 200:
-                        content = await response.read()
-                        # 检查下载的内容是否有效
-                        if len(content) < 1000:
-                            logger.warning(f"头像下载内容太小 ({len(content)} bytes): {hd_avatar_url}")
-                            return None
-                        async with aiofiles.open(local_path, "wb") as f:
-                            await f.write(content)
+            timeout = aiohttp.ClientTimeout(total=30)
+            async with (
+                aiohttp.ClientSession() as session,
+                session.get(hd_avatar_url, timeout=timeout) as response,
+            ):
+                if response.status == 200:
+                    content = await response.read()
+                    # 检查下载的内容是否有效
+                    if len(content) < 1000:
+                        logger.warning(f"头像下载内容太小 ({len(content)} bytes): {hd_avatar_url}")
+                        return None
+                    async with aiofiles.open(local_path, "wb") as f:
+                        await f.write(content)
                         logger.debug(f"下载头像: {user_id} -> {local_path} ({len(content)} bytes)")
                         return f"/data/static/images/{local_filename}"
         except Exception as e:
@@ -876,11 +882,7 @@ body {{
 
         # 检查内容哈希
         content_hash = self._generate_file_hash(content)
-        for match in matches:
-            if content_hash in match.name:
-                return True
-
-        return False
+        return any(content_hash in match.name for match in matches)
 
     def get_storage_stats(self) -> dict:
         """获取存储统计.
@@ -984,10 +986,7 @@ body {{
             avatar_text = (author_name[0] if author_name else "?").upper()
 
             # 头像HTML
-            if author_avatar:
-                avatar_html = f'<img src="{author_avatar}" alt="{author_name}">'
-            else:
-                avatar_html = avatar_text
+            avatar_html = f'<img src="{author_avatar}" alt="{author_name}">' if author_avatar else avatar_text
 
             item_html = f"""            <div class="comment-item">
                 <div class="comment-avatar">{avatar_html}</div>
