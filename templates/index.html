@@ -650,8 +650,12 @@ async function loadStats() {
     }
 }
 
-// 检查同步状态
+// 检查同步状态（防止重复调用）
+let isCheckingStatus = false;
 async function checkSyncStatus() {
+    if (isCheckingStatus) return;
+    isCheckingStatus = true;
+
     try {
         const res = await fetch('/api/sync/status');
         const data = await res.json();
@@ -663,16 +667,16 @@ async function checkSyncStatus() {
         const progressText = document.getElementById('sync-progress-text');
 
         if (data.status === 'running') {
-            syncCard.style.display = 'block';
-            syncBtn.disabled = true;
-            syncBtnText.textContent = '同步中...';
-            progressBar.style.width = data.progress + '%';
-            progressText.textContent = data.message;
+            if (syncCard) syncCard.style.display = 'block';
+            if (syncBtn) syncBtn.disabled = true;
+            if (syncBtnText) syncBtnText.textContent = '同步中...';
+            if (progressBar) progressBar.style.width = data.progress + '%';
+            if (progressText) progressText.textContent = data.message;
             updateSidebarStatus('running');
         } else {
-            syncCard.style.display = 'none';
-            syncBtn.disabled = false;
-            syncBtnText.textContent = '开始同步';
+            if (syncCard) syncCard.style.display = 'none';
+            if (syncBtn) syncBtn.disabled = false;
+            if (syncBtnText) syncBtnText.textContent = '立即同步';
             updateSidebarStatus(data.status);
 
             if (data.status === 'success' || data.status === 'failed') {
@@ -682,23 +686,32 @@ async function checkSyncStatus() {
         }
     } catch (e) {
         console.error('检查状态失败:', e);
+    } finally {
+        isCheckingStatus = false;
     }
 }
 
 // 开始同步（增量）
+let isStartingSync = false;
 async function startSync() {
+    if (isStartingSync) return;
+    isStartingSync = true;
+
     try {
         const res = await fetch('/api/sync/start', { method: 'POST' });
         const data = await res.json();
 
         if (res.ok) {
             showToast('同步任务已启动', 'success');
-            checkSyncStatus();
+            // 延迟检查状态，避免立即调用导致的递归
+            setTimeout(checkSyncStatus, 500);
         } else {
             showToast(data.detail || '启动失败', 'error');
         }
     } catch (e) {
         showToast('启动失败: ' + e.message, 'error');
+    } finally {
+        isStartingSync = false;
     }
 }
 
@@ -734,7 +747,8 @@ async function startFullSyncWithFeedback(btn) {
 
         if (res.ok) {
             showToast('全量同步已启动', 'success');
-            checkSyncStatus();
+            // 延迟检查状态，避免立即调用导致的递归
+            setTimeout(checkSyncStatus, 500);
         } else {
             showToast(data.detail || '启动失败', 'error');
             btn.innerHTML = originalText;
@@ -760,7 +774,8 @@ async function stopSync() {
     try {
         await fetch('/api/sync/stop', { method: 'POST' });
         showToast('同步已停止', 'info');
-        checkSyncStatus();
+        // 延迟检查状态，避免立即调用导致的递归
+        setTimeout(checkSyncStatus, 500);
     } catch (e) {
         showToast('停止失败: ' + e.message, 'error');
     }
