@@ -33,9 +33,9 @@ class ZhihuConfig(BaseModel):
 
     user_id: str = ""
     scan_interval: int = 60
-    max_items_per_scan: int = 50
+    max_items_per_scan: int = -1  # -1 表示无限制
     save_comments: bool = True
-    max_comments: int = 100
+    max_comments: int = -1  # -1 表示无限制
     sync_likes: bool = True  # 同步点赞
     sync_created: bool = False  # 同步创作
     skip_video: bool = True  # 跳过视频
