@@ -3,17 +3,16 @@
 import asyncio
 import json
 import re
+from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
-from typing import Callable, Dict, List, Optional
 
 from bs4 import BeautifulSoup
+from db import DatabaseManager
 from loguru import logger
 from playwright.async_api import Browser, BrowserContext, Page, async_playwright
-from tenacity import retry, stop_after_attempt, wait_exponential
-
-from db import DatabaseManager
 from storage import StorageManager
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 
 class ZhihuCrawler:
@@ -49,9 +48,9 @@ class ZhihuCrawler:
         self.request_delay = request_delay
         self.browser_type = browser_type  # auto, chromium, firefox, webkit, edge
 
-        self.browser: Optional[Browser] = None
-        self.context: Optional[BrowserContext] = None
-        self.page: Optional[Page] = None
+        self.browser: Browser | None = None
+        self.context: BrowserContext | None = None
+        self.page: Page | None = None
 
         # 统计
         self.new_items = 0
@@ -167,7 +166,7 @@ class ZhihuCrawler:
         cookie_file = self._get_cookie_file_path()
         if cookie_file.exists():
             try:
-                with open(cookie_file, "r", encoding="utf-8") as f:
+                with open(cookie_file, encoding="utf-8") as f:
                     storage_state = json.load(f)
                 logger.info("已加载保存的 Cookie")
             except Exception as e:
@@ -286,7 +285,7 @@ class ZhihuCrawler:
             await self._playwright.stop()
         logger.info("浏览器已关闭")
 
-    async def test_login(self) -> Dict:
+    async def test_login(self) -> dict:
         """测试 Cookie 是否有效 - 返回登录状态"""
         logger.info("测试登录状态...")
 
@@ -391,7 +390,7 @@ class ZhihuCrawler:
             logger.error("登录超时")
             return False
 
-    def _extract_json_from_page(self, text: str, pattern: str) -> Optional[dict]:
+    def _extract_json_from_page(self, text: str, pattern: str) -> dict | None:
         """从页面内容中提取 JSON 数据"""
         match = re.search(pattern, text)
         if match:
@@ -414,7 +413,7 @@ class ZhihuCrawler:
         await asyncio.sleep(self.request_delay)
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
-    async def fetch_likes(self, limit: int = 20, offset: int = 0) -> List[Dict]:
+    async def fetch_likes(self, limit: int = 20, offset: int = 0) -> list[dict]:
         """获取用户点赞列表 - 访问用户主页并解析活动数据"""
         # 访问用户主页
         url = f"{self.ZHIHU_BASE}/people/{self.user_id}"
@@ -469,7 +468,7 @@ class ZhihuCrawler:
 
         return []
 
-    def _parse_activities_from_html(self, html: str) -> List[Dict]:
+    def _parse_activities_from_html(self, html: str) -> list[dict]:
         """从 HTML 页面中解析活动数据"""
         activities = []
         soup = BeautifulSoup(html, "lxml")
@@ -608,7 +607,7 @@ class ZhihuCrawler:
         return activities
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
-    async def fetch_answer_detail(self, answer_id: str) -> Optional[Dict]:
+    async def fetch_answer_detail(self, answer_id: str) -> dict | None:
         """获取回答详情"""
         url = f"{self.API_BASE}/answers/{answer_id}"
         params = {"include": "content,voteup_count,comment_count,created_time,updated_time,author"}
@@ -631,7 +630,7 @@ class ZhihuCrawler:
         return None
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
-    async def fetch_answer_page(self, question_id: str, answer_id: str) -> Optional[str]:
+    async def fetch_answer_page(self, question_id: str, answer_id: str) -> str | None:
         """获取回答页面 HTML，包含完整内容和样式"""
         url = f"{self.ZHIHU_BASE}/question/{question_id}/answer/{answer_id}"
 
@@ -725,7 +724,7 @@ class ZhihuCrawler:
         return str(soup)
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
-    async def fetch_comments(self, answer_id: str, limit: int = 20) -> List[Dict]:
+    async def fetch_comments(self, answer_id: str, limit: int = 20) -> list[dict]:
         """获取评论"""
         url = f"{self.API_BASE}/answers/{answer_id}/root_comments"
         params = {"limit": limit, "offset": 0, "order": "normal", "status": "open"}
@@ -776,7 +775,7 @@ class ZhihuCrawler:
         """
         )
 
-    async def process_answer(self, activity: Dict, liked_time: datetime) -> bool:
+    async def process_answer(self, activity: dict, liked_time: datetime) -> bool:
         """处理单个回答"""
         try:
             target = activity.get("target", {})
@@ -925,9 +924,12 @@ class ZhihuCrawler:
         except Exception as e:
             logger.exception(f"处理评论失败: {e}")
 
-    async def scan_likes(self, max_items: int = 50, progress_callback: Optional[Callable] = None):
+    async def scan_likes(self, max_items: int = 50, progress_callback: Callable | None = None):
         """扫描用户点赞内容"""
         logger.info(f"开始扫描用户 {self.user_id} 的点赞内容...")
+
+        # 确保用户记录在数据库中存在
+        self.db.add_user(self.user_id, self.user_id)
 
         self.new_items = 0
         self.updated_items = 0
@@ -971,6 +973,11 @@ class ZhihuCrawler:
                 break
 
         logger.info(f"扫描完成: 新增 {self.new_items} 条, 更新 {self.updated_items} 条")
+
+        # 更新用户同步时间和次数
+        if self.new_items > 0 or self.updated_items > 0:
+            self.db.update_user_sync_time(self.user_id)
+
         return self.new_items, self.updated_items
 
     async def sync_all_comments(self):
