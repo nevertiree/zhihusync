@@ -105,9 +105,7 @@ show_error_codes = true
 ignore_missing_imports = true
 
 # 忽略特定的错误类型（逐步修复）
-[[tool.mypy.overrides]]
-module = ["src.crawler"]
-ignore_errors = true
+# 所有文件类型检查已启用
 
 [[tool.mypy.overrides]]
 module = ["src.storage"]
