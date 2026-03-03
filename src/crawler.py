@@ -533,15 +533,19 @@ class ZhihuCrawler:
             pass
 
         # 增量滚动：分批滚动并解析，避免长时间等待
-        logger.info(f"开始增量滚动，目标数量: {limit}...")
+        # 处理无限制情况（limit < 0）
+        no_limit = limit < 0
+        target_count = "无限制" if no_limit else limit
+        logger.info(f"开始增量滚动，目标数量: {target_count}...")
         all_activities: list[dict] = []
         last_count = 0
         no_new_content_count = 0
         max_no_new_content = 3
-        max_scroll_rounds = 20  # 最多滚动20轮，防止无限滚动
+        max_scroll_rounds = 50 if no_limit else 20  # 无限制时增加滚动轮数
         scroll_round = 0
 
-        while len(all_activities) < limit + offset and scroll_round < max_scroll_rounds:
+        # 循环条件：无限制时只检查滚动次数，有限制时检查目标数量
+        while (no_limit or len(all_activities) < limit + offset) and scroll_round < max_scroll_rounds:
             scroll_round += 1
             logger.debug(f"第 {scroll_round} 轮滚动...")
 
@@ -1411,7 +1415,8 @@ class ZhihuCrawler:
         no_limit = max_items < 0
 
         while no_limit or scanned < max_items:
-            batch_size = limit if no_limit else min(limit, max_items - scanned)
+            # 无限制时一次性获取更多，减少页面刷新次数
+            batch_size = 100 if no_limit else min(limit, max_items - scanned)
             activities = await self.fetch_likes(limit=batch_size, offset=offset)
 
             if not activities:
