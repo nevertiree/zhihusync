@@ -913,9 +913,15 @@ class ZhihuCrawler:
         if text:
             try:
                 raw_text = text.get_text()
+                logger.debug(f"评论 API 原始响应: {raw_text[:500]}...")
                 data = json.loads(raw_text)
                 comments = data.get("data", [])
                 logger.debug(f"评论 API 返回: {len(comments)} 条评论")
+                # 打印数据结构用于调试
+                if comments:
+                    logger.debug(
+                        f"第一条评论结构: {list(comments[0].keys()) if isinstance(comments[0], dict) else type(comments[0])}"
+                    )
                 return comments
             except json.JSONDecodeError as e:
                 logger.warning(f"解析评论 JSON 失败: {e}")
