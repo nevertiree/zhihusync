@@ -137,8 +137,99 @@ class StorageManager:
             filename = f"{safe_title}_{answer_id}.html"
         return self.html_path / filename
 
-    async def save_answer_html(self, answer_id: str, question_title: str, html_content: str) -> str:
+    async def save_answer(
+        self,
+        answer_id: str,
+        question_id: str,
+        question_title: str,
+        html_content: str,
+        page_metadata: dict = None,
+    ) -> str:
         """保存回答 HTML 内容.
+
+        处理 HTML 内容，添加元数据，下载图片，保存到文件。
+
+        Args:
+            answer_id: 回答ID.
+            question_id: 问题ID.
+            question_title: 问题标题.
+            html_content: HTML 内容.
+            page_metadata: 页面元数据字典.
+
+        Returns:
+            str: 保存的文件路径.
+        """
+        # 构建完整的 HTML 文档
+        full_html = self._build_full_html(
+            question_title=question_title,
+            content_html=html_content,
+            metadata=page_metadata,
+        )
+
+        # 处理 HTML 并下载图片
+        processed_html = await self._process_html(full_html, answer_id)
+
+        # 生成文件路径
+        filepath = self.get_answer_filepath(answer_id, question_title, html_content)
+
+        # 保存文件
+        async with aiofiles.open(filepath, "w", encoding="utf-8") as f:
+            await f.write(processed_html)
+
+        logger.info(f"保存 HTML: {filepath}")
+        return str(filepath)
+
+    def _build_full_html(
+        self, question_title: str, content_html: str, metadata: dict = None
+    ) -> str:
+        """构建完整的 HTML 文档.
+
+        Args:
+            question_title: 问题标题.
+            content_html: 内容 HTML.
+            metadata: 元数据字典.
+
+        Returns:
+            str: 完整的 HTML 文档.
+        """
+        meta_str = ""
+        if metadata:
+            for key, value in metadata.items():
+                meta_str += f'<meta name="{key}" content="{value}">\n'
+
+        return f"""<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{question_title} - 知乎备份</title>
+    {meta_str}
+    <style>
+        body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+            sans-serif; max-width: 800px; margin: 0 auto; padding: 20px;
+            line-height: 1.6; }}
+        h1 {{ color: #121212; font-size: 22px; margin-bottom: 16px; }}
+        .author-info {{ color: #646464; font-size: 14px; margin-bottom: 16px;
+            padding-bottom: 16px; border-bottom: 1px solid #e5e5e5; }}
+        .content {{ font-size: 16px; color: #121212; }}
+        .content img {{ max-width: 100%; height: auto; }}
+        .content p {{ margin: 0.8em 0; }}
+        .metadata {{ margin-top: 32px; padding-top: 16px;
+            border-top: 1px solid #e5e5e5; font-size: 12px; color: #999; }}
+    </style>
+</head>
+<body>
+    <article>
+        <h1>{question_title}</h1>
+        <div class="content">
+            {content_html}
+        </div>
+    </article>
+</body>
+</html>"""
+
+    async def save_answer_html(self, answer_id: str, question_title: str, html_content: str) -> str:
+        """保存回答 HTML 内容 (简化版).
 
         处理 HTML 内容，下载图片，保存到文件。
 
@@ -150,18 +241,13 @@ class StorageManager:
         Returns:
             str: 保存的文件路径.
         """
-        # 处理 HTML 并下载图片
-        processed_html = await self._process_html(html_content, answer_id)
-
-        # 生成文件路径
-        filepath = self.get_answer_filepath(answer_id, question_title, html_content)
-
-        # 保存文件
-        async with aiofiles.open(filepath, "w", encoding="utf-8") as f:
-            await f.write(processed_html)
-
-        logger.debug(f"保存 HTML: {filepath}")
-        return str(filepath)
+        return await self.save_answer(
+            answer_id=answer_id,
+            question_id="",
+            question_title=question_title,
+            html_content=html_content,
+            page_metadata=None,
+        )
 
     async def _process_html(self, html_content: str, answer_id: str) -> str:
         """处理 HTML 内容.
