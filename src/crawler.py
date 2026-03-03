@@ -701,10 +701,31 @@ class ZhihuCrawler:
                 author_headline = ""
 
                 if author_info:
-                    name_elem = author_info.find("a", class_="UserLink-link")
+                    # 尝试多种选择器获取用户名
+                    name_selectors = [
+                        "a.UserLink-link",
+                        ".AuthorInfo-name",
+                        "[data-za-detail-view-element_name='UserName']",
+                    ]
+                    for selector in name_selectors:
+                        name_elem = author_info.select_one(selector)
+                        if name_elem and name_elem.get_text(strip=True):
+                            author_name = name_elem.get_text(strip=True)
+                            break
+
+                    # 获取用户ID
+                    name_elem = author_info.select_one("a.UserLink-link")
                     if name_elem:
-                        author_name = name_elem.get_text(strip=True)
-                        author_id = name_elem.get("href", "").replace("/people/", "")
+                        href = name_elem.get("href", "")
+                        # 提取用户ID，处理多种格式
+                        if "/people/" in href:
+                            author_id = href.split("/people/")[-1].split("?")[0].strip("/")
+                        elif href.startswith("//"):
+                            # 格式: //www.zhihu.com/people/xxx
+                            author_id = href.split("/")[-1].split("?")[0]
+                        else:
+                            author_id = href.strip("/")
+
                     # 获取作者签名
                     badge = author_info.find("div", class_="AuthorInfo-badgeText")
                     if badge:
@@ -1074,9 +1095,10 @@ class ZhihuCrawler:
                     separator="\n", strip=True
                 )
 
-            # 提取作者详细信息（头像、签名）
+            # 提取作者详细信息（头像、名称、签名）
             author_avatar_url = None
             author_headline = None
+            author_name_from_page = None
 
             # 从页面提取作者信息
             author_info_elem = soup.select_one(".AuthorInfo")
@@ -1085,6 +1107,14 @@ class ZhihuCrawler:
                 avatar_img = author_info_elem.select_one(".Avatar img, .UserAvatar img")
                 if avatar_img and avatar_img.get("src"):
                     author_avatar_url = avatar_img.get("src")
+                    logger.debug(f"从页面提取到作者头像: {author_avatar_url[:80]}...")
+
+                # 提取作者名（如果API中没有）
+                if not author_name:
+                    name_elem = author_info_elem.select_one("a.UserLink-link, .AuthorInfo-name")
+                    if name_elem:
+                        author_name_from_page = name_elem.get_text(strip=True)
+                        logger.debug(f"从页面提取到作者名: {author_name_from_page}")
 
                 # 提取签名
                 headline_elem = author_info_elem.select_one(
@@ -1093,7 +1123,11 @@ class ZhihuCrawler:
                 if headline_elem:
                     author_headline = headline_elem.get_text(strip=True)
 
-            # 如果从页面没提取到，使用 API 数据中的
+            # 使用页面提取的作者名
+            if author_name_from_page and not author_name:
+                author_name = author_name_from_page
+
+            # 如果从页面没提取到签名，使用 API 数据中的
             if not author_headline:
                 author_headline = author.get("headline", "")
 
