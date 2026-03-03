@@ -109,7 +109,6 @@ ignore_missing_imports = true
 module = [
     "src.crawler",
     "src.image_generator",
-    "src.alerts",
 ]
 ignore_errors = true
 
