@@ -1,0 +1,38 @@
+# 开发构建配置 - 一次性构建（不依赖基础镜像）
+# 适用于：
+# 1. 首次尝试，不想构建基础镜像
+# 2. CI/CD 环境
+# 3. 需要简化构建流程的场景
+#
+# 注意：此方式每次构建都会重新下载浏览器，耗时较长（5-10分钟）
+
+version: '3.8'
+
+services:
+  zhihusync:
+    build:
+      context: .
+      dockerfile: Dockerfile.full  # 使用完整构建的 Dockerfile
+    image: zhihusync:latest
+    container_name: zhihusync
+    restart: unless-stopped
+
+    ports:
+      - "6067:6067"
+
+    volumes:
+      - ./data/html:/app/data/html
+      - ./data/meta:/app/data/meta
+      - ./data/static:/app/data/static
+      - ./config:/app/config
+
+    environment:
+      - PLAYWRIGHT_BROWSER=${PLAYWRIGHT_BROWSER:-auto}
+      - ZHIHUSYNC_ZHIHU_USER_ID=${ZHIHU_USER_ID:-}
+      - PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G

@@ -1,0 +1,68 @@
+version: '3.8'
+
+services:
+  zhihusync:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: zhihusync:latest
+    container_name: zhihusync
+    restart: unless-stopped
+
+    ports:
+      # Web 管理界面 (主机6067映射到容器6067)
+      - "6067:6067"
+
+    volumes:
+      # 数据持久化
+      - ./data/html:/app/data/html
+      - ./data/meta:/app/data/meta
+      - ./data/static:/app/data/static
+      # 配置文件（可选，首次启动会自动创建）
+      - ./config:/app/config
+
+    environment:
+      # 浏览器类型: auto(自动检测), chromium, firefox
+      # 镜像已打包 chromium 和 firefox，开箱即用
+      - PLAYWRIGHT_BROWSER=${PLAYWRIGHT_BROWSER:-auto}
+
+      # 知乎配置（推荐在 Web 界面配置，也可通过环境变量预设）
+      - ZHIHUSYNC_ZHIHU_USER_ID=${ZHIHU_USER_ID:-}
+      - ZHIHUSYNC_ZHIHU_SCAN_INTERVAL=${SCAN_INTERVAL:-60}
+      - ZHIHUSYNC_BROWSER_HEADLESS=${HEADLESS:-true}
+      - ZHIHUSYNC_LOGGING_LEVEL=${LOG_LEVEL:-INFO}
+
+      # 禁用运行时浏览器下载（已打包在基础镜像中）
+      - PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    # NAS 资源限制（可根据需要调整）
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+  # 可选: Nginx 用于直接浏览 HTML 备份文件
+  nginx:
+    image: nginx:alpine
+    container_name: zhihusync-web
+    restart: unless-stopped
+    ports:
+      - "6068:80"
+    volumes:
+      - ./data/html:/usr/share/nginx/html/answers:ro
+      - ./data/static:/usr/share/nginx/html/static:ro
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - zhihusync
+    profiles:
+      - nginx
