@@ -1,0 +1,51 @@
+# Pre-commit hooks for zhihusync
+# Install: pip install pre-commit
+# Setup: pre-commit install
+
+repos:
+  # General file checks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: ^(data/|logs/|test/)
+      - id: end-of-file-fixer
+        exclude: ^(data/|logs/|test/)
+      - id: check-yaml
+      - id: check-added-large-files
+        args: ['--maxkb=1000']
+      - id: check-merge-conflict
+      - id: check-case-conflict
+      - id: detect-private-key
+
+  # Python code formatting - only src/
+  - repo: https://github.com/psf/black
+    rev: 23.12.1
+    hooks:
+      - id: black
+        language_version: python3
+        args: ['--line-length=100']
+        files: ^src/.*\.py$
+
+  # Python docstring style check - only src/
+  - repo: https://github.com/pycqa/pydocstyle
+    rev: 6.3.0
+    hooks:
+      - id: pydocstyle
+        args: ['--convention=google', '--add-ignore=D415,D200,D212']
+        files: ^src/.*\.py$
+
+  # Flake8 linting - only src/
+  - repo: https://github.com/pycqa/flake8
+    rev: 7.0.0
+    hooks:
+      - id: flake8
+        additional_dependencies:
+          - flake8-docstrings>=1.7.0
+        args: [
+          '--max-line-length=100',
+          '--extend-ignore=E203,W503,Q000,I100,I101,I201,I202,E402',
+          '--docstring-convention=google',
+          '--ignore=D100,D104,D415',
+        ]
+        files: ^src/.*\.py$

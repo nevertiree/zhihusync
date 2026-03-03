@@ -1,0 +1,542 @@
+{% extends "base.html" %}
+
+{% block title %}配置 - zhihusync{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>⚙️ 配置管理</h2>
+</div>
+
+<!-- 配置指南 -->
+<div class="card card-info">
+    <div class="card-header">
+        <h3>📖 配置指南</h3>
+    </div>
+    <div class="card-body">
+        <div class="guide-section">
+            <h4>🔑 第一步：配置 Cookie（必需）</h4>
+            <p>知乎需要登录后才能访问点赞内容，请按以下步骤获取 Cookie：</p>
+            <ol class="guide-steps">
+                <li>在电脑浏览器中打开 <a href="https://www.zhihu.com" target="_blank">zhihu.com</a> 并登录</li>
+                <li>按 <kbd>F12</kbd> 打开开发者工具</li>
+                <li>切换到 <strong>Application/应用</strong> 标签</li>
+                <li>在左侧选择 <strong>Cookies</strong> → <code>https://www.zhihu.com</code></li>
+                <li>复制所有 Cookie 内容（或使用 EditThisCookie 插件导出 JSON）</li>
+                <li>将内容粘贴到下方的 Cookie 输入框中</li>
+            </ol>
+            <div class="guide-tip">
+                <strong>💡 提示：</strong>Cookie 会定期过期，如果同步失败，请重新获取并更新。
+            </div>
+        </div>
+
+        <div class="guide-section">
+            <h4>👤 第二步：设置用户 ID（必需）</h4>
+            <p>用户 ID 用于识别要备份哪个账号的点赞内容：</p>
+            <ol class="guide-steps">
+                <li>访问你的知乎个人主页</li>
+                <li>从 URL 中提取用户 ID<br>
+                    例如：<code>https://www.zhihu.com/people/<strong>zhang-san-123</strong></code><br>
+                    用户 ID 就是 <code>zhang-san-123</code></li>
+                <li>将用户 ID 填入下方输入框</li>
+            </ol>
+        </div>
+
+        <div class="guide-section">
+            <h4>⚙️ 第三步：高级设置（可选）</h4>
+            <ul>
+                <li><strong>扫描间隔</strong>：自动同步的时间间隔（分钟），建议 30-120 分钟</li>
+                <li><strong>最大条目数</strong>：每次同步最多获取多少条新内容</li>
+                <li><strong>保存评论</strong>：是否同时备份评论内容</li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<!-- Cookie 配置 -->
+<div class="card">
+    <div class="card-header">
+        <h3>🍪 Cookie 配置</h3>
+        <span class="badge" id="cookie-status-badge">检查中...</span>
+    </div>
+    <div class="card-body">
+        <div class="form-group">
+            <label class="form-label">
+                知乎 Cookie
+                <span class="tooltip" title="从浏览器开发者工具中复制 Cookie">ℹ️</span>
+            </label>
+            <textarea class="form-textarea" id="cookie-input" rows="6"
+                placeholder="粘贴从浏览器获取的 Cookie JSON..."></textarea>
+            <div class="form-help">
+                <details>
+                    <summary>📋 如何获取 Cookie？（点击查看详细步骤）</summary>
+                    <div class="help-details">
+                        <h5>方法一：手动复制（推荐）</h5>
+                        <ol>
+                            <li>在浏览器中登录知乎</li>
+                            <li>按 F12 打开开发者工具</li>
+                            <li>切换到 Application/应用 标签</li>
+                            <li>选择 Cookies → https://www.zhihu.com</li>
+                            <li>右键点击表格 → Copy all / 复制全部</li>
+                        </ol>
+
+                        <h5>方法二：使用 EditThisCookie 插件</h5>
+                        <ol>
+                            <li>安装 EditThisCookie 浏览器扩展</li>
+                            <li>登录知乎后，点击扩展图标</li>
+                            <li>选择 "Export" → "Export as JSON"</li>
+                            <li>复制导出的 JSON 内容</li>
+                        </ol>
+
+                        <h5>方法三：使用控制台命令</h5>
+                        <pre><code>// 在 Console 标签页执行
+JSON.stringify(document.cookie.split(';').map(c => {
+  const [n, ...v] = c.trim().split('=');
+  return {name: n, value: v.join('='), domain: '.zhihu.com'};
+}))</code></pre>
+                    </div>
+                </details>
+            </div>
+        </div>
+        <div class="form-actions">
+            <button class="btn btn-primary" onclick="saveCookie()">保存 Cookie</button>
+            <button class="btn btn-secondary" onclick="checkCookieStatus()">检查状态</button>
+            <button class="btn btn-info" onclick="testCookie()" id="test-cookie-btn">🧪 测试登录</button>
+        </div>
+        <div id="cookie-test-result" class="cookie-test-result" style="display: none;"></div>
+    </div>
+</div>
+
+<!-- 基本配置 -->
+<div class="card">
+    <div class="card-header">
+        <h3>🔧 基本设置</h3>
+    </div>
+    <div class="card-body">
+        <form id="config-form">
+            <div class="form-row">
+                <div class="form-col">
+                    <div class="form-group">
+                        <label class="form-label">知乎用户 ID <span class="required">*</span></label>
+                        <input type="text" class="form-input" id="user-id"
+                            placeholder="例如: zhang-san-123">
+                        <div class="form-help">
+                            从你的知乎个人主页 URL 获取，例如：<br>
+                            https://www.zhihu.com/people/<strong>zhang-san-123</strong>
+                        </div>
+                    </div>
+                </div>
+                <div class="form-col">
+                    <div class="form-group">
+                        <label class="form-label">扫描间隔 (分钟)</label>
+                        <input type="number" class="form-input" id="scan-interval"
+                            value="60" min="5" max="1440">
+                        <div class="form-help">建议 30-120 分钟，避免请求过于频繁</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-col">
+                    <div class="form-group">
+                        <label class="form-label">每次扫描最大条目</label>
+                        <input type="number" class="form-input" id="max-items"
+                            value="50" min="10" max="500">
+                    </div>
+                </div>
+                <div class="form-col">
+                    <div class="form-group">
+                        <label class="form-label">是否保存评论</label>
+                        <select class="form-select" id="save-comments">
+                            <option value="true">是</option>
+                            <option value="false">否</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">无头模式</label>
+                <select class="form-select" id="headless">
+                    <option value="true">是 (后台运行，推荐)</option>
+                    <option value="false">否 (显示浏览器窗口)</option>
+                </select>
+                <div class="form-help">调试时可关闭无头模式查看浏览器操作</div>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">保存配置</button>
+                <button type="button" class="btn btn-secondary" onclick="loadConfig()">重置</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- 存储路径 (只读) -->
+<div class="card">
+    <div class="card-header">
+        <h3>📁 存储路径</h3>
+    </div>
+    <div class="card-body">
+        <div class="form-row">
+            <div class="form-col">
+                <div class="form-group">
+                    <label class="form-label">HTML 存储路径</label>
+                    <input type="text" class="form-input" id="html-path" readonly>
+                </div>
+            </div>
+            <div class="form-col">
+                <div class="form-group">
+                    <label class="form-label">数据库路径</label>
+                    <input type="text" class="form-input" id="db-path" readonly>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 常见问题 -->
+<div class="card card-info">
+    <div class="card-header">
+        <h3>❓ 常见问题</h3>
+    </div>
+    <div class="card-body">
+        <details class="faq-item">
+            <summary>Cookie 有效期多久？</summary>
+            <p>知乎 Cookie 通常有效期为 1-3 个月，过期后需要重新配置。如果同步失败且日志显示登录失效，请重新获取 Cookie。</p>
+        </details>
+        <details class="faq-item">
+            <summary>如何找到自己的用户 ID？</summary>
+            <p>登录知乎后，点击右上角头像 → 我的主页，地址栏中的 URL 格式为 <code>https://www.zhihu.com/people/xxx</code>，其中的 <code>xxx</code> 就是你的用户 ID。</p>
+        </details>
+        <details class="faq-item">
+            <summary>同步失败怎么办？</summary>
+            <p>1. 检查 Cookie 是否有效<br>2. 检查用户 ID 是否正确<br>3. 查看日志页面的错误信息<br>4. 尝试增加请求间隔时间</p>
+        </details>
+        <details class="faq-item">
+            <summary>备份的数据在哪里？</summary>
+            <p>备份的 HTML 文件保存在 <code>data/html</code> 目录下，数据库文件在 <code>data/meta/zhihusync.db</code>。</p>
+        </details>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+.guide-section {
+    margin-bottom: 24px;
+    padding-bottom: 24px;
+    border-bottom: 1px solid var(--border-color);
+}
+.guide-section:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+    padding-bottom: 0;
+}
+.guide-section h4 {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 12px;
+    color: var(--primary);
+}
+.guide-steps {
+    margin: 12px 0;
+    padding-left: 20px;
+}
+.guide-steps li {
+    margin: 8px 0;
+    line-height: 1.6;
+}
+.guide-steps code {
+    background: rgba(0,0,0,0.05);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: monospace;
+}
+.guide-tip {
+    background: rgba(0, 102, 255, 0.05);
+    border-left: 3px solid var(--primary);
+    padding: 12px 16px;
+    margin-top: 16px;
+    border-radius: 0 8px 8px 0;
+}
+.help-details {
+    background: #f8f9fa;
+    padding: 16px;
+    border-radius: 8px;
+    margin-top: 12px;
+}
+.help-details h5 {
+    font-weight: 600;
+    margin: 16px 0 8px;
+    color: var(--text-primary);
+}
+.help-details h5:first-child {
+    margin-top: 0;
+}
+.help-details pre {
+    background: #1a1a2e;
+    color: #e0e0e0;
+    padding: 12px;
+    border-radius: 8px;
+    overflow-x: auto;
+    font-size: 12px;
+}
+.help-details ol {
+    margin: 8px 0;
+    padding-left: 20px;
+}
+.help-details li {
+    margin: 4px 0;
+}
+kbd {
+    background: #f4f4f5;
+    border: 1px solid #d4d4d8;
+    border-radius: 4px;
+    padding: 2px 6px;
+    font-family: monospace;
+    font-size: 13px;
+}
+.faq-item {
+    margin: 12px 0;
+    padding: 16px;
+    background: rgba(0,0,0,0.02);
+    border-radius: 8px;
+}
+.faq-item summary {
+    font-weight: 500;
+    cursor: pointer;
+}
+.faq-item p {
+    margin-top: 12px;
+    color: var(--text-secondary);
+    line-height: 1.6;
+}
+.faq-item code {
+    background: rgba(0,0,0,0.05);
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+.cookie-test-result {
+    margin-top: 16px;
+    padding: 16px;
+    border-radius: 8px;
+    font-size: 14px;
+    line-height: 1.6;
+}
+.cookie-test-result.success {
+    background: rgba(34, 197, 94, 0.1);
+    border: 1px solid rgba(34, 197, 94, 0.3);
+    color: #166534;
+}
+.cookie-test-result.error {
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    color: #991b1b;
+}
+.cookie-test-result.loading {
+    background: rgba(59, 130, 246, 0.1);
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    color: #1e40af;
+}
+.cookie-test-result h4 {
+    margin: 0 0 8px 0;
+    font-size: 14px;
+    font-weight: 600;
+}
+.cookie-test-result p {
+    margin: 4px 0;
+}
+.cookie-test-result .user-info {
+    margin-top: 8px;
+    padding: 8px;
+    background: rgba(255,255,255,0.5);
+    border-radius: 4px;
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    loadConfig();
+    checkCookieStatus();
+});
+
+// 加载配置
+async function loadConfig() {
+    try {
+        const res = await fetch('/api/config');
+        const data = await res.json();
+
+        document.getElementById('user-id').value = data.user_id || '';
+        document.getElementById('scan-interval').value = data.scan_interval || 60;
+        document.getElementById('max-items').value = data.max_items_per_scan || 50;
+        document.getElementById('save-comments').value = String(data.save_comments !== false);
+        document.getElementById('headless').value = String(data.headless !== false);
+        document.getElementById('html-path').value = data.html_path || '';
+        document.getElementById('db-path').value = data.db_path || '';
+    } catch (e) {
+        showToast('加载配置失败: ' + e.message, 'error');
+    }
+}
+
+// 保存配置
+document.getElementById('config-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+
+    const config = {
+        user_id: document.getElementById('user-id').value.trim(),
+        scan_interval: parseInt(document.getElementById('scan-interval').value),
+        max_items_per_scan: parseInt(document.getElementById('max-items').value),
+        save_comments: document.getElementById('save-comments').value === 'true',
+        headless: document.getElementById('headless').value === 'true'
+    };
+
+    if (!config.user_id) {
+        showToast('请填写用户 ID', 'error');
+        return;
+    }
+
+    try {
+        const res = await fetch('/api/config', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(config)
+        });
+
+        if (res.ok) {
+            showToast('配置已保存', 'success');
+        } else {
+            const data = await res.json();
+            showToast(data.detail || '保存失败', 'error');
+        }
+    } catch (e) {
+        showToast('保存失败: ' + e.message, 'error');
+    }
+});
+
+// 检查 Cookie 状态
+async function checkCookieStatus() {
+    const badge = document.getElementById('cookie-status-badge');
+    try {
+        const res = await fetch('/api/cookies/check');
+        const data = await res.json();
+
+        if (data.exists && data.valid) {
+            badge.textContent = '✅ 已配置';
+            badge.className = 'badge badge-success';
+        } else if (data.exists) {
+            badge.textContent = '⚠️ 可能无效';
+            badge.className = 'badge badge-warning';
+        } else {
+            badge.textContent = '❌ 未配置';
+            badge.className = 'badge badge-danger';
+        }
+    } catch (e) {
+        badge.textContent = '❓ 未知';
+        badge.className = 'badge badge-secondary';
+    }
+}
+
+// 测试 Cookie 有效性
+async function testCookie() {
+    const btn = document.getElementById('test-cookie-btn');
+    const resultDiv = document.getElementById('cookie-test-result');
+
+    // 设置加载状态
+    btn.disabled = true;
+    btn.textContent = '⏳ 测试中...';
+    resultDiv.style.display = 'block';
+    resultDiv.className = 'cookie-test-result loading';
+    resultDiv.innerHTML = '<h4>🔄 正在测试登录状态...</h4><p>正在启动浏览器并访问知乎，请稍候...</p>';
+
+    try {
+        const res = await fetch('/api/cookies/test', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'}
+        });
+
+        const data = await res.json();
+
+        if (res.ok && data.is_logged_in) {
+            resultDiv.className = 'cookie-test-result success';
+            resultDiv.innerHTML = `
+                <h4>✅ 登录有效</h4>
+                <p>${data.message}</p>
+                ${data.user_name ? `
+                <div class="user-info">
+                    <strong>用户名:</strong> ${data.user_name}<br>
+                    ${data.user_id ? `<strong>用户ID:</strong> ${data.user_id}` : ''}
+                </div>
+                ` : ''}
+            `;
+        } else {
+            resultDiv.className = 'cookie-test-result error';
+            resultDiv.innerHTML = `
+                <h4>❌ ${data.is_logged_in !== undefined ? '登录失效' : '测试失败'}</h4>
+                <p>${data.message || '未知错误'}</p>
+                ${data.current_url ? `<p><strong>当前页面:</strong> ${data.current_url}</p>` : ''}
+                <p style="margin-top: 8px; font-size: 13px;">💡 提示：请重新获取 Cookie 并确保在浏览器中已登录知乎</p>
+            `;
+        }
+    } catch (e) {
+        resultDiv.className = 'cookie-test-result error';
+        resultDiv.innerHTML = `<h4>❌ 测试出错</h4><p>${e.message}</p>`;
+    } finally {
+        btn.disabled = false;
+        btn.textContent = '🧪 测试登录';
+    }
+}
+
+// 保存 Cookie
+async function saveCookie() {
+    const input = document.getElementById('cookie-input').value.trim();
+
+    if (!input) {
+        showToast('请输入 Cookie', 'error');
+        return;
+    }
+
+    try {
+        // 尝试解析 JSON
+        let cookieData;
+        try {
+            cookieData = JSON.parse(input);
+        } catch (e) {
+            // 如果不是 JSON，尝试构造 storage state 格式
+            cookieData = {
+                cookies: input.split(';').map(c => {
+                    const [name, ...value] = c.trim().split('=');
+                    return {
+                        name: name.trim(),
+                        value: value.join('=').trim(),
+                        domain: '.zhihu.com',
+                        path: '/'
+                    };
+                }).filter(c => c.name)
+            };
+        }
+
+        // 确保格式正确
+        if (Array.isArray(cookieData)) {
+            cookieData = {cookies: cookieData};
+        }
+
+        const res = await fetch('/api/cookies', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({cookies: JSON.stringify(cookieData)})
+        });
+
+        if (res.ok) {
+            showToast('Cookie 已保存', 'success');
+            checkCookieStatus();
+            document.getElementById('cookie-input').value = '';
+        } else {
+            const data = await res.json();
+            showToast(data.detail || '保存失败', 'error');
+        }
+    } catch (e) {
+        showToast('保存失败: ' + e.message, 'error');
+    }
+}
+</script>
+{% endblock %}

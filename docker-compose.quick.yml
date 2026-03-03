@@ -1,0 +1,33 @@
+# 快速启动配置 - 使用官方 Playwright 镜像作为基础
+# 无需本地构建基础镜像，下载即用
+
+version: '3.8'
+
+services:
+  zhihusync:
+    build:
+      context: .
+      dockerfile: Dockerfile.quick
+    image: zhihusync:latest
+    container_name: zhihusync
+    restart: unless-stopped
+
+    ports:
+      - "6067:6067"
+
+    volumes:
+      - ./data/html:/app/data/html
+      - ./data/meta:/app/data/meta
+      - ./data/static:/app/data/static
+      - ./config:/app/config
+      - ./src:/app/src  # 开发模式：代码变更实时生效
+      - ./templates:/app/templates
+      - ./static:/app/static
+
+    environment:
+      - PLAYWRIGHT_BROWSER=chromium
+      - ZHIHUSYNC_ZHIHU_USER_ID=${ZHIHU_USER_ID:-mo-ri-jing-tan-zhu-jie-chong}
+      - ZHIHUSYNC_LOGGING_LEVEL=DEBUG
+      - PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+
+    command: python -m src.app --mode both

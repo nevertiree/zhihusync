@@ -1,0 +1,241 @@
+{% extends "base.html" %}
+
+{% block title %}日志 - zhihusync{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>📋 系统日志</h2>
+    <div class="header-actions">
+        <button class="btn btn-secondary" onclick="loadLogs()">🔄 刷新</button>
+        <button class="btn btn-secondary" onclick="toggleAutoRefresh()" id="auto-refresh-btn">
+            ⏸️ 暂停刷新
+        </button>
+    </div>
+</div>
+
+<!-- 实时日志 -->
+<div class="card">
+    <div class="card-header">
+        <h3>实时日志</h3>
+        <select class="form-select form-select-sm" id="log-lines" onchange="loadLogs()" style="width: auto;">
+            <option value="50">最近 50 行</option>
+            <option value="100" selected>最近 100 行</option>
+            <option value="200">最近 200 行</option>
+            <option value="500">最近 500 行</option>
+        </select>
+    </div>
+    <div class="card-body">
+        <div class="log-container" id="log-container">
+            <div class="log-empty">加载中...</div>
+        </div>
+    </div>
+</div>
+
+<!-- 同步历史详情 -->
+<div class="card">
+    <div class="card-header">
+        <h3>同步历史详情</h3>
+    </div>
+    <div class="card-body">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>开始时间</th>
+                    <th>结束时间</th>
+                    <th>状态</th>
+                    <th>扫描</th>
+                    <th>新增</th>
+                    <th>更新</th>
+                    <th>错误信息</th>
+                </tr>
+            </thead>
+            <tbody id="history-body">
+                <tr>
+                    <td colspan="8" class="text-center text-muted">加载中...</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="pagination" id="history-pagination"></div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let autoRefresh = true;
+let refreshInterval;
+let historyPage = 1;
+
+// 加载日志
+async function loadLogs() {
+    try {
+        const lines = document.getElementById('log-lines').value;
+        const res = await fetch(`/api/logs?lines=${lines}`);
+        const data = await res.json();
+
+        const container = document.getElementById('log-container');
+
+        if (!data.logs || data.logs.length === 0) {
+            container.innerHTML = '<div class="log-empty">暂无日志</div>';
+            return;
+        }
+
+        const wasAtBottom = container.scrollTop + container.clientHeight >= container.scrollHeight - 10;
+
+        container.innerHTML = data.logs.map(line => {
+            // 根据日志级别添加颜色
+            let className = 'log-line';
+            if (line.includes('ERROR') || line.includes('失败')) {
+                className += ' log-error';
+            } else if (line.includes('WARNING')) {
+                className += ' log-warning';
+            } else if (line.includes('SUCCESS') || line.includes('成功')) {
+                className += ' log-success';
+            }
+
+            return `<div class="${className}">${escapeHtml(line)}</div>`;
+        }).join('');
+
+        // 保持在底部
+        if (wasAtBottom || container.scrollTop === 0) {
+            container.scrollTop = container.scrollHeight;
+        }
+    } catch (e) {
+        document.getElementById('log-container').innerHTML =
+            `<div class="log-empty text-danger">加载失败: ${e.message}</div>`;
+    }
+}
+
+// 加载同步历史
+async function loadHistory(page = 1) {
+    historyPage = page;
+
+    try {
+        const res = await fetch(`/api/sync/history?page=${page}&page_size=10`);
+        const data = await res.json();
+
+        const tbody = document.getElementById('history-body');
+
+        if (data.items.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted">暂无记录</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = data.items.map(log => {
+            const statusClass = {
+                'success': 'badge-success',
+                'failed': 'badge-danger',
+                'running': 'badge-warning'
+            }[log.status] || 'badge-secondary';
+
+            const statusText = {
+                'success': '成功',
+                'failed': '失败',
+                'running': '进行中'
+            }[log.status] || log.status;
+
+            return `
+                <tr>
+                    <td>${log.id}</td>
+                    <td>${log.started_at ? new Date(log.started_at).toLocaleString() : '-'}</td>
+                    <td>${log.ended_at ? new Date(log.ended_at).toLocaleString() : '-'}</td>
+                    <td><span class="badge ${statusClass}">${statusText}</span></td>
+                    <td>${log.items_scanned || 0}</td>
+                    <td>${log.items_new || 0}</td>
+                    <td>${log.items_updated || 0}</td>
+                    <td class="text-muted" title="${escapeHtml(log.error_message || '')}">
+                        ${log.error_message ? escapeHtml(log.error_message.substring(0, 50)) + '...' : '-'}
+                    </td>
+                </tr>
+            `;
+        }).join('');
+
+        // 分页
+        const totalPages = Math.ceil(data.total / data.page_size);
+        renderHistoryPagination(totalPages);
+    } catch (e) {
+        document.getElementById('history-body').innerHTML =
+            `<tr><td colspan="8" class="text-center text-danger">加载失败: ${e.message}</td></tr>`;
+    }
+}
+
+// 渲染分页
+function renderHistoryPagination(totalPages) {
+    const container = document.getElementById('history-pagination');
+
+    if (totalPages <= 1) {
+        container.innerHTML = '';
+        return;
+    }
+
+    let html = '';
+
+    html += `<button class="btn btn-sm ${historyPage === 1 ? 'disabled' : ''}"
+        ${historyPage === 1 ? '' : `onclick="loadHistory(${historyPage - 1})"`}>上一页</button>`;
+
+    for (let i = 1; i <= totalPages; i++) {
+        if (i === 1 || i === totalPages || (i >= historyPage - 2 && i <= historyPage + 2)) {
+            html += `<button class="btn btn-sm ${i === historyPage ? 'active' : ''}"
+                onclick="loadHistory(${i})">${i}</button>`;
+        } else if (i === historyPage - 3 || i === historyPage + 3) {
+            html += `<span class="pagination-ellipsis">...</span>`;
+        }
+    }
+
+    html += `<button class="btn btn-sm ${historyPage === totalPages ? 'disabled' : ''}"
+        ${historyPage === totalPages ? '' : `onclick="loadHistory(${historyPage + 1})"`}>下一页</button>`;
+
+    container.innerHTML = html;
+}
+
+// 切换自动刷新
+function toggleAutoRefresh() {
+    autoRefresh = !autoRefresh;
+    const btn = document.getElementById('auto-refresh-btn');
+
+    if (autoRefresh) {
+        btn.innerHTML = '⏸️ 暂停刷新';
+        startAutoRefresh();
+    } else {
+        btn.innerHTML = '▶️ 继续刷新';
+        stopAutoRefresh();
+    }
+}
+
+// 开始自动刷新
+function startAutoRefresh() {
+    refreshInterval = setInterval(() => {
+        if (autoRefresh) {
+            loadLogs();
+        }
+    }, 3000);
+}
+
+// 停止自动刷新
+function stopAutoRefresh() {
+    clearInterval(refreshInterval);
+}
+
+// HTML 转义
+function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// 初始化
+document.addEventListener('DOMContentLoaded', function() {
+    loadLogs();
+    loadHistory();
+    startAutoRefresh();
+});
+
+// 页面卸载时清理
+window.addEventListener('beforeunload', function() {
+    stopAutoRefresh();
+});
+</script>
+{% endblock %}

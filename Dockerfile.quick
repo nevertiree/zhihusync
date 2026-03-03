@@ -1,0 +1,38 @@
+# 快速构建版本 - 使用官方 Playwright 镜像
+# 基于 mcr.microsoft.com/playwright/python:v1.40.0-jammy
+# 已包含 Chromium, Firefox, WebKit
+
+FROM mcr.microsoft.com/playwright/python:v1.40.0-jammy
+
+WORKDIR /app
+
+# 安装 Python 依赖
+COPY requirements.txt .
+RUN pip install --no-cache-dir -i https://pypi.tuna.tsinghua.edu.cn/simple -r requirements.txt
+
+# 复制应用代码
+COPY src/ /app/src/
+COPY config/ /app/config/
+COPY templates/ /app/templates/
+COPY static/ /app/static/
+COPY entrypoint.sh /app/
+
+# 创建数据目录
+RUN mkdir -p /app/data/html /app/data/meta /app/data/static/images && \
+    chmod +x /app/entrypoint.sh
+
+# 环境变量
+ENV PYTHONPATH=/app
+ENV PYTHONUNBUFFERED=1
+ENV ZHIHUSYNC_ENV=docker
+ENV PLAYWRIGHT_BROWSER=chromium
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+
+EXPOSE 6067
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:6067/api/stats')" || exit 1
+
+ENTRYPOINT ["/app/entrypoint.sh"]
+CMD ["python", "-m", "src.app", "--mode", "both"]

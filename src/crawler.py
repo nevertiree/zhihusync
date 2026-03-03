@@ -1,0 +1,746 @@
+"""爬虫模块 - 知乎内容抓取"""
+
+import asyncio
+import json
+import re
+import time
+from datetime import datetime
+from pathlib import Path
+from typing import Callable, Dict, List, Optional
+
+from bs4 import BeautifulSoup
+from loguru import logger
+from playwright.async_api import Browser, BrowserContext, Page, async_playwright
+from tenacity import retry, stop_after_attempt, wait_exponential
+
+from db import DatabaseManager
+from storage import StorageManager
+
+
+class ZhihuCrawler:
+    """知乎爬虫 - 支持多种浏览器"""
+
+    # API 端点
+    ZHIHU_BASE = "https://www.zhihu.com"
+    API_BASE = "https://www.zhihu.com/api/v4"
+
+    def __init__(
+        self,
+        user_id: str,
+        db_manager: DatabaseManager,
+        storage_manager: StorageManager,
+        headless: bool = True,
+        request_delay: float = 2.0,
+        browser_type: str = "auto",
+    ):
+        """初始化爬虫.
+
+        Args:
+            user_id: 知乎用户ID.
+            db_manager: 数据库管理器实例.
+            storage_manager: 存储管理器实例.
+            headless: 是否使用无头模式.
+            request_delay: 请求间隔(秒).
+            browser_type: 浏览器类型(auto/chromium/firefox/webkit/edge).
+        """
+        self.user_id = user_id
+        self.db = db_manager
+        self.storage = storage_manager
+        self.headless = headless
+        self.request_delay = request_delay
+        self.browser_type = browser_type  # auto, chromium, firefox, webkit, edge
+
+        self.browser: Optional[Browser] = None
+        self.context: Optional[BrowserContext] = None
+        self.page: Optional[Page] = None
+
+        # 统计
+        self.new_items = 0
+        self.updated_items = 0
+
+    async def __aenter__(self):
+        """异步上下文管理器入口"""
+        await self.init_browser()
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        """异步上下文管理器出口"""
+        await self.close()
+
+    def _get_available_browser(self, playwright):
+        """获取可用的浏览器类型"""
+        import os
+
+        # 如果指定了浏览器类型，优先使用
+        if self.browser_type != "auto":
+            return self.browser_type
+
+        # 检查环境变量
+        env_browser = os.environ.get("PLAYWRIGHT_BROWSER", "")
+        if env_browser in ["chromium", "firefox", "webkit", "edge"]:
+            return env_browser
+
+        # 尝试检测已安装的浏览器
+        browsers = ["chromium", "firefox", "webkit"]
+        for browser_name in browsers:
+            try:
+                getattr(playwright, browser_name)  # 验证浏览器可用
+                logger.debug(f"检测到浏览器: {browser_name}")
+                return browser_name
+            except Exception:
+                continue
+
+        # 默认返回 chromium
+        return "chromium"
+
+    def _get_cookie_file_path(self) -> Path:
+        """获取 Cookie 文件路径 - 基于 db_path 所在目录"""
+        db_path = Path(
+            self.db.db_path if hasattr(self.db, "db_path") else "/app/data/meta/zhihusync.db"
+        )
+        meta_dir = db_path.parent
+        return meta_dir / "cookies.json"
+
+    async def init_browser(self):
+        """初始化浏览器 - 支持多种浏览器"""
+        logger.info(f"正在初始化浏览器 (类型: {self.browser_type})...")
+
+        playwright = await async_playwright().start()
+        self._playwright = playwright
+
+        # 获取可用的浏览器
+        browser_name = self._get_available_browser(playwright)
+        logger.info(f"使用浏览器: {browser_name}")
+
+        # 获取浏览器类型
+        if browser_name == "edge":
+            # Edge 使用 chromium 启动，但指定 executable_path
+            browser_type = playwright.chromium
+            edge_path = self._get_edge_path()
+            launch_options = {
+                "headless": self.headless,
+                "args": [
+                    "--no-sandbox",
+                    "--disable-setuid-sandbox",
+                    "--disable-dev-shm-usage",
+                    "--disable-accelerated-2d-canvas",
+                    "--disable-gpu",
+                    "--window-size=1920,1080",
+                ],
+            }
+            if edge_path:
+                launch_options["executable_path"] = edge_path
+                logger.info(f"使用 Edge 浏览器: {edge_path}")
+        else:
+            browser_type = getattr(playwright, browser_name)
+            launch_options = {
+                "headless": self.headless,
+                "args": [
+                    "--no-sandbox",
+                    "--disable-setuid-sandbox",
+                    "--disable-dev-shm-usage",
+                    "--disable-accelerated-2d-canvas",
+                    "--disable-gpu",
+                    "--window-size=1920,1080",
+                ],
+            }
+
+        try:
+            self.browser = await browser_type.launch(**launch_options)
+        except Exception as e:
+            logger.warning(f"启动 {browser_name} 失败: {e}，尝试其他浏览器...")
+            # 尝试其他浏览器
+            for fallback in ["chromium", "firefox", "webkit"]:
+                if fallback != browser_name:
+                    try:
+                        browser_type = getattr(playwright, fallback)
+                        self.browser = await browser_type.launch(**launch_options)
+                        logger.info(f"使用备用浏览器: {fallback}")
+                        break
+                    except Exception as e2:
+                        logger.warning(f"启动 {fallback} 也失败: {e2}")
+                        continue
+            else:
+                raise Exception("没有可用的浏览器，请运行: playwright install")
+
+        # 尝试加载已保存的 Cookie
+        storage_state = None
+        cookie_file = self._get_cookie_file_path()
+        if cookie_file.exists():
+            try:
+                with open(cookie_file, "r", encoding="utf-8") as f:
+                    storage_state = json.load(f)
+                logger.info("已加载保存的 Cookie")
+            except Exception as e:
+                logger.warning(f"加载 Cookie 失败: {e}")
+
+        context_options = {
+            "user_agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.0"
+            ),
+            "viewport": {"width": 1920, "height": 1080},
+            "locale": "zh-CN",
+        }
+
+        # 尝试使用 storage_state，如果失败则手动添加 cookie
+        if storage_state:
+            try:
+                context_options["storage_state"] = storage_state
+                self.context = await self.browser.new_context(**context_options)
+                logger.info("已使用 storage_state 创建 context")
+            except Exception as e:
+                logger.warning(f"使用 storage_state 失败: {e}，尝试手动添加 cookie")
+                context_options.pop("storage_state", None)
+                self.context = await self.browser.new_context(**context_options)
+                # 手动添加 cookie
+                await self._add_cookies_manually(storage_state)
+        else:
+            self.context = await self.browser.new_context(**context_options)
+
+        self.page = await self.context.new_page()
+
+        logger.info("浏览器初始化完成")
+
+    async def _add_cookies_manually(self, storage_state):
+        """手动添加 cookie 到 context - 使用 JavaScript 方式"""
+        try:
+            cookies = storage_state.get("cookies", [])
+            if not cookies:
+                return
+
+            # 创建页面访问知乎以便添加 cookie
+            self.page = await self.context.new_page()
+            await self.page.goto(
+                "https://www.zhihu.com", wait_until="domcontentloaded", timeout=10000
+            )
+
+            # 使用 JavaScript 批量设置 cookie
+            success_count = 0
+            for cookie in cookies:
+                name = cookie.get("name", "")
+                value = cookie.get("value", "")
+                domain = cookie.get("domain", ".zhihu.com")
+                path = cookie.get("path", "/")
+
+                try:
+                    # 使用 encodeURIComponent 处理特殊字符
+                    js_code = f"""() => {{
+                        document.cookie = "{name}=" + encodeURIComponent("{value}") +
+                        "; domain={domain}; path={path}";
+                    }}"""
+                    await self.page.evaluate(js_code)
+                    success_count += 1
+                except Exception as e:
+                    logger.debug(f"设置 cookie {name} 失败: {e}")
+
+            logger.info(f"通过 JavaScript 设置了 {success_count}/{len(cookies)} 条 cookie")
+        except Exception as e:
+            logger.warning(f"手动添加 cookie 失败: {e}")
+
+    def _get_edge_path(self):
+        """获取 Edge 浏览器路径"""
+        import os
+        import platform
+
+        system = platform.system()
+        possible_paths = []
+
+        if system == "Windows":
+            possible_paths = [
+                r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
+                r"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
+                os.path.expandvars(r"%LOCALAPPDATA%\Microsoft\Edge\Application\msedge.exe"),
+            ]
+        elif system == "Darwin":  # macOS
+            possible_paths = [
+                "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+                "~/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+            ]
+        elif system == "Linux":
+            possible_paths = [
+                "/usr/bin/microsoft-edge",
+                "/usr/bin/microsoft-edge-stable",
+                "/opt/microsoft-edge/msedge",
+                "/snap/bin/edge",
+            ]
+
+        # 检查环境变量
+        edge_env = os.environ.get("EDGE_PATH", os.environ.get("PLAYWRIGHT_EDGE_PATH", ""))
+        if edge_env:
+            possible_paths.insert(0, edge_env)
+
+        for path in possible_paths:
+            path = os.path.expanduser(path)
+            if os.path.isfile(path) and os.access(path, os.X_OK):
+                return path
+
+        return None
+
+    async def close(self):
+        """关闭浏览器"""
+        if self.context:
+            await self.context.close()
+        if self.browser:
+            await self.browser.close()
+        if hasattr(self, "_playwright"):
+            await self._playwright.stop()
+        logger.info("浏览器已关闭")
+
+    async def test_login(self) -> Dict:
+        """测试 Cookie 是否有效 - 返回登录状态"""
+        logger.info("测试登录状态...")
+
+        try:
+            # 访问知乎首页
+            await self.page.goto(f"{self.ZHIHU_BASE}", timeout=30000)
+
+            # 检查是否有登录态
+            # 方法1: 检查 localStorage 中的用户信息
+            user_info = await self.page.evaluate(
+                """
+                () => {
+                    try {
+                        const user = localStorage.getItem('$$user');
+                        return user ? JSON.parse(user) : null;
+                    } catch (e) {
+                        return null;
+                    }
+                }
+            """
+            )
+
+            # 方法2: 检查页面上的用户头像或昵称元素
+            has_user_menu = (
+                await self.page.locator(
+                    "[data-za-detail-view-path-module='TopNavBar'] .AppHeader-profile"
+                ).count()
+                > 0
+            )
+
+            # 方法3: 尝试访问 API 获取当前用户信息
+            me_response = None
+            try:
+                await self.page.goto(f"{self.API_BASE}/me", timeout=10000)
+                content = await self.page.content()
+                soup = BeautifulSoup(content, "lxml")
+                text = soup.find("pre")
+                if text:
+                    me_response = json.loads(text.get_text())
+            except Exception:
+                pass
+
+            # 判断登录状态
+            is_logged_in = False
+            user_name = None
+            user_id = None
+
+            if user_info and user_info.get("name"):
+                is_logged_in = True
+                user_name = user_info.get("name")
+                user_id = user_info.get("url_token") or user_info.get("id")
+            elif has_user_menu:
+                is_logged_in = True
+            elif me_response and not me_response.get("error"):
+                is_logged_in = True
+                user_name = me_response.get("name")
+                user_id = me_response.get("url_token") or me_response.get("id")
+
+            # 获取当前页面 URL 判断是否被重定向到登录页
+            current_url = self.page.url
+            if "signin" in current_url or "login" in current_url:
+                is_logged_in = False
+
+            result = {
+                "success": is_logged_in,
+                "is_logged_in": is_logged_in,
+                "user_name": user_name,
+                "user_id": user_id,
+                "current_url": current_url,
+                "message": "登录有效" if is_logged_in else "Cookie 已失效或过期，请重新登录",
+            }
+
+            if is_logged_in:
+                logger.info(f"✅ 登录有效，用户: {user_name or '未知'}")
+            else:
+                logger.warning("❌ Cookie 已失效")
+
+            return result
+
+        except Exception as e:
+            logger.exception(f"测试登录失败: {e}")
+            return {
+                "success": False,
+                "is_logged_in": False,
+                "message": f"测试失败: {str(e)}",
+            }
+
+    async def wait_for_login(self, timeout: int = 300):
+        """等待用户登录"""
+        logger.info("请登录知乎...")
+
+        await self.page.goto(f"{self.ZHIHU_BASE}/signin")
+
+        # 等待跳转到首页或个人主页
+        try:
+            await self.page.wait_for_url(
+                lambda url: "zhihu.com" in url and "signin" not in url, timeout=timeout * 1000
+            )
+            logger.info("登录成功")
+            return True
+        except Exception:
+            logger.error("登录超时")
+            return False
+
+    def _extract_json_from_page(self, text: str, pattern: str) -> Optional[dict]:
+        """从页面内容中提取 JSON 数据"""
+        match = re.search(pattern, text)
+        if match:
+            try:
+                return json.loads(match.group(1))
+            except json.JSONDecodeError:
+                pass
+        return None
+
+    def _parse_timestamp(self, ts: int or str) -> datetime:
+        """解析时间戳"""
+        if isinstance(ts, str):
+            ts = int(ts)
+        if ts > 1e12:  # 毫秒时间戳
+            ts = ts / 1000
+        return datetime.fromtimestamp(ts)
+
+    async def _delay(self):
+        """请求延迟"""
+        await asyncio.sleep(self.request_delay)
+
+    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
+    async def fetch_likes(self, limit: int = 20, offset: int = 0) -> List[Dict]:
+        """获取用户点赞列表"""
+        url = f"{self.API_BASE}/members/{self.user_id}/activities"
+        params = {
+            "limit": limit,
+            "offset": offset,
+            "after_id": int(time.time()),
+            "action": "vote_up_answer",
+        }
+
+        full_url = f"{url}?{'&'.join(f'{k}={v}' for k, v in params.items())}"
+
+        await self._delay()
+        await self.page.goto(full_url)
+
+        # 获取页面内容（API 返回的是 JSON）
+        content = await self.page.content()
+
+        # 提取 JSON
+        soup = BeautifulSoup(content, "lxml")
+        text = soup.find("pre")
+        if text:
+            try:
+                data = json.loads(text.get_text())
+                return data.get("data", [])
+            except json.JSONDecodeError:
+                pass
+
+        return []
+
+    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
+    async def fetch_answer_detail(self, answer_id: str) -> Optional[Dict]:
+        """获取回答详情"""
+        url = f"{self.API_BASE}/answers/{answer_id}"
+        params = {"include": "content,voteup_count,comment_count,created_time,updated_time,author"}
+
+        full_url = f"{url}?{'&'.join(f'{k}={v}' for k, v in params.items())}"
+
+        await self._delay()
+        await self.page.goto(full_url)
+
+        content = await self.page.content()
+        soup = BeautifulSoup(content, "lxml")
+        text = soup.find("pre")
+
+        if text:
+            try:
+                return json.loads(text.get_text())
+            except json.JSONDecodeError:
+                pass
+
+        return None
+
+    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
+    async def fetch_answer_page(self, question_id: str, answer_id: str) -> Optional[str]:
+        """获取回答页面 HTML"""
+        url = f"{self.ZHIHU_BASE}/question/{question_id}/answer/{answer_id}"
+
+        await self._delay()
+        await self.page.goto(url, wait_until="networkidle")
+
+        # 等待内容加载
+        try:
+            await self.page.wait_for_selector(".RichContent", timeout=10000)
+        except Exception:
+            logger.warning(f"等待内容超时: {answer_id}")
+
+        # 滚动页面以加载所有内容
+        await self._scroll_page()
+
+        content = await self.page.content()
+        return content
+
+    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
+    async def fetch_comments(self, answer_id: str, limit: int = 20) -> List[Dict]:
+        """获取评论"""
+        url = f"{self.API_BASE}/answers/{answer_id}/root_comments"
+        params = {"limit": limit, "offset": 0, "order": "normal", "status": "open"}
+
+        full_url = f"{url}?{'&'.join(f'{k}={v}' for k, v in params.items())}"
+
+        await self._delay()
+        await self.page.goto(full_url)
+
+        content = await self.page.content()
+        soup = BeautifulSoup(content, "lxml")
+        text = soup.find("pre")
+
+        if text:
+            try:
+                data = json.loads(text.get_text())
+                return data.get("data", [])
+            except json.JSONDecodeError:
+                pass
+
+        return []
+
+    async def _scroll_page(self):
+        """滚动页面加载内容"""
+        await self.page.evaluate(
+            """
+            async () => {
+                await new Promise((resolve) => {
+                    let totalHeight = 0;
+                    const distance = 500;
+                    const timer = setInterval(() => {
+                        const scrollHeight = document.body.scrollHeight;
+                        window.scrollBy(0, distance);
+                        totalHeight += distance;
+
+                        if (totalHeight >= scrollHeight) {
+                            clearInterval(timer);
+                            resolve();
+                        }
+                    }, 200);
+
+                    setTimeout(() => {
+                        clearInterval(timer);
+                        resolve();
+                    }, 5000);
+                });
+            }
+        """
+        )
+
+    async def process_answer(self, activity: Dict, liked_time: datetime) -> bool:
+        """处理单个回答"""
+        try:
+            target = activity.get("target", {})
+
+            # 提取回答信息
+            answer_id = str(target.get("id", ""))
+            question = target.get("question", {})
+            question_id = str(question.get("id", ""))
+            question_title = question.get("title", "无标题")
+
+            author = target.get("author", {})
+            author_id = author.get("id", "")
+            author_name = author.get("name", "匿名用户")
+            author_url = author.get("url", "")
+            author_headline = author.get("headline", "")
+
+            voteup_count = target.get("voteup_count", 0)
+            comment_count = target.get("comment_count", 0)
+            created_time = target.get("created_time", 0)
+            updated_time = target.get("updated_time", 0)
+
+            # 检查是否已存在
+            existing = self.db.get_answer_by_id(answer_id)
+
+            # 如果是已存在的记录且没有更新，跳过
+            if existing:
+                logger.debug(f"回答已存在，跳过: {question_title[:50]}...")
+                return False
+
+            # 获取完整页面内容
+            logger.info(f"获取回答: {question_title[:60]}...")
+            page_html = await self.fetch_answer_page(question_id, answer_id)
+
+            if not page_html:
+                logger.warning(f"无法获取页面内容: {answer_id}")
+                return False
+
+            # 解析页面获取内容
+            soup = BeautifulSoup(page_html, "lxml")
+
+            # 提取回答内容
+            content_elem = soup.select_one(".RichContent-inner")
+            if content_elem:
+                content_html = str(content_elem)
+                content_text = content_elem.get_text(separator="\n", strip=True)
+            else:
+                content_html = target.get("content", "")
+                content_text = BeautifulSoup(content_html, "lxml").get_text(
+                    separator="\n", strip=True
+                )
+
+            # 保存 HTML 文件
+            metadata = {
+                "question_id": question_id,
+                "author_name": author_name,
+                "author_headline": author_headline,
+                "voteup_count": voteup_count,
+                "comment_count": comment_count,
+                "updated_time": (
+                    self._parse_timestamp(updated_time).isoformat() if updated_time else ""
+                ),
+                "backup_time": datetime.now().isoformat(),
+            }
+
+            html_path = await self.storage.save_answer(
+                answer_id=answer_id,
+                question_id=question_id,
+                question_title=question_title,
+                html_content=content_html,
+                page_metadata=metadata,
+            )
+
+            # 保存元数据到数据库
+            answer_data = {
+                "id": answer_id,
+                "question_id": question_id,
+                "question_title": question_title,
+                "author_id": author_id,
+                "author_name": author_name,
+                "author_url": author_url,
+                "content_text": content_text[:2000] if content_text else "",
+                "content_length": len(content_text) if content_text else 0,
+                "voteup_count": voteup_count,
+                "comment_count": comment_count,
+                "created_time": self._parse_timestamp(created_time) if created_time else None,
+                "updated_time": self._parse_timestamp(updated_time) if updated_time else None,
+                "liked_time": liked_time,
+                "html_path": html_path,
+                "original_url": f"{self.ZHIHU_BASE}/question/{question_id}/answer/{answer_id}",
+                "has_comments": False,
+                "extra_meta": {
+                    "author_headline": author_headline,
+                },
+            }
+
+            is_new = self.db.save_answer(answer_data)
+
+            if is_new:
+                self.new_items += 1
+            else:
+                self.updated_items += 1
+
+            return True
+
+        except Exception as e:
+            logger.exception(f"处理回答失败: {e}")
+            return False
+
+    async def process_comments(self, answer_id: str):
+        """处理评论"""
+        try:
+            answer = self.db.get_answer_by_id(answer_id)
+            if not answer or answer.has_comments:
+                return
+
+            logger.info(f"获取评论: {answer_id}")
+            comments_data = await self.fetch_comments(answer_id, limit=100)
+
+            comments_to_save = []
+            for item in comments_data:
+                comment = item.get("comment", item)  # 处理不同格式
+                comment_info = {
+                    "id": str(comment.get("id", "")),
+                    "answer_id": answer_id,
+                    "author_id": comment.get("author", {}).get("id", ""),
+                    "author_name": comment.get("author", {}).get("name", "匿名用户"),
+                    "content": comment.get("content", ""),
+                    "like_count": comment.get("like_count", 0),
+                    "created_time": (
+                        self._parse_timestamp(comment.get("created_time", 0))
+                        if comment.get("created_time")
+                        else None
+                    ),
+                }
+                self.db.save_comment(comment_info)
+                comments_to_save.append(comment_info)
+
+            # 追加评论到 HTML 文件
+            if comments_to_save and answer.html_path:
+                await self.storage.append_comments(answer.html_path, comments_to_save)
+
+            self.db.mark_answer_has_comments(answer_id)
+            logger.info(f"保存 {len(comments_to_save)} 条评论: {answer_id}")
+
+        except Exception as e:
+            logger.exception(f"处理评论失败: {e}")
+
+    async def scan_likes(self, max_items: int = 50, progress_callback: Optional[Callable] = None):
+        """扫描用户点赞内容"""
+        logger.info(f"开始扫描用户 {self.user_id} 的点赞内容...")
+
+        self.new_items = 0
+        self.updated_items = 0
+        scanned = 0
+        offset = 0
+        limit = 20
+
+        while scanned < max_items:
+            batch_size = min(limit, max_items - scanned)
+            activities = await self.fetch_likes(limit=batch_size, offset=offset)
+
+            if not activities:
+                break
+
+            for activity in activities:
+                # 只处理点赞回答
+                if (
+                    activity.get("verb") != "MEMBER_VOTEUP_ARTICLE"
+                    and activity.get("verb") != "MEMBER_VOTEUP_ANSWER"
+                ):
+                    continue
+
+                # 解析点赞时间
+                created_time = activity.get("created_time", 0)
+                liked_time = self._parse_timestamp(created_time) if created_time else datetime.now()
+
+                # 处理回答
+                await self.process_answer(activity, liked_time)
+                scanned += 1
+
+                if progress_callback:
+                    progress_callback(scanned, max_items)
+
+                if scanned >= max_items:
+                    break
+
+            offset += len(activities)
+
+            # 如果没有更多数据，退出
+            if len(activities) < batch_size:
+                break
+
+        logger.info(f"扫描完成: 新增 {self.new_items} 条, 更新 {self.updated_items} 条")
+        return self.new_items, self.updated_items
+
+    async def sync_all_comments(self):
+        """同步所有未获取评论的回答"""
+        answers = self.db.get_answers_without_comments()
+        logger.info(f"需要同步评论的回答: {len(answers)} 条")
+
+        for answer in answers:
+            await self.process_comments(answer.id)
+            await asyncio.sleep(1)  # 避免请求过快

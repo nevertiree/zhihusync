@@ -1,0 +1,46 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info
+.pytest_cache
+.mypy_cache
+.venv/
+venv/
+env/
+
+# 数据目录（容器中会自动创建）
+data/
+*.db
+*.log
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# 文档
+*.md
+!README.md
+
+# 脚本
+scripts/
+start.sh
+
+# 其他
+docker-compose*.yml
+Dockerfile*
+Makefile
+.dockerignore
+.gitignore
