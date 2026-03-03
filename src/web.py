@@ -624,8 +624,8 @@ async def start_init_sync():
                 db_manager=db,
                 storage_manager=storage,
                 headless=True,
-                request_delay=config.zhihu.request_delay,
-                max_comments=config.zhihu.max_comments_per_answer,
+                request_delay=config.browser.request_delay,
+                max_comments=config.zhihu.max_comments,
             ) as crawler:
                 # 使用 init_mode=True 进行全量采集
                 new_items, updated_items = await crawler.scan_likes(
