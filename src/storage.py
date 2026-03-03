@@ -193,9 +193,16 @@ class StorageManager:
             str: 完整的 HTML 文档.
         """
         meta_str = ""
+        author_name = ""
+        author_headline = ""
+        voteup_count = ""
+
         if metadata:
             for key, value in metadata.items():
                 meta_str += f'<meta name="{key}" content="{value}">\n'
+            author_name = metadata.get("author_name", "")
+            author_headline = metadata.get("author_headline", "")
+            voteup_count = str(metadata.get("voteup_count", ""))
 
         return f"""<!DOCTYPE html>
 <html lang="zh-CN">
@@ -205,26 +212,177 @@ class StorageManager:
     <title>{question_title} - 知乎备份</title>
     {meta_str}
     <style>
-        body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-            sans-serif; max-width: 800px; margin: 0 auto; padding: 20px;
-            line-height: 1.6; }}
-        h1 {{ color: #121212; font-size: 22px; margin-bottom: 16px; }}
-        .author-info {{ color: #646464; font-size: 14px; margin-bottom: 16px;
-            padding-bottom: 16px; border-bottom: 1px solid #e5e5e5; }}
-        .content {{ font-size: 16px; color: #121212; }}
-        .content img {{ max-width: 100%; height: auto; }}
-        .content p {{ margin: 0.8em 0; }}
-        .metadata {{ margin-top: 32px; padding-top: 16px;
-            border-top: 1px solid #e5e5e5; font-size: 12px; color: #999; }}
+        /* 基础样式 */
+        body {{
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+                "Helvetica Neue", Arial, sans-serif;
+            font-size: 15px;
+            line-height: 1.6;
+            color: #121212;
+            background: #f6f6f6;
+            margin: 0;
+            padding: 20px;
+        }}
+        .container {{
+            max-width: 800px;
+            margin: 0 auto;
+            background: #fff;
+            border-radius: 4px;
+            box-shadow: 0 1px 3px rgba(18, 18, 18, 0.1);
+            padding: 24px;
+        }}
+
+        /* 标题样式 */
+        .question-title {{
+            font-size: 22px;
+            font-weight: 600;
+            color: #121212;
+            margin-bottom: 16px;
+            line-height: 1.4;
+        }}
+
+        /* 作者信息样式 */
+        .author-info {{
+            display: flex;
+            align-items: center;
+            margin-bottom: 16px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid #ebebeb;
+        }}
+        .author-avatar {{
+            width: 40px;
+            height: 40px;
+            border-radius: 4px;
+            background: #0066ff;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            margin-right: 12px;
+            font-size: 16px;
+        }}
+        .author-meta {{
+            flex: 1;
+        }}
+        .author-name {{
+            font-size: 15px;
+            font-weight: 600;
+            color: #444;
+        }}
+        .author-headline {{
+            font-size: 14px;
+            color: #8590a6;
+            margin-top: 2px;
+        }}
+
+        /* 内容样式 - 模拟知乎 RichContent */
+        .content {{
+            font-size: 15px;
+            line-height: 1.8;
+            color: #121212;
+        }}
+        .content p {{
+            margin: 1em 0;
+        }}
+        .content img {{
+            max-width: 100%;
+            height: auto;
+            border-radius: 4px;
+            margin: 1em 0;
+        }}
+        .content a {{
+            color: #175199;
+            text-decoration: none;
+        }}
+        .content a:hover {{
+            border-bottom: 1px solid #175199;
+        }}
+        .content blockquote {{
+            margin: 1em 0;
+            padding: 0 1em;
+            color: #646464;
+            border-left: 3px solid #d3d3d3;
+        }}
+        .content pre {{
+            background: #f6f6f6;
+            padding: 16px;
+            overflow-x: auto;
+            border-radius: 4px;
+            font-family: "Monaco", "Menlo", monospace;
+            font-size: 14px;
+        }}
+        .content code {{
+            background: rgba(0, 102, 255, 0.1);
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: "Monaco", "Menlo", monospace;
+            font-size: 14px;
+        }}
+        .content ul, .content ol {{
+            padding-left: 2em;
+            margin: 1em 0;
+        }}
+        .content li {{
+            margin: 0.5em 0;
+        }}
+        .content h1, .content h2, .content h3 {{
+            font-weight: 600;
+            margin: 1.5em 0 0.8em;
+        }}
+        .content h1 {{ font-size: 20px; }}
+        .content h2 {{ font-size: 18px; }}
+        .content h3 {{ font-size: 16px; }}
+
+        /* 底部信息 */
+        .footer {{
+            margin-top: 32px;
+            padding-top: 16px;
+            border-top: 1px solid #ebebeb;
+            font-size: 13px;
+            color: #8590a6;
+        }}
+        .vote-count {{
+            color: #0066ff;
+            font-weight: 600;
+        }}
+
+        /* 移动端适配 */
+        @media (max-width: 640px) {{
+            body {{
+                padding: 10px;
+                font-size: 14px;
+            }}
+            .container {{
+                padding: 16px;
+            }}
+            .question-title {{
+                font-size: 18px;
+            }}
+        }}
     </style>
 </head>
 <body>
-    <article>
-        <h1>{question_title}</h1>
+    <div class="container">
+        <h1 class="question-title">{question_title}</h1>
+
+        <div class="author-info">
+            <div class="author-avatar">{(author_name[0] if author_name else "?").upper()}</div>
+            <div class="author-meta">
+                <div class="author-name">{author_name or "匿名用户"}</div>
+                <div class="author-headline">{author_headline or "知乎用户"}</div>
+            </div>
+        </div>
+
         <div class="content">
             {content_html}
         </div>
-    </article>
+
+        <div class="footer">
+            <span class="vote-count">{voteup_count}</span> 人赞同了该回答
+            | 备份于 {metadata.get('backup_time', '') if metadata else ''}
+        </div>
+    </div>
 </body>
 </html>"""
 

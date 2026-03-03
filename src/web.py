@@ -66,6 +66,13 @@ app = FastAPI(
 templates = Jinja2Templates(directory="templates")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
+# 挂载数据目录以便访问备份的 HTML
+app.mount(
+    "/data/html",
+    StaticFiles(directory=config.storage.html_path),
+    name="html_files",
+)
+
 
 # ============ 数据模型 ============
 
@@ -188,6 +195,31 @@ async def get_setup_status():
         "has_cookie": has_cookie,
         "user_id": config.zhihu.user_id or "",
     }
+
+
+@app.get("/api/users")
+async def get_users():
+    """获取监控用户列表"""
+    from models import User
+
+    session = db.get_session()
+    try:
+        users = session.query(User).filter_by(is_active=True).all()
+        return {
+            "users": [
+                {
+                    "user_id": user.id,
+                    "name": user.name or user.id,
+                    "created_at": user.created_at.isoformat() if user.created_at else None,
+                    "last_sync": user.last_sync_at.isoformat() if user.last_sync_at else None,
+                    "sync_count": user.sync_count,
+                    "status": "active" if user.is_active else "inactive",
+                }
+                for user in users
+            ]
+        }
+    finally:
+        session.close()
 
 
 @app.get("/api/config")

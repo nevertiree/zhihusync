@@ -632,7 +632,7 @@ class ZhihuCrawler:
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
     async def fetch_answer_page(self, question_id: str, answer_id: str) -> Optional[str]:
-        """获取回答页面 HTML"""
+        """获取回答页面 HTML，包含完整内容和样式"""
         url = f"{self.ZHIHU_BASE}/question/{question_id}/answer/{answer_id}"
 
         await self._delay()
@@ -644,11 +644,85 @@ class ZhihuCrawler:
         except Exception:
             logger.warning(f"等待内容超时: {answer_id}")
 
+        # 点击所有"展开全文"按钮
+        await self._expand_all_content()
+
         # 滚动页面以加载所有内容
         await self._scroll_page()
 
-        content = await self.page.content()
+        # 获取页面内容和样式
+        content = await self._get_page_with_styles()
         return content
+
+    async def _expand_all_content(self):
+        """点击所有'展开全文'按钮以获取完整内容"""
+        try:
+            # 查找所有展开按钮
+            expand_buttons = await self.page.query_selector_all(
+                'button.ContentItem-more, button.Button:has-text("阅读全文"), '
+                'button.Button:has-text("展开全文")'
+            )
+
+            for button in expand_buttons[:5]:  # 限制最多点击5个
+                try:
+                    await button.click()
+                    await asyncio.sleep(0.5)  # 等待内容展开
+                except Exception:
+                    continue
+
+            # 也尝试通过 JavaScript 点击
+            await self.page.evaluate(
+                """
+                () => {
+                    const buttons = document.querySelectorAll(
+                        'button.ContentItem-more, .ContentItem-more'
+                    );
+                    buttons.forEach(btn => btn.click());
+                }
+            """
+            )
+            await asyncio.sleep(1)
+
+        except Exception as e:
+            logger.debug(f"展开内容时出错: {e}")
+
+    async def _get_page_with_styles(self) -> str:
+        """获取页面内容并提取关键样式"""
+        # 获取原始 HTML
+        html_content = await self.page.content()
+
+        # 获取所有样式表内容
+        styles = await self.page.evaluate(
+            """
+            () => {
+                const styles = [];
+                // 获取内联样式
+                document.querySelectorAll('style').forEach(el => {
+                    styles.push(el.textContent);
+                });
+                // 获取链接的 CSS 文件（部分）
+                document.querySelectorAll('link[rel="stylesheet"]').forEach(el => {
+                    // 只保留知乎域名的样式
+                    if (el.href && el.href.includes('zhihu.com')) {
+                        styles.push(`/* Original: ${el.href} */`);
+                    }
+                });
+                return styles.join('\\n');
+            }
+        """
+        )
+
+        # 构建包含样式的完整 HTML
+        soup = BeautifulSoup(html_content, "lxml")
+
+        # 添加提取的样式到 head
+        head = soup.find("head")
+        if head:
+            style_tag = soup.new_tag("style")
+            style_tag.string = styles
+            head.append(style_tag)
+
+        return str(soup)
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
     async def fetch_comments(self, answer_id: str, limit: int = 20) -> List[Dict]:
