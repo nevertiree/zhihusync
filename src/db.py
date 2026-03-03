@@ -275,6 +275,22 @@ class DatabaseManager:
         finally:
             session.close()
 
+    def get_user_answer_ids(self, user_id: str) -> list[str]:
+        """获取用户的所有回答ID - 用于断点续传去重.
+
+        Args:
+            user_id: 用户ID.
+
+        Returns:
+            List[str]: 回答ID列表.
+        """
+        session = self.get_session()
+        try:
+            answers = session.query(Answer.id).filter_by(user_id=user_id).all()
+            return [a[0] for a in answers]
+        finally:
+            session.close()
+
     def get_all_answers(
         self, limit: int | None = None, offset: int = 0, user_id: str | None = None
     ) -> list[Answer]:
