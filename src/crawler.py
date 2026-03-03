@@ -1102,11 +1102,7 @@ class ZhihuCrawler:
 
             # 从页面提取作者信息
             author_info_elem = soup.select_one(".AuthorInfo")
-            logger.debug(f"查找 AuthorInfo: {author_info_elem is not None}")
             if author_info_elem:
-                # 调试: 查看 AuthorInfo HTML 结构
-                logger.debug(f"AuthorInfo HTML: {author_info_elem.prettify()[:500]}...")
-
                 # 提取头像 - 尝试多种选择器
                 avatar_selectors = [
                     ".Avatar img",
@@ -1120,7 +1116,7 @@ class ZhihuCrawler:
                     avatar_img = author_info_elem.select_one(selector)
                     if avatar_img and avatar_img.get("src"):
                         author_avatar_url = avatar_img.get("src")
-                        logger.debug(f"使用选择器 '{selector}' 提取到作者头像: {author_avatar_url[:80]}...")
+                        logger.debug(f"提取到作者头像: {author_avatar_url[:60]}...")
                         break
 
                 # 提取作者名（如果API中没有）
