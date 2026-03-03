@@ -13,7 +13,6 @@ import asyncio
 import hashlib
 import re
 from pathlib import Path
-from typing import Optional, Set
 from urllib.parse import urlparse
 
 import aiofiles
@@ -78,7 +77,7 @@ class StorageManager:
         self.images_path.mkdir(parents=True, exist_ok=True)
 
         # 已下载的图片缓存
-        self._downloaded_images: Set[str] = set()
+        self._downloaded_images: set[str] = set()
 
         logger.info(f"存储管理器初始化: html={html_path}, static={static_path}")
 
@@ -115,7 +114,7 @@ class StorageManager:
         return hashlib.md5(content.encode()).hexdigest()[:length]
 
     def get_answer_filepath(
-        self, answer_id: str, question_title: str, content: Optional[str] = None
+        self, answer_id: str, question_title: str, content: str | None = None
     ) -> Path:
         """生成回答文件路径.
 
@@ -763,7 +762,7 @@ body {{
         ext = Path(urlparse(original_url).path).suffix or ".jpg"
         return f"../static/images/{url_hash}{ext}"
 
-    async def _download_image(self, url: str, answer_id: str) -> Optional[str]:
+    async def _download_image(self, url: str, answer_id: str) -> str | None:
         """下载单张图片.
 
         Args:
@@ -805,7 +804,7 @@ body {{
 
         return None
 
-    def check_answer_exists(self, answer_id: str, content: Optional[str] = None) -> bool:
+    def check_answer_exists(self, answer_id: str, content: str | None = None) -> bool:
         """检查回答是否已存在.
 
         Args:
@@ -847,3 +846,115 @@ body {{
             "html_size_mb": round(total_html_size / 1024 / 1024, 2),
             "image_size_mb": round(total_image_size / 1024 / 1024, 2),
         }
+
+    async def append_comments(self, html_path: str, comments: list[dict]) -> bool:
+        """将评论追加到HTML文件中.
+
+        Args:
+            html_path: HTML文件路径.
+            comments: 评论数据列表.
+
+        Returns:
+            bool: 成功返回True.
+        """
+        if not comments:
+            return True
+
+        try:
+            path = Path(html_path)
+            if not path.exists():
+                logger.warning(f"HTML文件不存在: {html_path}")
+                return False
+
+            # 读取现有HTML
+            async with aiofiles.open(path, "r", encoding="utf-8") as f:
+                html_content = await f.read()
+
+            # 构建评论HTML
+            comments_html = self._build_comments_html(comments)
+
+            # 在底部信息之前插入评论区
+            # 查找 <!-- 底部信息 --> 标记
+            footer_marker = "<!-- 底部信息 -->"
+            if footer_marker in html_content:
+                # 在底部信息之前插入评论
+                new_html = html_content.replace(
+                    footer_marker, f"{comments_html}\n            {footer_marker}"
+                )
+            else:
+                # 如果没有找到标记，在 </body> 之前插入
+                body_end = "</body>"
+                new_html = html_content.replace(body_end, f"{comments_html}\n{body_end}")
+
+            # 写回文件
+            async with aiofiles.open(path, "w", encoding="utf-8") as f:
+                await f.write(new_html)
+
+            logger.info(f"已追加 {len(comments)} 条评论到: {html_path}")
+            return True
+
+        except Exception as e:
+            logger.exception(f"追加评论失败: {e}")
+            return False
+
+    def _build_comments_html(self, comments: list[dict]) -> str:
+        """构建评论区的HTML.
+
+        Args:
+            comments: 评论数据列表.
+
+        Returns:
+            str: 评论区HTML.
+        """
+        if not comments:
+            return ""
+
+        # 构建每条评论的HTML
+        comments_items = []
+        for comment in comments:
+            author_name = comment.get("author_name", "匿名用户")
+            author_avatar = comment.get("author_avatar_url", "")
+            content = comment.get("content", "")
+            like_count = comment.get("like_count", 0)
+            created_time = comment.get("created_time")
+
+            # 处理时间显示
+            time_str = ""
+            if created_time:
+                from datetime import datetime
+
+                if isinstance(created_time, datetime):
+                    time_str = created_time.strftime("%Y-%m-%d %H:%M")
+                else:
+                    time_str = str(created_time)
+
+            # 截断作者名用于头像
+            avatar_text = (author_name[0] if author_name else "?").upper()
+
+            # 头像HTML
+            if author_avatar:
+                avatar_html = f'<img src="{author_avatar}" alt="{author_name}">'
+            else:
+                avatar_html = avatar_text
+
+            item_html = f"""            <div class="comment-item">
+                <div class="comment-avatar">{avatar_html}</div>
+                <div class="comment-content">
+                    <div class="comment-author">{author_name}</div>
+                    <div class="comment-text">{content}</div>
+                    <div class="comment-meta">
+                        <span>{time_str}</span>
+                        <span>👍 {like_count}</span>
+                    </div>
+                </div>
+            </div>"""
+            comments_items.append(item_html)
+
+        # 组合完整评论区
+        comments_list = "\n".join(comments_items)
+
+        return f"""            <!-- 评论区 -->
+            <div class="comments-section">
+                <div class="comments-header">💬 评论 ({len(comments)}条)</div>
+{comments_list}
+            </div>"""
