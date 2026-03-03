@@ -3,7 +3,6 @@
 import asyncio
 import json
 import re
-import time
 from datetime import datetime
 from pathlib import Path
 from typing import Callable, Dict, List, Optional
@@ -416,34 +415,197 @@ class ZhihuCrawler:
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
     async def fetch_likes(self, limit: int = 20, offset: int = 0) -> List[Dict]:
-        """获取用户点赞列表"""
-        url = f"{self.API_BASE}/members/{self.user_id}/activities"
-        params = {
-            "limit": limit,
-            "offset": offset,
-            "after_id": int(time.time()),
-            "action": "vote_up_answer",
-        }
-
-        full_url = f"{url}?{'&'.join(f'{k}={v}' for k, v in params.items())}"
+        """获取用户点赞列表 - 访问用户主页并解析活动数据"""
+        # 访问用户主页
+        url = f"{self.ZHIHU_BASE}/people/{self.user_id}"
+        logger.info(f"访问用户主页: {url}")
 
         await self._delay()
-        await self.page.goto(full_url)
+        await self.page.goto(url)
 
-        # 获取页面内容（API 返回的是 JSON）
+        # 等待页面加载并滚动以加载更多内容
+        try:
+            await self.page.wait_for_load_state("networkidle", timeout=10000)
+            # 等待动态内容加载
+            await asyncio.sleep(2)
+        except Exception:
+            pass
+
+        # 获取页面内容
         content = await self.page.content()
+        logger.debug(f"页面内容长度: {len(content)}")
 
-        # 提取 JSON
+        # 解析活动数据
+        activities = self._parse_activities_from_html(content)
+        if activities:
+            logger.info(f"从页面解析到 {len(activities)} 条点赞记录")
+            return activities[:limit]
+
+        # 如果页面解析失败，尝试访问 API
+        logger.info("页面解析失败，尝试直接访问 API...")
+        api_url = f"{self.API_BASE}/members/{self.user_id}/activities?limit={limit}&offset={offset}"
+
+        await self._delay()
+        await self.page.goto(api_url)
+
+        content = await self.page.content()
         soup = BeautifulSoup(content, "lxml")
         text = soup.find("pre")
+
         if text:
             try:
-                data = json.loads(text.get_text())
-                return data.get("data", [])
-            except json.JSONDecodeError:
-                pass
+                raw_text = text.get_text()
+                data = json.loads(raw_text)
+                activities = data.get("data", [])
+                paging = data.get("paging", {})
+                logger.info(
+                    f"API 返回: {len(activities)} 条记录, total={paging.get('totals', 'unknown')}"
+                )
+                return activities
+            except json.JSONDecodeError as e:
+                logger.warning(f"解析 API 响应失败: {e}")
+        else:
+            logger.warning("API 响应中没有找到 JSON 数据")
 
         return []
+
+    def _parse_activities_from_html(self, html: str) -> List[Dict]:
+        """从 HTML 页面中解析活动数据"""
+        activities = []
+        soup = BeautifulSoup(html, "lxml")
+
+        # 查找所有活动项
+        activity_items = soup.find_all("div", class_="List-item")
+        logger.debug(f"Found {len(activity_items)} activity items in HTML")
+
+        for item in activity_items:
+            try:
+                # 获取活动类型和时间
+                meta_div = item.find("div", class_="ActivityItem-meta")
+                if not meta_div:
+                    continue
+
+                meta_title = meta_div.find("span", class_="ActivityItem-metaTitle")
+                time_span = meta_div.find_all("span")
+                created_time_str = time_span[-1].text if len(time_span) > 1 else ""
+
+                # 只处理点赞活动
+                if not meta_title or "赞同" not in meta_title.text:
+                    continue
+
+                # 确定类型
+                is_article = "文章" in meta_title.text
+                verb = "MEMBER_VOTEUP_ARTICLE" if is_article else "MEMBER_VOTEUP_ANSWER"
+
+                # 获取内容项
+                content_item = item.find("div", class_="ContentItem")
+                if not content_item:
+                    continue
+
+                # 提取 data-zop 属性
+                data_zop = content_item.get("data-zop", "{}")
+                try:
+                    zop_data = json.loads(data_zop)
+                except json.JSONDecodeError:
+                    zop_data = {}
+
+                answer_id = str(zop_data.get("itemId", ""))
+
+                # 从 title 中提取问题信息和链接
+                title_elem = content_item.find("h2", class_="ContentItem-title")
+                question_title = ""
+                question_id = ""
+                answer_href = ""
+
+                if title_elem:
+                    link = title_elem.find("a")
+                    if link:
+                        question_title = link.get_text(strip=True)
+                        answer_href = link.get("href", "")
+                        # 从 href 中提取 question_id
+                        # 格式: //www.zhihu.com/question/{question_id}/answer/{answer_id}
+                        if "/question/" in answer_href:
+                            parts = answer_href.split("/")
+                            for i, part in enumerate(parts):
+                                if part == "question" and i + 1 < len(parts):
+                                    question_id = parts[i + 1]
+                                    break
+
+                # 获取作者信息
+                author_info = content_item.find("div", class_="AuthorInfo")
+                author_name = ""
+                author_id = ""
+                author_headline = ""
+
+                if author_info:
+                    name_elem = author_info.find("a", class_="UserLink-link")
+                    if name_elem:
+                        author_name = name_elem.get_text(strip=True)
+                        author_id = name_elem.get("href", "").replace("/people/", "")
+                    # 获取作者签名
+                    badge = author_info.find("div", class_="AuthorInfo-badgeText")
+                    if badge:
+                        author_headline = badge.get_text(strip=True)
+
+                # 获取赞同数
+                voteup_count = 0
+                comment_count = 0
+                actions = content_item.find("div", class_="ContentItem-actions")
+                if actions:
+                    # 查找赞同按钮
+                    vote_btn = actions.find("button", class_="VoteButton")
+                    if vote_btn:
+                        text = vote_btn.get_text(strip=True)
+                        # 提取数字
+                        import re
+
+                        numbers = re.findall(r"\d+", text)
+                        if numbers:
+                            voteup_count = int(numbers[0])
+
+                # 解析时间字符串为时间戳
+                created_time = 0
+                if created_time_str:
+                    try:
+                        from datetime import datetime
+
+                        dt = datetime.strptime(created_time_str, "%Y-%m-%d %H:%M")
+                        created_time = int(dt.timestamp() * 1000)  # 毫秒时间戳
+                    except ValueError:
+                        pass
+
+                # 构建完整的活动数据，符合 process_answer 期望的格式
+                activity = {
+                    "id": answer_id,
+                    "verb": verb,
+                    "created_time": created_time,
+                    "target": {
+                        "id": answer_id,
+                        "type": "article" if is_article else "answer",
+                        "question": {
+                            "id": question_id,
+                            "title": question_title,
+                        },
+                        "author": {
+                            "id": author_id,
+                            "name": author_name,
+                            "headline": author_headline,
+                        },
+                        "voteup_count": voteup_count,
+                        "comment_count": comment_count,
+                        "created_time": created_time,
+                        "updated_time": created_time,
+                    },
+                }
+
+                activities.append(activity)
+                logger.debug(f"Parsed activity: {answer_id} - {question_title[:50]}")
+
+            except Exception as e:
+                logger.debug(f"Failed to parse activity item: {e}")
+                continue
+
+        return activities
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
     async def fetch_answer_detail(self, answer_id: str) -> Optional[Dict]:
@@ -616,6 +778,7 @@ class ZhihuCrawler:
             # 保存元数据到数据库
             answer_data = {
                 "id": answer_id,
+                "user_id": self.user_id,  # 添加用户ID
                 "question_id": question_id,
                 "question_title": question_title,
                 "author_id": author_id,
