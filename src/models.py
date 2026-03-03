@@ -7,12 +7,10 @@ Attributes:
     Base: SQLAlchemy 声明式基类，所有模型的基类.
 """
 
-from datetime import timedelta, timezone
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import JSON, Boolean, Column, DateTime, ForeignKey, Index, Integer, String, Text
-from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.orm import declarative_base, relationship
-from sqlalchemy.sql import expression
 
 Base = declarative_base()
 """SQLAlchemy 声明式基类."""
@@ -21,16 +19,14 @@ Base = declarative_base()
 BEIJING_TZ = timezone(timedelta(hours=8))
 
 
-class BeijingNow(expression.FunctionElement):
-    """SQLAlchemy 函数元素，用于获取北京时间."""
+def get_beijing_now_naive() -> datetime:
+    """获取当前北京时间（无时区，用于 SQLite）.
 
-    type = DateTime()
-
-
-@compiles(BeijingNow, "sqlite")
-def compile_beijing_now(element, compiler, **kw):
-    """SQLite 编译器：返回当前北京时间."""
-    return "datetime('now', '+8 hours')"
+    Returns:
+        datetime: 无时区的北京时间.
+    """
+    dt = datetime.now(BEIJING_TZ)
+    return dt.replace(tzinfo=None)
 
 
 class User(Base):
@@ -60,8 +56,10 @@ class User(Base):
     avatar_url = Column(String(500), nullable=True, comment="头像URL")
     headline = Column(String(500), nullable=True, comment="个性签名")
     is_active = Column(Boolean, default=True, comment="是否激活")
-    created_at = Column(DateTime, default=BeijingNow, comment="添加时间")
-    updated_at = Column(DateTime, default=BeijingNow, onupdate=BeijingNow, comment="更新时间")
+    created_at = Column(DateTime, default=get_beijing_now_naive, comment="添加时间")
+    updated_at = Column(
+        DateTime, default=get_beijing_now_naive, onupdate=get_beijing_now_naive, comment="更新时间"
+    )
     last_sync_at = Column(DateTime, nullable=True, comment="上次同步时间")
     sync_count = Column(Integer, default=0, comment="同步次数")
 
@@ -123,7 +121,7 @@ class Answer(Base):
     created_time = Column(DateTime, comment="回答创建时间")
     updated_time = Column(DateTime, comment="回答更新时间")
     liked_time = Column(DateTime, comment="用户点赞时间")
-    synced_at = Column(DateTime, default=BeijingNow, comment="同步时间")
+    synced_at = Column(DateTime, default=get_beijing_now_naive, comment="同步时间")
 
     # 存储路径
     html_path = Column(String(500), comment="本地HTML文件路径")
@@ -182,7 +180,7 @@ class Comment(Base):
 
     # 时间
     created_time = Column(DateTime, comment="评论创建时间")
-    synced_at = Column(DateTime, default=BeijingNow, comment="同步时间")
+    synced_at = Column(DateTime, default=get_beijing_now_naive, comment="同步时间")
 
     # 关系
     answer = relationship("Answer", back_populates="comments")
@@ -216,7 +214,7 @@ class SyncLog(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(String(50), ForeignKey("users.id"), nullable=True, comment="用户ID")
-    started_at = Column(DateTime, default=BeijingNow, comment="开始时间")
+    started_at = Column(DateTime, default=get_beijing_now_naive, comment="开始时间")
     ended_at = Column(DateTime, comment="结束时间")
     status = Column(String(20), comment="状态: running/success/failed")
     items_scanned = Column(Integer, default=0, comment="扫描条目数")
@@ -275,8 +273,10 @@ class AlertConfig(Base):
     alert_on_sync_error = Column(Boolean, default=True, comment="同步失败告警")
     alert_on_rate_limit = Column(Boolean, default=True, comment="频率限制告警")
 
-    created_at = Column(DateTime, default=BeijingNow, comment="创建时间")
-    updated_at = Column(DateTime, default=BeijingNow, onupdate=BeijingNow, comment="更新时间")
+    created_at = Column(DateTime, default=get_beijing_now_naive, comment="创建时间")
+    updated_at = Column(
+        DateTime, default=get_beijing_now_naive, onupdate=get_beijing_now_naive, comment="更新时间"
+    )
 
 
 class AlertHistory(Base):
@@ -304,4 +304,4 @@ class AlertHistory(Base):
     channel = Column(String(50), comment="发送渠道: webhook/email")
     status = Column(String(20), comment="状态: success/failed")
     error_info = Column(Text, nullable=True, comment="错误信息")
-    created_at = Column(DateTime, default=BeijingNow, comment="创建时间")
+    created_at = Column(DateTime, default=get_beijing_now_naive, comment="创建时间")
