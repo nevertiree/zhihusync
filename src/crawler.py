@@ -487,10 +487,17 @@ class ZhihuCrawler:
             )
 
             if user_info.get("name") or user_info.get("avatar_url"):
+                # 下载用户头像
+                local_avatar = None
+                if user_info.get("avatar_url"):
+                    local_avatar = await self.storage.download_avatar(
+                        user_info.get("avatar_url"), self.user_id
+                    )
+
                 self.db.update_user_info(
                     self.user_id,
                     name=user_info.get("name"),
-                    avatar_url=user_info.get("avatar_url"),
+                    avatar_url=local_avatar or user_info.get("avatar_url"),
                     headline=user_info.get("headline"),
                 )
                 logger.info(
@@ -1090,11 +1097,21 @@ class ZhihuCrawler:
             if not author_headline:
                 author_headline = author.get("headline", "")
 
+            # 下载作者头像
+            local_author_avatar = None
+            if author_avatar_url and author_id:
+                local_author_avatar = await self.storage.download_avatar(
+                    author_avatar_url, author_id
+                )
+                if local_author_avatar:
+                    author_avatar_url = local_author_avatar
+
             # 保存 HTML 文件
             metadata = {
                 "question_id": question_id,
                 "author_name": author_name,
                 "author_headline": author_headline,
+                "author_avatar_url": author_avatar_url or "",
                 "voteup_count": voteup_count,
                 "comment_count": comment_count,
                 "updated_time": (
