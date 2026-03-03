@@ -43,6 +43,7 @@
                     <th>ID</th>
                     <th>开始时间</th>
                     <th>结束时间</th>
+                    <th>类型</th>
                     <th>状态</th>
                     <th>扫描</th>
                     <th>新增</th>
@@ -52,7 +53,7 @@
             </thead>
             <tbody id="history-body">
                 <tr>
-                    <td colspan="8" class="text-center text-muted">加载中...</td>
+                    <td colspan="9" class="text-center text-muted">加载中...</td>
                 </tr>
             </tbody>
         </table>
@@ -136,11 +137,20 @@ async function loadHistory(page = 1) {
                 'running': '进行中'
             }[log.status] || log.status;
 
+            // 同步类型显示
+            const syncTypeConfig = {
+                'manual': { text: '手工', class: 'badge-info' },
+                'scheduled': { text: '定时', class: 'badge-success' },
+                'full': { text: '全量', class: 'badge-warning' }
+            };
+            const typeConfig = syncTypeConfig[log.sync_type] || { text: '手工', class: 'badge-info' };
+
             return `
                 <tr>
                     <td>${log.id}</td>
                     <td>${log.started_at ? new Date(log.started_at).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' }) : '-'}</td>
                     <td>${log.ended_at ? new Date(log.ended_at).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' }) : '-'}</td>
+                    <td><span class="badge ${typeConfig.class}">${typeConfig.text}</span></td>
                     <td><span class="badge ${statusClass}">${statusText}</span></td>
                     <td>${log.items_scanned || 0}</td>
                     <td>${log.items_new || 0}</td>
@@ -157,7 +167,7 @@ async function loadHistory(page = 1) {
         renderHistoryPagination(totalPages);
     } catch (e) {
         document.getElementById('history-body').innerHTML =
-            `<tr><td colspan="8" class="text-center text-danger">加载失败: ${e.message}</td></tr>`;
+            `<tr><td colspan="9" class="text-center text-danger">加载失败: ${e.message}</td></tr>`;
     }
 }
 
