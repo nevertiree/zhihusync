@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}支持开发者 - zhihusync{% endblock %}
+{% block title %}捐赠 - zhihusync{% endblock %}
 
 {% block content %}
 <div class="page-header">
@@ -32,45 +32,9 @@
 
     <!-- 捐赠方式 -->
     <div class="donate-methods">
-        <h3>💝 支持方式</h3>
-        
-        <div class="donate-grid">
-            <!-- 微信支付 -->
-            <div class="card donate-card">
-                <div class="card-header">
-                    <h4>💚 微信支付</h4>
-                </div>
-                <div class="card-body">
-                    <div class="qr-placeholder" id="wechat-qr">
-                        <div class="qr-upload" onclick="document.getElementById('wechat-input').click()">
-                            <span class="qr-icon">📱</span>
-                            <span class="qr-text">点击上传微信收款码</span>
-                            <small>建议尺寸 300x300</small>
-                        </div>
-                        <input type="file" id="wechat-input" accept="image/*" style="display:none" onchange="previewQR(this, 'wechat-qr')">
-                    </div>
-                    <p class="donate-tip">打开微信扫一扫</p>
-                </div>
-            </div>
+        <h3>💝 捐赠方式</h3>
 
-            <!-- 支付宝 -->
-            <div class="card donate-card">
-                <div class="card-header">
-                    <h4>💙 支付宝</h4>
-                </div>
-                <div class="card-body">
-                    <div class="qr-placeholder" id="alipay-qr">
-                        <div class="qr-upload" onclick="document.getElementById('alipay-input').click()">
-                            <span class="qr-icon">📱</span>
-                            <span class="qr-text">点击上传支付宝收款码</span>
-                            <small>建议尺寸 300x300</small>
-                        </div>
-                        <input type="file" id="alipay-input" accept="image/*" style="display:none" onchange="previewQR(this, 'alipay-qr')">
-                    </div>
-                    <p class="donate-tip">打开支付宝扫一扫</p>
-                </div>
-            </div>
-
+        <div class="donate-grid two-columns">
             <!-- Buy Me a Coffee -->
             <div class="card donate-card">
                 <div class="card-header">
@@ -81,7 +45,7 @@
                         <span class="bmc-icon">☕</span>
                         <p>Buy Me a Coffee</p>
                         <a href="https://www.buymeacoffee.com/yourusername" target="_blank" class="btn btn-primary btn-small">
-                            去支持
+                            去捐赠
                         </a>
                     </div>
                     <p class="donate-tip">支持 PayPal / 信用卡</p>
@@ -141,20 +105,4 @@
         </div>
     </div>
 </div>
-{% endblock %}
-
-{% block scripts %}
-<script>
-// QR 码预览
-function previewQR(input, previewId) {
-    if (input.files && input.files[0]) {
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            const container = document.getElementById(previewId);
-            container.innerHTML = `<img src="${e.target.result}" alt="收款码" class="qr-image">`;
-        };
-        reader.readAsDataURL(input.files[0]);
-    }
-}
-</script>
 {% endblock %}
