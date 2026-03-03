@@ -1,10 +1,10 @@
 {% extends "base.html" %}
 
-{% block title %}备份内容 - zhihusync{% endblock %}
+{% block title %}明细 - zhihusync{% endblock %}
 
 {% block content %}
 <div class="page-header">
-    <h2>📄 备份内容</h2>
+    <h2>📋 明细</h2>
     <div class="header-actions">
         <div class="search-box">
             <input type="text" id="search-input" placeholder="搜索标题或作者..."
@@ -18,20 +18,24 @@
 <div class="card">
     <div class="card-body">
         <div class="table-container">
-            <table class="data-table content-table">
+            <table class="data-table detail-table">
                 <thead>
                     <tr>
-                        <th style="width: 35%;">问题</th>
-                        <th style="width: 25%;">作者</th>
-                        <th>点赞</th>
-                        <th>评论</th>
-                        <th>备份时间</th>
-                        <th style="width: 180px;">操作</th>
+                        <th style="width: 80px;">用户</th>
+                        <th style="width: 120px;">回答作者</th>
+                        <th style="min-width: 200px;">问题标题</th>
+                        <th style="width: 60px;">点赞</th>
+                        <th style="width: 60px;">评论</th>
+                        <th style="width: 90px;">点赞时间</th>
+                        <th style="width: 90px;">回答时间</th>
+                        <th style="width: 90px;">修改时间</th>
+                        <th style="width: 90px;">备份时间</th>
+                        <th style="width: 140px;">操作</th>
                     </tr>
                 </thead>
                 <tbody id="answers-body">
                     <tr>
-                        <td colspan="6" class="text-center text-muted">加载中...</td>
+                        <td colspan="10" class="text-center text-muted">加载中...</td>
                     </tr>
                 </tbody>
             </table>
@@ -78,171 +82,173 @@
                 <div class="image-preview-container">
                     <img id="generated-image" src="" alt="生成的长图" class="image-preview">
                 </div>
-                <div class="image-info mt-3">
-                    <p class="text-muted small" id="image-info-text"></p>
+                <div class="image-actions">
+                    <a id="image-download-link" href="" download class="btn btn-primary">下载图片</a>
+                    <button class="btn btn-secondary" onclick="copyImageUrl()">复制链接</button>
                 </div>
             </div>
-            <div id="image-error" class="alert alert-danger hidden"></div>
+            <div id="image-error" class="alert alert-danger hidden">
+                <p id="image-error-message"></p>
+            </div>
         </div>
-        <div class="modal-footer" id="image-modal-footer">
-            <button class="btn btn-secondary" onclick="closeImageModal()">关闭</button>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeImageModal()">取消</button>
             <button class="btn btn-primary" id="btn-generate" onclick="generateImage()">开始生成</button>
-            <a id="btn-download" href="#" download class="btn btn-success hidden" target="_blank">下载图片</a>
+            <a id="btn-download" href="" download class="btn btn-success hidden">下载图片</a>
         </div>
     </div>
 </div>
+{% endblock %}
 
+{% block styles %}
 <style>
-/* 图片生成模态框样式 */
-.modal-lg {
-    max-width: 800px;
-    width: 90%;
-}
-
-.image-preview-container {
-    max-height: 500px;
-    overflow-y: auto;
-    border: 1px solid #e0e0e0;
-    border-radius: 8px;
-    padding: 10px;
-    background: #f5f5f5;
-}
-
-.image-preview {
-    max-width: 100%;
-    height: auto;
-    display: block;
-    margin: 0 auto;
-    border-radius: 4px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-}
-
-.loading-spinner {
-    width: 50px;
-    height: 50px;
-    border: 4px solid #f3f3f3;
-    border-top: 4px solid #0066ff;
-    border-radius: 50%;
-    animation: spin 1s linear infinite;
-    margin: 0 auto;
-}
-
-@keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-}
-
-.hidden {
-    display: none !important;
-}
-
-.form-group {
-    margin-bottom: 15px;
-}
-
-.form-group label {
-    display: block;
-    margin-bottom: 5px;
-    font-weight: 500;
-}
-
-.form-control {
-    width: 100%;
-    padding: 8px 12px;
-    border: 1px solid #d9d9d9;
-    border-radius: 4px;
-    font-size: 14px;
-}
-
-.checkbox-label {
-    display: flex !important;
-    align-items: center;
-    gap: 8px;
-    cursor: pointer;
-}
-
-.checkbox-label input[type="checkbox"] {
-    width: 18px;
-    height: 18px;
-    cursor: pointer;
-}
-
-.mt-3 {
-    margin-top: 15px;
-}
-
-.btn-generate-img {
-    background: #0066ff;
-    color: white;
-    border: none;
-    padding: 4px 10px;
-    border-radius: 4px;
+/* 明细表格样式 */
+.detail-table {
     font-size: 12px;
-    cursor: pointer;
-    transition: all 0.2s;
 }
 
-.btn-generate-img:hover {
-    background: #005ce6;
-}
-
-.actions-cell {
+.detail-table th {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    padding: 10px 6px;
     white-space: nowrap;
 }
 
-.actions-cell .btn {
-    margin-right: 4px;
-    padding: 4px 8px;
-    font-size: 12px;
+.detail-table td {
+    padding: 8px 6px;
+    vertical-align: middle;
 }
 
-.actions-cell .btn:last-child {
-    margin-right: 0;
+/* 用户标签 */
+.user-tag {
+    display: inline-block;
+    padding: 2px 8px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 500;
+    white-space: nowrap;
 }
 
-/* 作者信息显示 */
-.author-info-cell {
+/* 作者信息 */
+.author-cell {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
 }
 
 .author-avatar-small {
-    width: 32px;
-    height: 32px;
-    border-radius: 4px;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
     object-fit: cover;
     flex-shrink: 0;
 }
 
 .author-avatar-placeholder {
-    width: 32px;
-    height: 32px;
-    border-radius: 4px;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 14px;
+    font-size: 12px;
     flex-shrink: 0;
-}
-
-.author-details {
-    min-width: 0;
 }
 
 .author-name {
     font-weight: 500;
-    font-size: 13px;
-}
-
-.author-headline-small {
-    font-size: 11px;
-    color: var(--text-secondary);
+    color: var(--text-primary);
+    max-width: 80px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    max-width: 150px;
+}
+
+/* 问题标题 */
+.title-cell {
+    max-width: 250px;
+}
+
+.title-cell a {
+    color: var(--text-primary);
+    text-decoration: none;
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.title-cell a:hover {
+    color: var(--primary);
+}
+
+/* 数字列 */
+.number-cell {
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+}
+
+/* 时间列 */
+.time-cell {
+    font-size: 11px;
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+
+/* 操作按钮 */
+.actions-cell {
+    display: flex;
+    gap: 4px;
+    flex-wrap: nowrap;
+}
+
+.actions-cell .btn {
+    padding: 4px 8px;
+    font-size: 11px;
+    white-space: nowrap;
+}
+
+.btn-view {
+    background: var(--primary);
+    color: white;
+}
+
+.btn-view:hover {
+    background: var(--primary-dark);
+}
+
+.btn-screenshot {
+    background: var(--success);
+    color: white;
+}
+
+.btn-screenshot:hover {
+    background: #45ad14;
+}
+
+.btn-delete {
+    background: var(--danger);
+    color: white;
+}
+
+.btn-delete:hover {
+    background: #cf1322;
+}
+
+/* 响应式 */
+@media (max-width: 1400px) {
+    .detail-table {
+        font-size: 11px;
+    }
+    
+    .detail-table th,
+    .detail-table td {
+        padding: 6px 4px;
+    }
 }
 </style>
 {% endblock %}
@@ -254,6 +260,31 @@ let totalPages = 1;
 let currentAnswerId = null;
 let currentAnswerTitle = '';
 
+// 格式化时间
+function formatTime(isoString) {
+    if (!isoString) return '-';
+    const date = new Date(isoString);
+    return date.toLocaleString('zh-CN', {
+        timeZone: 'Asia/Shanghai',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+}
+
+// 格式化日期
+function formatDate(isoString) {
+    if (!isoString) return '-';
+    const date = new Date(isoString);
+    return date.toLocaleString('zh-CN', {
+        timeZone: 'Asia/Shanghai',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+    });
+}
+
 // 加载回答列表
 async function loadAnswers(page = 1) {
     currentPage = page;
@@ -261,7 +292,7 @@ async function loadAnswers(page = 1) {
 
     try {
         const tbody = document.getElementById('answers-body');
-        tbody.innerHTML = '<tr><td colspan="6" class="text-center">加载中...</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="10" class="text-center">加载中...</td></tr>';
 
         const url = `/api/answers?page=${page}&page_size=20${search ? '&search=' + encodeURIComponent(search) : ''}`;
         const res = await fetch(url);
@@ -270,7 +301,7 @@ async function loadAnswers(page = 1) {
         totalPages = data.total_pages;
 
         if (data.items.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">暂无数据</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="10" class="text-center text-muted">暂无数据</td></tr>';
             renderPagination();
             return;
         }
@@ -278,44 +309,41 @@ async function loadAnswers(page = 1) {
         tbody.innerHTML = data.items.map(item => {
             const title = escapeHtml(item.question_title || '无标题');
             const author = escapeHtml(item.author_name || '匿名用户');
-            const synced = item.synced_at
-                ? new Date(item.synced_at).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })
-                : '-';
-            const htmlFileName = item.html_path ? item.html_path.split('/').pop() : '';
-
+            const userTag = escapeHtml(item.user_id ? item.user_id.substring(0, 6) : '未知');
+            
             const authorAvatar = item.author_avatar_url
                 ? `<img src="${item.author_avatar_url}" class="author-avatar-small" alt="">`
                 : '<span class="author-avatar-placeholder">👤</span>';
-            const authorHeadline = item.author_headline
-                ? `<div class="author-headline-small">${escapeHtml(item.author_headline)}</div>`
-                : '';
+            
+            const htmlFileName = item.html_path ? item.html_path.split('/').pop() : '';
 
             return `
                 <tr>
+                    <td><span class="user-tag" title="用户ID: ${escapeHtml(item.user_id || '')}">${userTag}</span></td>
+                    <td>
+                        <div class="author-cell" title="${author}">
+                            ${authorAvatar}
+                            <span class="author-name">${author}</span>
+                        </div>
+                    </td>
                     <td class="title-cell" title="${title}">
                         <a href="${item.original_url}" target="_blank">${title}</a>
                     </td>
-                    <td>
-                        <div class="author-info-cell">
-                            ${authorAvatar}
-                            <div class="author-details">
-                                <div class="author-name">${author}</div>
-                                ${authorHeadline}
-                            </div>
-                        </div>
-                    </td>
-                    <td>${item.voteup_count.toLocaleString()}</td>
-                    <td>${item.comment_count.toLocaleString()}</td>
-                    <td>${synced}</td>
+                    <td class="number-cell">${item.voteup_count.toLocaleString()}</td>
+                    <td class="number-cell">${item.comment_count.toLocaleString()}</td>
+                    <td class="time-cell">${formatTime(item.liked_time)}</td>
+                    <td class="time-cell">${formatDate(item.created_time)}</td>
+                    <td class="time-cell">${formatDate(item.updated_time)}</td>
+                    <td class="time-cell">${formatTime(item.synced_at)}</td>
                     <td class="actions-cell">
                         ${item.html_path ? `
                             <a href="/data/html/${encodeURIComponent(htmlFileName)}"
-                               target="_blank" class="btn btn-sm btn-secondary">查看</a>
-                            <button class="btn btn-generate-img"
+                               target="_blank" class="btn btn-view" title="查看">👁</a>
+                            <button class="btn btn-screenshot"
                                     onclick="openImageModal('${item.id}', '${escapeHtml(title)}')"
-                                    title="生成长图">📷 截图</button>
-                        ` : '<span class="text-muted">无文件</span>'}
-                        <button class="btn btn-sm btn-danger" onclick="deleteAnswer('${item.id}', '${escapeHtml(title)}')">删除</button>
+                                    title="截图">📷</button>
+                        ` : '<span class="text-muted">-</span>'}
+                        <button class="btn btn-delete" onclick="deleteAnswer('${item.id}', '${escapeHtml(title)}')" title="删除">🗑</button>
                     </td>
                 </tr>
             `;
@@ -325,7 +353,7 @@ async function loadAnswers(page = 1) {
     } catch (e) {
         console.error('加载失败:', e);
         document.getElementById('answers-body').innerHTML =
-            `<tr><td colspan="6" class="text-center text-danger">加载失败: ${e.message}</td></tr>`;
+            `<tr><td colspan="10" class="text-center text-danger">加载失败: ${e.message}</td></tr>`;
     }
 }
 
@@ -340,11 +368,9 @@ function renderPagination() {
 
     let html = '';
 
-    // 上一页
     html += `<button class="btn btn-sm ${currentPage === 1 ? 'disabled' : ''}"
         ${currentPage === 1 ? '' : `onclick="loadAnswers(${currentPage - 1})"`}>上一页</button>`;
 
-    // 页码
     const maxButtons = 5;
     let start = Math.max(1, currentPage - Math.floor(maxButtons / 2));
     let end = Math.min(totalPages, start + maxButtons - 1);
@@ -368,97 +394,22 @@ function renderPagination() {
         html += `<button class="btn btn-sm" onclick="loadAnswers(${totalPages})">${totalPages}</button>`;
     }
 
-    // 下一页
     html += `<button class="btn btn-sm ${currentPage === totalPages ? 'disabled' : ''}"
         ${currentPage === totalPages ? '' : `onclick="loadAnswers(${currentPage + 1})"`}>下一页</button>`;
 
     container.innerHTML = html;
 }
 
-// 打开生成长图模态框
-function openImageModal(answerId, title) {
-    currentAnswerId = answerId;
-    currentAnswerTitle = title;
-
-    // 重置状态
-    document.getElementById('image-modal-title').textContent = `为回答生成长图: ${title.substring(0, 50)}${title.length > 50 ? '...' : ''}`;
-    document.getElementById('image-generate-form').classList.remove('hidden');
-    document.getElementById('image-generating').classList.add('hidden');
-    document.getElementById('image-result').classList.add('hidden');
-    document.getElementById('image-error').classList.add('hidden');
-    document.getElementById('btn-generate').classList.remove('hidden');
-    document.getElementById('btn-download').classList.add('hidden');
-
-    // 显示模态框
-    document.getElementById('image-modal').classList.add('active');
-}
-
-// 关闭生成长图模态框
-function closeImageModal() {
-    document.getElementById('image-modal').classList.remove('active');
-    currentAnswerId = null;
-    currentAnswerTitle = '';
-}
-
-// 生成图片
-async function generateImage() {
-    if (!currentAnswerId) return;
-
-    const cardStyle = document.getElementById('card-style').value;
-    const includeComments = document.getElementById('include-comments').checked;
-
-    // 显示生成中状态
-    document.getElementById('image-generate-form').classList.add('hidden');
-    document.getElementById('image-generating').classList.remove('hidden');
-    document.getElementById('btn-generate').classList.add('hidden');
-    document.getElementById('image-error').classList.add('hidden');
-
-    try {
-        const url = `/api/answers/${currentAnswerId}/generate-image?card_style=${cardStyle}&include_comments=${includeComments}`;
-        const res = await fetch(url, {method: 'POST'});
-        const data = await res.json();
-
-        if (res.ok && data.status === 'success') {
-            // 显示结果
-            document.getElementById('image-generating').classList.add('hidden');
-            document.getElementById('image-result').classList.remove('hidden');
-
-            const imageUrl = data.data.image_url;
-            document.getElementById('generated-image').src = imageUrl;
-            document.getElementById('btn-download').href = imageUrl;
-            document.getElementById('btn-download').classList.remove('hidden');
-            document.getElementById('image-info-text').textContent =
-                `图片路径: ${data.data.image_path}`;
-
-            showToast('图片生成成功！', 'success');
-        } else {
-            throw new Error(data.detail || '生成失败');
-        }
-    } catch (e) {
-        console.error('生成图片失败:', e);
-        document.getElementById('image-generating').classList.add('hidden');
-        document.getElementById('image-generate-form').classList.remove('hidden');
-        document.getElementById('btn-generate').classList.remove('hidden');
-
-        const errorDiv = document.getElementById('image-error');
-        errorDiv.textContent = '生成失败: ' + e.message;
-        errorDiv.classList.remove('hidden');
-
-        showToast('图片生成失败: ' + e.message, 'error');
-    }
-}
-
 // 删除回答
-async function deleteAnswer(id, title) {
-    if (!confirm(`确定要删除回答 "${title}" 吗？\n\n此操作不可恢复！`)) {
+async function deleteAnswer(answerId, title) {
+    if (!confirm(`确定要删除回答 "${title.substring(0, 30)}..." 吗？\n\n此操作不可恢复！`)) {
         return;
     }
 
     try {
-        const res = await fetch(`/api/answers/${id}`, {method: 'DELETE'});
-
+        const res = await fetch(`/api/answers/${answerId}`, { method: 'DELETE' });
         if (res.ok) {
-            showToast('已删除', 'success');
+            showToast('删除成功', 'success');
             loadAnswers(currentPage);
         } else {
             const data = await res.json();
@@ -467,6 +418,67 @@ async function deleteAnswer(id, title) {
     } catch (e) {
         showToast('删除失败: ' + e.message, 'error');
     }
+}
+
+// 打开生成长图模态框
+function openImageModal(answerId, title) {
+    currentAnswerId = answerId;
+    currentAnswerTitle = title;
+
+    document.getElementById('image-modal-title').textContent = `为回答生成长图: ${title.substring(0, 50)}${title.length > 50 ? '...' : ''}`;
+    document.getElementById('image-generate-form').classList.remove('hidden');
+    document.getElementById('image-generating').classList.add('hidden');
+    document.getElementById('image-result').classList.add('hidden');
+    document.getElementById('image-error').classList.add('hidden');
+    document.getElementById('btn-generate').classList.remove('hidden');
+    document.getElementById('btn-download').classList.add('hidden');
+
+    document.getElementById('image-modal').classList.add('active');
+}
+
+// 关闭生成长图模态框
+function closeImageModal() {
+    document.getElementById('image-modal').classList.remove('active');
+}
+
+// 生成长图
+async function generateImage() {
+    const cardStyle = document.getElementById('card-style').value;
+    const includeComments = document.getElementById('include-comments').checked;
+
+    document.getElementById('image-generate-form').classList.add('hidden');
+    document.getElementById('image-generating').classList.remove('hidden');
+    document.getElementById('btn-generate').classList.add('hidden');
+
+    try {
+        const url = `/api/answers/${currentAnswerId}/generate-image?card_style=${cardStyle}&include_comments=${includeComments}`;
+        const res = await fetch(url, { method: 'POST' });
+        const data = await res.json();
+
+        if (res.ok && data.status === 'success') {
+            document.getElementById('image-generating').classList.add('hidden');
+            document.getElementById('image-result').classList.remove('hidden');
+            document.getElementById('generated-image').src = data.image_url;
+            document.getElementById('image-download-link').href = data.image_url;
+            document.getElementById('btn-download').href = data.image_url;
+            document.getElementById('btn-download').classList.remove('hidden');
+        } else {
+            throw new Error(data.detail || '生成失败');
+        }
+    } catch (e) {
+        document.getElementById('image-generating').classList.add('hidden');
+        document.getElementById('image-error').classList.remove('hidden');
+        document.getElementById('image-error-message').textContent = e.message;
+        document.getElementById('btn-generate').classList.remove('hidden');
+    }
+}
+
+// 复制图片链接
+function copyImageUrl() {
+    const url = document.getElementById('generated-image').src;
+    navigator.clipboard.writeText(url).then(() => {
+        showToast('链接已复制', 'success');
+    });
 }
 
 // HTML 转义

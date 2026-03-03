@@ -680,12 +680,16 @@ async def get_answers(page: int = 1, page_size: int = 20, search: str = ""):
             items.append(
                 {
                     "id": a.id,
+                    "user_id": a.user_id,
                     "question_title": a.question_title,
                     "author_name": a.author_name or "匿名用户",
                     "author_avatar_url": a.author_avatar_url,
                     "author_headline": a.author_headline,
                     "voteup_count": a.voteup_count,
                     "comment_count": a.comment_count,
+                    "created_time": a.created_time.isoformat() if a.created_time else "",
+                    "updated_time": a.updated_time.isoformat() if a.updated_time else "",
+                    "liked_time": a.liked_time.isoformat() if a.liked_time else "",
                     "synced_at": a.synced_at.isoformat() if a.synced_at else "",
                     "html_path": a.html_path,
                     "original_url": a.original_url,
