@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Initial support for parsing liked articles (previously only answers were supported)
+- Comprehensive unit tests (43 tests) covering web API, crawler, and storage modules
 
 ### Fixed
 - Fixed `fetch_likes` method to parse activity data from user profile HTML
@@ -16,6 +17,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed missing `user_id` field in `answer_data` causing database errors
 - Added `save_answer` method in `StorageManager` for saving complete HTML documents
 - Added `_build_full_html` method to generate styled HTML documents
+- **Fixed 404 error** when clicking "View" button in backup content page by adding `/data/html` static file route
+- **Fixed empty user list** in dashboard by adding `/api/users` endpoint with proper field mapping
+- **Fixed truncated content** by adding `_expand_all_content` method to click "阅读全文" (Read full) buttons
+- **Fixed missing CSS styles** by enhancing HTML template with Zhihu-like styling including:
+  - Proper typography and colors matching Zhihu's design
+  - Mobile responsive styles
+  - Author information section
+  - Vote count display
+  - Metadata footer
 
 ## [0.2.0] - 2026-03-03
 
