@@ -828,8 +828,9 @@ body {{
             local_filename = f"avatar_{safe_user_id}{ext}"
             local_path = self.images_path / local_filename
 
-            # 检查是否已存在
-            if local_path.exists():
+            # 检查是否已存在且文件有效(大于1KB)
+            if local_path.exists() and local_path.stat().st_size > 1024:
+                logger.debug(f"头像已存在: {local_path} ({local_path.stat().st_size} bytes)")
                 return f"/data/static/images/{local_filename}"
 
             # 下载头像
@@ -839,9 +840,13 @@ body {{
                 ) as response:
                     if response.status == 200:
                         content = await response.read()
+                        # 检查下载的内容是否有效
+                        if len(content) < 100:
+                            logger.warning(f"头像下载内容太小 ({len(content)} bytes): {avatar_url}")
+                            return None
                         async with aiofiles.open(local_path, "wb") as f:
                             await f.write(content)
-                        logger.debug(f"下载头像: {user_id} -> {local_path}")
+                        logger.debug(f"下载头像: {user_id} -> {local_path} ({len(content)} bytes)")
                         return f"/data/static/images/{local_filename}"
         except Exception as e:
             logger.warning(f"下载头像失败 {user_id}: {e}")
