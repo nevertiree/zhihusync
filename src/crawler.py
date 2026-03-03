@@ -1388,9 +1388,21 @@ class ZhihuCrawler:
         except Exception as e:
             logger.exception(f"处理评论失败: {e}")
 
-    async def scan_likes(self, max_items: int = 50, progress_callback: Callable | None = None):
-        """扫描用户点赞内容 - 支持断点续传"""
-        logger.info(f"开始扫描用户 {self.user_id} 的点赞内容 (max={max_items})...")
+    async def scan_likes(
+        self,
+        max_items: int = 50,
+        progress_callback: Callable | None = None,
+        init_mode: bool = False,
+    ):
+        """扫描用户点赞内容 - 支持断点续传和初始化模式.
+
+        Args:
+            max_items: 最大扫描数量，-1 表示无限制
+            progress_callback: 进度回调函数
+            init_mode: 初始化模式，True 时会重新爬取所有历史数据（无视已存在）
+        """
+        mode_str = "初始化模式" if init_mode else "增量模式"
+        logger.info(f"开始扫描用户 {self.user_id} 的点赞内容 ({mode_str}, max={max_items})...")
 
         # 确保用户记录在数据库中存在
         user_created = self.db.add_user(self.user_id, self.user_id)
@@ -1404,12 +1416,17 @@ class ZhihuCrawler:
         scanned = 0
         offset = 0
         limit = 10  # 减少每批数量，更频繁保存
-        processed_ids = set()  # 防止重复处理
+        processed_ids = set()  # 防止重复处理（仅当前批次内）
 
-        # 获取已处理的回答ID，支持断点续传
+        # 获取已处理的回答ID
         existing_answers = self.db.get_user_answer_ids(self.user_id)
-        processed_ids.update(existing_answers)
-        logger.info(f"已有 {len(processed_ids)} 条回答，将跳过重复内容")
+
+        if init_mode:
+            logger.info(f"初始化模式：将重新爬取所有 {len(existing_answers)} 条历史数据")
+        else:
+            # 增量模式：跳过已存在的
+            processed_ids.update(existing_answers)
+            logger.info(f"已有 {len(processed_ids)} 条回答，将跳过重复内容")
 
         # -1 表示无限制
         no_limit = max_items < 0
@@ -1433,13 +1450,17 @@ class ZhihuCrawler:
                 target = activity.get("target", {})
                 answer_id = str(target.get("id", ""))
 
-                # 如果已经处理过，跳过
-                if answer_id and answer_id in processed_ids:
+                # 如果已经处理过，跳过（初始化模式除外）
+                if answer_id and answer_id in processed_ids and not init_mode:
                     logger.debug(f"跳过已处理的回答: {answer_id}")
                     scanned += 1
                     if not no_limit and scanned >= max_items:
                         break
                     continue
+
+                # 初始化模式下，已存在的回答强制更新
+                if init_mode and answer_id and answer_id in existing_answers:
+                    logger.debug(f"初始化模式：强制更新已存在的回答: {answer_id}")
 
                 # 解析点赞时间
                 created_time = activity.get("created_time", 0)

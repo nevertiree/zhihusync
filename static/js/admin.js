@@ -162,3 +162,51 @@ document.addEventListener('keydown', function(e) {
         }
     }
 });
+
+
+// ==================== 初始化采集 ====================
+
+async function startInitSync() {
+    const btn = document.getElementById('init-sync-btn');
+    const status = document.getElementById('init-sync-status');
+
+    // 确认对话框
+    if (!confirm('确定要开始初始化采集吗？\n\n这将：\n- 重新爬取全部历史点赞数据\n- 可能需要较长时间（取决于点赞数量）\n- 可以中途停止')) {
+        return;
+    }
+
+    try {
+        btn.disabled = true;
+        btn.textContent = '🚀 初始化采集中...';
+        status.textContent = '启动中...';
+
+        const res = await fetch('/api/sync/init', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+
+        const data = await res.json();
+
+        if (data.status === 'started') {
+            showToast('success', data.message);
+            status.textContent = '采集中，请查看日志页面了解进度';
+
+            // 3秒后跳转到日志页面
+            setTimeout(() => {
+                window.location.href = '/logs';
+            }, 3000);
+        } else if (data.status === 'error') {
+            showToast('error', data.message);
+            btn.disabled = false;
+            btn.textContent = '🚀 开始初始化采集';
+            status.textContent = '';
+        }
+    } catch (err) {
+        showToast('error', '启动失败: ' + err.message);
+        btn.disabled = false;
+        btn.textContent = '🚀 开始初始化采集';
+        status.textContent = '';
+    }
+}
