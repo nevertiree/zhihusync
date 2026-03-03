@@ -57,9 +57,9 @@
             <span class="icon">🔄</span>
             <span id="sync-btn-text">立即同步</span>
         </button>
-        <button class="btn btn-warning" id="full-sync-btn" onclick="startFullSync()" title="全量同步：重新爬取全部历史点赞">
+        <button class="btn btn-warning" id="full-sync-btn" onclick="startFullSyncWithFeedback(this)" title="全量同步：重新爬取全部历史点赞">
             <span class="icon">🚀</span>
-            <span>全量同步</span>
+            <span id="full-sync-btn-text">全量同步</span>
         </button>
     </div>
 </div>
@@ -438,10 +438,47 @@
     background: var(--warning);
     color: white;
     border: none;
+    transition: all 0.2s ease;
 }
 
 .btn-warning:hover:not(:disabled) {
     background: #d48806;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(250, 173, 20, 0.4);
+}
+
+.btn-warning:active:not(:disabled) {
+    transform: translateY(0);
+    box-shadow: 0 2px 6px rgba(250, 173, 20, 0.3);
+}
+
+.btn-warning.btn-clicked {
+    background: #fa8c16;
+    box-shadow: 0 0 0 3px rgba(250, 173, 20, 0.3);
+    animation: pulse-warning 1s infinite;
+}
+
+@keyframes pulse-warning {
+    0%, 100% {
+        box-shadow: 0 0 0 3px rgba(250, 173, 20, 0.3);
+    }
+    50% {
+        box-shadow: 0 0 0 6px rgba(250, 173, 20, 0.1);
+    }
+}
+
+.btn-primary {
+    transition: all 0.2s ease;
+}
+
+.btn-primary:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 102, 255, 0.3);
+}
+
+.btn-primary:active:not(:disabled) {
+    transform: translateY(0);
+    box-shadow: 0 2px 6px rgba(0, 102, 255, 0.2);
 }
 
 .sync-type-badge {
@@ -665,13 +702,33 @@ async function startSync() {
     }
 }
 
-// 开始全量同步
-async function startFullSync() {
-    if (!confirm('确定要开始全量同步吗？\n\n这将：\n- 重新爬取全部历史点赞数据\n- 无视已存在的数据，强制更新\n- 可能需要较长时间\n\n建议仅在首次使用或数据异常时执行。')) {
-        return;
-    }
+// 开始全量同步（带点击反馈）
+async function startFullSyncWithFeedback(btn) {
+    // 按钮点击反馈效果
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '<span class="icon">⏳</span><span>准备中...</span>';
+    btn.classList.add('btn-clicked');
+    btn.disabled = true;
+
+    // 显示提示
+    showToast('正在启动全量同步...', 'info');
+
+    // 延迟执行，让用户看到反馈
+    await new Promise(resolve => setTimeout(resolve, 300));
 
     try {
+        const confirmed = confirm('确定要开始全量同步吗？\n\n这将：\n- 重新爬取全部历史点赞数据\n- 无视已存在的数据，强制更新\n- 可能需要较长时间\n\n建议仅在首次使用或数据异常时执行。');
+
+        if (!confirmed) {
+            // 恢复按钮状态
+            btn.innerHTML = originalText;
+            btn.classList.remove('btn-clicked');
+            btn.disabled = false;
+            return;
+        }
+
+        btn.innerHTML = '<span class="icon">🚀</span><span>启动中...</span>';
+
         const res = await fetch('/api/sync/init', { method: 'POST' });
         const data = await res.json();
 
@@ -680,10 +737,22 @@ async function startFullSync() {
             checkSyncStatus();
         } else {
             showToast(data.detail || '启动失败', 'error');
+            btn.innerHTML = originalText;
+            btn.classList.remove('btn-clicked');
+            btn.disabled = false;
         }
     } catch (e) {
         showToast('启动失败: ' + e.message, 'error');
+        btn.innerHTML = originalText;
+        btn.classList.remove('btn-clicked');
+        btn.disabled = false;
     }
+}
+
+// 开始全量同步（兼容旧调用）
+async function startFullSync() {
+    const btn = document.getElementById('full-sync-btn');
+    await startFullSyncWithFeedback(btn);
 }
 
 // 停止同步
