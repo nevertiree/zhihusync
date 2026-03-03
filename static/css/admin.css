@@ -248,6 +248,12 @@ body {
   margin-top: 4px;
 }
 
+.stat-separator {
+  margin: 0 4px;
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
 /* 按钮 */
 .btn {
   display: inline-flex;

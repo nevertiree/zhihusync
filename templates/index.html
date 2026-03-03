@@ -76,15 +76,15 @@
     <div class="stat-card">
         <div class="stat-icon">💬</div>
         <div class="stat-content">
-            <div class="stat-value" id="stat-comments">-</div>
-            <div class="stat-label">已备份评论</div>
+            <div class="stat-value"><span id="stat-with-comments">-</span><span class="stat-separator">/</span><span id="stat-total-with-comments">-</span></div>
+            <div class="stat-label">含评论/总回答</div>
         </div>
     </div>
     <div class="stat-card">
-        <div class="stat-icon">✅</div>
+        <div class="stat-icon">⚠️</div>
         <div class="stat-content">
-            <div class="stat-value" id="stat-with-comments">-</div>
-            <div class="stat-label">含评论回答</div>
+            <div class="stat-value" id="stat-deleted">-</div>
+            <div class="stat-label">已删除(404)</div>
         </div>
     </div>
     <div class="stat-card">
@@ -648,8 +648,9 @@ async function loadStats() {
         const data = await res.json();
 
         document.getElementById('stat-answers').textContent = data.total_answers.toLocaleString();
-        document.getElementById('stat-comments').textContent = data.total_comments.toLocaleString();
         document.getElementById('stat-with-comments').textContent = data.with_comments.toLocaleString();
+        document.getElementById('stat-total-with-comments').textContent = data.total_answers.toLocaleString();
+        document.getElementById('stat-deleted').textContent = data.deleted_answers.toLocaleString();
 
         // 更新侧边栏状态
         updateSidebarStatus(data.sync_status);
