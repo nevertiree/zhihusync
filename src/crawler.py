@@ -889,6 +889,7 @@ class ZhihuCrawler:
         full_url = f"{url}?{'&'.join(f'{k}={v}' for k, v in params.items())}"
 
         await self._delay()
+        logger.debug(f"请求评论 API: {full_url}")
         await self.page.goto(full_url)
 
         content = await self.page.content()
@@ -897,10 +898,17 @@ class ZhihuCrawler:
 
         if text:
             try:
-                data = json.loads(text.get_text())
-                return data.get("data", [])
-            except json.JSONDecodeError:
-                pass
+                raw_text = text.get_text()
+                data = json.loads(raw_text)
+                comments = data.get("data", [])
+                logger.debug(f"评论 API 返回: {len(comments)} 条评论")
+                return comments
+            except json.JSONDecodeError as e:
+                logger.warning(f"解析评论 JSON 失败: {e}")
+            except Exception as e:
+                logger.warning(f"获取评论失败: {e}")
+        else:
+            logger.warning(f"评论 API 返回无内容: {answer_id}")
 
         return []
 
@@ -1132,10 +1140,20 @@ class ZhihuCrawler:
         try:
             answer = self.db.get_answer_by_id(answer_id)
             if not answer or answer.has_comments:
+                logger.debug(
+                    f"跳过评论处理: answer_id={answer_id}, exists={bool(answer)}, has_comments={answer.has_comments if answer else 'N/A'}"
+                )
                 return
 
-            logger.info(f"获取评论: {answer_id}")
+            logger.info(f"获取评论: {answer_id} (预期 {answer.comment_count} 条)")
             comments_data = await self.fetch_comments(answer_id, limit=100)
+            logger.info(f"评论 API 返回 {len(comments_data)} 条数据")
+
+            if not comments_data:
+                # 标记为已处理（即使没有评论）避免重复请求
+                self.db.mark_answer_has_comments(answer_id)
+                logger.info(f"回答无评论: {answer_id}")
+                return
 
             comments_to_save = []
             for item in comments_data:
