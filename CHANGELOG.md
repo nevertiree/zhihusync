@@ -26,6 +26,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Author information section
   - Vote count display
   - Metadata footer
+- **Fixed dashboard showing [-] for monitored users** by adding user creation in crawler
+  - Added `db.add_user()` call at the start of `scan_likes()` to ensure user record exists
+  - Added `db.update_user_sync_time()` call after sync completion to update sync info
 
 ## [0.3.0] - 2026-03-03
 
