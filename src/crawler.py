@@ -1166,7 +1166,7 @@ class ZhihuCrawler:
                 return
 
             logger.info(f"获取评论: {answer_id} (预期 {answer.comment_count} 条)")
-            comments_data = await self.fetch_comments(answer_id, limit=100)
+            comments_data = await self.fetch_comments(answer_id, limit=20)
             logger.info(f"评论 API 返回 {len(comments_data)} 条数据")
 
             if not comments_data:
