@@ -18,13 +18,15 @@ def get_beijing_now() -> datetime:
     """获取当前北京时间.
 
     Returns:
-        datetime: 带北京时区信息的当前时间.
+        datetime: 当前北京时间（无时区信息，适合数据库存储）.
 
     Examples:
         >>> now = get_beijing_now()
         >>> print(now.strftime("%Y-%m-%d %H:%M:%S"))
     """
-    return datetime.now(BEIJING_TZ)
+    # 获取带时区的北京时间，然后移除时区信息（SQLite 需要无时区的 datetime）
+    dt = datetime.now(BEIJING_TZ)
+    return dt.replace(tzinfo=None)
 
 
 def get_beijing_time(dt: datetime = None) -> datetime:
