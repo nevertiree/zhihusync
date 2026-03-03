@@ -412,6 +412,96 @@ class ZhihuCrawler:
         """请求延迟"""
         await asyncio.sleep(self.request_delay)
 
+    async def _fetch_user_profile(self):
+        """获取用户详细信息（名称、头像、签名）"""
+        try:
+            url = f"{self.ZHIHU_BASE}/people/{self.user_id}"
+            logger.info(f"获取用户资料: {url}")
+
+            await self._delay()
+            await self.page.goto(url, wait_until="networkidle")
+            await asyncio.sleep(1)
+
+            # 提取用户信息
+            user_info = await self.page.evaluate(
+                """
+                () => {
+                    const result = {
+                        name: null,
+                        avatar_url: null,
+                        headline: null
+                    };
+
+                    // 尝试多种选择器获取用户名
+                    const nameSelectors = [
+                        '.ProfileHeader-name',
+                        '.UserNameCard-name',
+                        '[data-za-detail-view-path-module="UserNameCard"]',
+                        '.ProfileHeader-content .ProfileHeader-name',
+                        '.Card .UserNameCard .UserNameCard-name'
+                    ];
+
+                    for (const selector of nameSelectors) {
+                        const el = document.querySelector(selector);
+                        if (el && el.textContent.trim()) {
+                            result.name = el.textContent.trim();
+                            break;
+                        }
+                    }
+
+                    // 获取头像
+                    const avatarSelectors = [
+                        '.ProfileHeader-avatar img',
+                        '.UserAvatar img',
+                        '.Avatar img',
+                        'img[alt="头像"]'
+                    ];
+
+                    for (const selector of avatarSelectors) {
+                        const el = document.querySelector(selector);
+                        if (el && el.src) {
+                            result.avatar_url = el.src;
+                            break;
+                        }
+                    }
+
+                    // 获取个性签名
+                    const headlineSelectors = [
+                        '.ProfileHeader-headline',
+                        '.UserNameCard-headline',
+                        '.ProfileHeader-contentHeadline'
+                    ];
+
+                    for (const selector of headlineSelectors) {
+                        const el = document.querySelector(selector);
+                        if (el && el.textContent.trim()) {
+                            result.headline = el.textContent.trim();
+                            break;
+                        }
+                    }
+
+                    return result;
+                }
+            """
+            )
+
+            if user_info.get("name") or user_info.get("avatar_url"):
+                self.db.update_user_info(
+                    self.user_id,
+                    name=user_info.get("name"),
+                    avatar_url=user_info.get("avatar_url"),
+                    headline=user_info.get("headline"),
+                )
+                logger.info(
+                    f"获取到用户信息: name={user_info.get('name')}, "
+                    f"headline={user_info.get('headline', '')[:30]}..."
+                )
+            else:
+                logger.warning("未能获取到用户详细信息")
+
+        except Exception as e:
+            logger.warning(f"获取用户资料失败: {e}")
+
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
     async def fetch_likes(self, limit: int = 20, offset: int = 0) -> list[dict]:
         """获取用户点赞列表 - 访问用户主页并解析活动数据"""
@@ -422,13 +512,16 @@ class ZhihuCrawler:
         await self._delay()
         await self.page.goto(url)
 
-        # 等待页面加载并滚动以加载更多内容
+        # 等待页面加载
         try:
             await self.page.wait_for_load_state("networkidle", timeout=10000)
-            # 等待动态内容加载
             await asyncio.sleep(2)
         except Exception:
             pass
+
+        # 滚动页面加载更多内容
+        logger.info("开始滚动页面加载更多内容...")
+        await self._scroll_page_for_activities()
 
         # 获取页面内容
         content = await self.page.content()
@@ -438,7 +531,7 @@ class ZhihuCrawler:
         activities = self._parse_activities_from_html(content)
         if activities:
             logger.info(f"从页面解析到 {len(activities)} 条点赞记录")
-            return activities[:limit]
+            return activities[offset : offset + limit]
 
         # 如果页面解析失败，尝试访问 API
         logger.info("页面解析失败，尝试直接访问 API...")
@@ -775,6 +868,61 @@ class ZhihuCrawler:
         """
         )
 
+    async def _scroll_page_for_activities(self):
+        """滚动页面加载更多动态内容"""
+        logger.info("滚动页面加载更多动态...")
+
+        # 先点击"查看更多"或"展开"按钮（如果有）
+        try:
+            await self.page.evaluate(
+                """
+                () => {
+                    // 点击所有"查看更多"按钮
+                    const buttons = document.querySelectorAll(
+                        'button[data-za-detail-view-element_name="ViewMore"], '
+                        + '.ActivityItem-more, .ContentItem-more, .Button:contains("查看更多")'
+                    );
+                    buttons.forEach(btn => btn.click());
+
+                    // 点击所有"展开阅读全文"按钮
+                    const expandButtons = document.querySelectorAll(
+                        '.ContentItem-expandButton, .RichContent-expandButton'
+                    );
+                    expandButtons.forEach(btn => btn.click());
+                }
+            """
+            )
+            await asyncio.sleep(1)
+        except Exception:
+            pass
+
+        # 多次滚动页面加载更多内容
+        last_height = 0
+        scroll_attempts = 0
+        max_scroll_attempts = 10
+
+        while scroll_attempts < max_scroll_attempts:
+            # 滚动到页面底部
+            await self.page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+            await asyncio.sleep(1.5)  # 等待内容加载
+
+            # 获取新的页面高度
+            new_height = await self.page.evaluate("document.body.scrollHeight")
+
+            if new_height == last_height:
+                # 高度没有变化，尝试再滚动一次确认
+                scroll_attempts += 1
+                if scroll_attempts >= 3:  # 连续3次没有新内容则停止
+                    logger.info(f"滚动结束，共滚动 {scroll_attempts} 次")
+                    break
+            else:
+                # 有新内容加载，重置计数
+                scroll_attempts = 0
+                last_height = new_height
+                logger.debug(f"页面高度变化: {last_height} -> {new_height}")
+
+        logger.info(f"页面滚动完成，最终高度: {last_height}")
+
     async def process_answer(self, activity: dict, liked_time: datetime) -> bool:
         """处理单个回答"""
         try:
@@ -827,6 +975,29 @@ class ZhihuCrawler:
                     separator="\n", strip=True
                 )
 
+            # 提取作者详细信息（头像、签名）
+            author_avatar_url = None
+            author_headline = None
+
+            # 从页面提取作者信息
+            author_info_elem = soup.select_one(".AuthorInfo")
+            if author_info_elem:
+                # 提取头像
+                avatar_img = author_info_elem.select_one(".Avatar img, .UserAvatar img")
+                if avatar_img and avatar_img.get("src"):
+                    author_avatar_url = avatar_img.get("src")
+
+                # 提取签名
+                headline_elem = author_info_elem.select_one(
+                    ".AuthorInfo-badgeText, .AuthorInfo-headline"
+                )
+                if headline_elem:
+                    author_headline = headline_elem.get_text(strip=True)
+
+            # 如果从页面没提取到，使用 API 数据中的
+            if not author_headline:
+                author_headline = author.get("headline", "")
+
             # 保存 HTML 文件
             metadata = {
                 "question_id": question_id,
@@ -856,6 +1027,8 @@ class ZhihuCrawler:
                 "question_title": question_title,
                 "author_id": author_id,
                 "author_name": author_name,
+                "author_avatar_url": author_avatar_url,
+                "author_headline": author_headline,
                 "author_url": author_url,
                 "content_text": content_text[:2000] if content_text else "",
                 "content_length": len(content_text) if content_text else 0,
@@ -898,11 +1071,13 @@ class ZhihuCrawler:
             comments_to_save = []
             for item in comments_data:
                 comment = item.get("comment", item)  # 处理不同格式
+                author_info = comment.get("author", {})
                 comment_info = {
                     "id": str(comment.get("id", "")),
                     "answer_id": answer_id,
-                    "author_id": comment.get("author", {}).get("id", ""),
-                    "author_name": comment.get("author", {}).get("name", "匿名用户"),
+                    "author_id": author_info.get("id", ""),
+                    "author_name": author_info.get("name", "匿名用户"),
+                    "author_avatar_url": author_info.get("avatar_url", ""),
                     "content": comment.get("content", ""),
                     "like_count": comment.get("like_count", 0),
                     "created_time": (
@@ -931,6 +1106,9 @@ class ZhihuCrawler:
         # 确保用户记录在数据库中存在
         user_created = self.db.add_user(self.user_id, self.user_id)
         logger.info(f"用户记录检查: user_id={self.user_id}, created={user_created}")
+
+        # 获取用户详细信息（名称、头像、签名）
+        await self._fetch_user_profile()
 
         self.new_items = 0
         self.updated_items = 0

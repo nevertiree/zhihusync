@@ -22,7 +22,7 @@
                 <thead>
                     <tr>
                         <th style="width: 35%;">问题</th>
-                        <th>作者</th>
+                        <th style="width: 25%;">作者</th>
                         <th>点赞</th>
                         <th>评论</th>
                         <th>备份时间</th>
@@ -199,6 +199,51 @@
 .actions-cell .btn:last-child {
     margin-right: 0;
 }
+
+/* 作者信息显示 */
+.author-info-cell {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.author-avatar-small {
+    width: 32px;
+    height: 32px;
+    border-radius: 4px;
+    object-fit: cover;
+    flex-shrink: 0;
+}
+
+.author-avatar-placeholder {
+    width: 32px;
+    height: 32px;
+    border-radius: 4px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    flex-shrink: 0;
+}
+
+.author-details {
+    min-width: 0;
+}
+
+.author-name {
+    font-weight: 500;
+    font-size: 13px;
+}
+
+.author-headline-small {
+    font-size: 11px;
+    color: var(--text-secondary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 150px;
+}
 </style>
 {% endblock %}
 
@@ -238,12 +283,27 @@ async function loadAnswers(page = 1) {
                 : '-';
             const htmlFileName = item.html_path ? item.html_path.split('/').pop() : '';
 
+            const authorAvatar = item.author_avatar_url
+                ? `<img src="${item.author_avatar_url}" class="author-avatar-small" alt="">`
+                : '<span class="author-avatar-placeholder">👤</span>';
+            const authorHeadline = item.author_headline
+                ? `<div class="author-headline-small">${escapeHtml(item.author_headline)}</div>`
+                : '';
+
             return `
                 <tr>
                     <td class="title-cell" title="${title}">
                         <a href="${item.original_url}" target="_blank">${title}</a>
                     </td>
-                    <td>${author}</td>
+                    <td>
+                        <div class="author-info-cell">
+                            ${authorAvatar}
+                            <div class="author-details">
+                                <div class="author-name">${author}</div>
+                                ${authorHeadline}
+                            </div>
+                        </div>
+                    </td>
                     <td>${item.voteup_count.toLocaleString()}</td>
                     <td>${item.comment_count.toLocaleString()}</td>
                     <td>${synced}</td>
