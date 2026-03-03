@@ -219,4 +219,4 @@ def ensure_directories(config: AppConfig) -> None:
         Path(config.logging.file).parent,
     ]
     for path in paths:
-        Path(path).mkdir(parents=True, exist_ok=True)
+        Path(str(path)).mkdir(parents=True, exist_ok=True)

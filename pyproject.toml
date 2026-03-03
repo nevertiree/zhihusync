@@ -111,6 +111,5 @@ module = [
     "src.image_generator",
     "src.alerts",
     "src.storage",
-    "src.config_loader",
 ]
 ignore_errors = true
