@@ -1196,7 +1196,10 @@ class ZhihuCrawler:
                 self.db.save_comment(comment_info)
                 comments_to_save.append(comment_info)
 
-            # 标记为已获取评论
+            # 追加评论到 HTML 文件
+            if comments_to_save and answer.html_path:
+                await self.storage.append_comments(answer.html_path, comments_to_save)
+
             self.db.mark_answer_has_comments(answer_id)
             logger.info(f"保存 {len(comments_to_save)} 条评论: {answer_id}")
 
