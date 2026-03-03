@@ -12,9 +12,6 @@ Examples:
 """
 
 import asyncio
-
-# 设置北京时区环境变量
-import os
 import signal
 import sys
 from pathlib import Path
@@ -22,14 +19,6 @@ from pathlib import Path
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 from loguru import logger
-
-os.environ["TZ"] = "Asia/Shanghai"
-try:
-    import time
-
-    time.tzset()
-except Exception:
-    pass  # Windows 不支持 tzset
 
 # 添加 src 到路径
 sys.path.insert(0, str(Path(__file__).parent))
