@@ -189,6 +189,12 @@ async def logs_page(request: Request):
     return templates.TemplateResponse("logs.html", {"request": request})
 
 
+@app.get("/donate")
+async def donate_page(request: Request):
+    """捐赠页面"""
+    return templates.TemplateResponse("donate.html", {"request": request})
+
+
 # ============ API 路由 ============
 
 

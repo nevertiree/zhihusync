@@ -213,6 +213,33 @@ zhihusync/
 
 ---
 
+## ☕ 支持项目
+
+如果这个项目对你有帮助，欢迎请开发者喝杯咖啡！
+
+<p align="center">
+  <a href="https://www.buymeacoffee.com/yourusername" target="_blank">
+    <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" height="50">
+  </a>
+</p>
+
+### 捐赠方式
+
+| 方式 | 链接/二维码 |
+|------|------------|
+| 💚 微信支付 | 扫码支付 |
+| 💙 支付宝 | 扫码支付 |
+| 🌐 Buy Me a Coffee | [buymeacoffee.com/yourusername](https://www.buymeacoffee.com/yourusername) |
+| 💖 GitHub Sponsors | [github.com/sponsors/yourusername](https://github.com/sponsors/yourusername) |
+
+> 所有捐赠将用于项目维护（服务器、域名等）以及给开发者续杯咖啡 ☕
+
+### 特别感谢
+
+感谢所有支持这个项目的朋友们！🙏
+
+---
+
 ## 📄 许可证
 
 [MIT License](LICENSE) © 2026 zhihusync
