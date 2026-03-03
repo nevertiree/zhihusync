@@ -740,9 +740,9 @@ body {{
             return
 
         try:
-            local_path = await self._download_image(src, answer_id)
-            if local_path:
-                img_tag["src"] = local_path
+            downloaded_path = await self._download_image(src, answer_id)
+            if downloaded_path:
+                img_tag["src"] = downloaded_path
                 self._downloaded_images.add(src)
         except Exception as e:
             logger.warning(f"下载图片失败 {src}: {e}")
