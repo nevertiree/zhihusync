@@ -194,6 +194,7 @@ class StorageManager:
         meta_str = ""
         author_name = ""
         author_headline = ""
+        author_avatar_url = ""
         voteup_count = ""
         comment_count = ""
         backup_time = ""
@@ -205,6 +206,7 @@ class StorageManager:
                     meta_str += f'<meta name="{key}" content="{value}">\n'
             author_name = metadata.get("author_name", "")
             author_headline = metadata.get("author_headline", "")
+            author_avatar_url = metadata.get("author_avatar_url", "")
             voteup_count = str(metadata.get("voteup_count", "0"))
             comment_count = str(metadata.get("comment_count", "0"))
             backup_time = metadata.get("backup_time", "")
@@ -638,7 +640,9 @@ body {{
 
             <!-- 作者信息 -->
             <div class="answer-header">
-                <div class="author-avatar">{(author_name[0] if author_name else "?").upper()}</div>
+                <div class="author-avatar">
+                    {f'<img src="{author_avatar_url}" alt="{author_name}">' if author_avatar_url else (author_name[0] if author_name else "?").upper()}
+                </div>
                 <div class="author-info">
                     <div class="author-name-row">
                         <span class="author-name">{author_name or "匿名用户"}</span>
@@ -801,6 +805,46 @@ body {{
                         return self._get_local_image_path(url)
         except Exception as e:
             logger.warning(f"下载图片失败 {url}: {e}")
+
+        return None
+
+    async def download_avatar(self, avatar_url: str, user_id: str) -> str | None:
+        """下载用户头像.
+
+        Args:
+            avatar_url: 头像URL.
+            user_id: 用户ID(用于文件名).
+
+        Returns:
+            Optional[str]: 本地相对路径，失败返回None.
+        """
+        if not avatar_url:
+            return None
+
+        try:
+            # 使用用户ID作为文件名，避免重复下载同一用户
+            safe_user_id = hashlib.md5(user_id.encode()).hexdigest()[:16]
+            ext = Path(urlparse(avatar_url).path).suffix or ".jpg"
+            local_filename = f"avatar_{safe_user_id}{ext}"
+            local_path = self.images_path / local_filename
+
+            # 检查是否已存在
+            if local_path.exists():
+                return f"../static/images/{local_filename}"
+
+            # 下载头像
+            async with aiohttp.ClientSession() as session:
+                async with session.get(
+                    avatar_url, timeout=aiohttp.ClientTimeout(total=30)
+                ) as response:
+                    if response.status == 200:
+                        content = await response.read()
+                        async with aiofiles.open(local_path, "wb") as f:
+                            await f.write(content)
+                        logger.debug(f"下载头像: {user_id} -> {local_path}")
+                        return f"../static/images/{local_filename}"
+        except Exception as e:
+            logger.warning(f"下载头像失败 {user_id}: {e}")
 
         return None
 
