@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+
+{% block title %}支持开发者 - zhihusync{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>☕ 请开发者喝杯咖啡</h2>
+    <p class="subtitle">如果这个项目对你有帮助，欢迎支持我继续开发</p>
+</div>
+
+<div class="donate-container">
+    <!-- 项目介绍 -->
+    <div class="card donate-intro">
+        <div class="card-body">
+            <div class="intro-text">
+                <h3>📦 zhihusync</h3>
+                <p>一个开源的知乎点赞内容备份工具，帮助你：</p>
+                <ul class="feature-list">
+                    <li>✅ 自动备份知乎点赞的回答和文章</li>
+                    <li>✅ 生成精美的 HTML 离线浏览页面</li>
+                    <li>✅ 支持评论备份和图片本地化</li>
+                    <li>✅ 一键导出为长图分享</li>
+                </ul>
+                <p class="github-link">
+                    <a href="https://github.com/yourusername/zhihusync" target="_blank" class="btn btn-secondary">
+                        <span>⭐ GitHub 仓库</span>
+                    </a>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- 捐赠方式 -->
+    <div class="donate-methods">
+        <h3>💝 支持方式</h3>
+        
+        <div class="donate-grid">
+            <!-- 微信支付 -->
+            <div class="card donate-card">
+                <div class="card-header">
+                    <h4>💚 微信支付</h4>
+                </div>
+                <div class="card-body">
+                    <div class="qr-placeholder" id="wechat-qr">
+                        <div class="qr-upload" onclick="document.getElementById('wechat-input').click()">
+                            <span class="qr-icon">📱</span>
+                            <span class="qr-text">点击上传微信收款码</span>
+                            <small>建议尺寸 300x300</small>
+                        </div>
+                        <input type="file" id="wechat-input" accept="image/*" style="display:none" onchange="previewQR(this, 'wechat-qr')">
+                    </div>
+                    <p class="donate-tip">打开微信扫一扫</p>
+                </div>
+            </div>
+
+            <!-- 支付宝 -->
+            <div class="card donate-card">
+                <div class="card-header">
+                    <h4>💙 支付宝</h4>
+                </div>
+                <div class="card-body">
+                    <div class="qr-placeholder" id="alipay-qr">
+                        <div class="qr-upload" onclick="document.getElementById('alipay-input').click()">
+                            <span class="qr-icon">📱</span>
+                            <span class="qr-text">点击上传支付宝收款码</span>
+                            <small>建议尺寸 300x300</small>
+                        </div>
+                        <input type="file" id="alipay-input" accept="image/*" style="display:none" onchange="previewQR(this, 'alipay-qr')">
+                    </div>
+                    <p class="donate-tip">打开支付宝扫一扫</p>
+                </div>
+            </div>
+
+            <!-- Buy Me a Coffee -->
+            <div class="card donate-card">
+                <div class="card-header">
+                    <h4>🌐 国际支付</h4>
+                </div>
+                <div class="card-body">
+                    <div class="bmc-placeholder">
+                        <span class="bmc-icon">☕</span>
+                        <p>Buy Me a Coffee</p>
+                        <a href="https://www.buymeacoffee.com/yourusername" target="_blank" class="btn btn-primary btn-small">
+                            去支持
+                        </a>
+                    </div>
+                    <p class="donate-tip">支持 PayPal / 信用卡</p>
+                </div>
+            </div>
+
+            <!-- GitHub Sponsors -->
+            <div class="card donate-card">
+                <div class="card-header">
+                    <h4>💖 GitHub</h4>
+                </div>
+                <div class="card-body">
+                    <div class="github-placeholder">
+                        <span class="github-icon">🐙</span>
+                        <p>GitHub Sponsors</p>
+                        <a href="https://github.com/sponsors/yourusername" target="_blank" class="btn btn-secondary btn-small">
+                            去赞助
+                        </a>
+                    </div>
+                    <p class="donate-tip">月度赞助支持开发</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 支持者墙 -->
+    <div class="card supporters-wall">
+        <div class="card-header">
+            <h3>🙏 特别感谢</h3>
+        </div>
+        <div class="card-body">
+            <p class="supporters-text">
+                感谢所有支持这个项目的朋友们！
+            </p>
+            <div class="supporters-list">
+                <span class="supporter-tag">匿名用户</span>
+                <span class="supporter-tag">🌟 期待你的名字</span>
+            </div>
+            <p class="supporters-note">
+                <small>想要出现在支持者名单？捐赠后请备注你的 GitHub 用户名</small>
+            </p>
+        </div>
+    </div>
+
+    <!-- 使用承诺 -->
+    <div class="card usage-promise">
+        <div class="card-header">
+            <h3>📋 使用承诺</h3>
+        </div>
+        <div class="card-body">
+            <ul class="promise-list">
+                <li>🔒 所有捐赠将用于项目维护（服务器、域名等）</li>
+                <li>☕ 也是给开发者续杯咖啡的动力</li>
+                <li>📢 赞助者将获得优先技术支持</li>
+                <li>💡 新功能建议会被优先考虑</li>
+            </ul>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// QR 码预览
+function previewQR(input, previewId) {
+    if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const container = document.getElementById(previewId);
+            container.innerHTML = `<img src="${e.target.result}" alt="收款码" class="qr-image">`;
+        };
+        reader.readAsDataURL(input.files[0]);
+    }
+}
+</script>
+{% endblock %}
