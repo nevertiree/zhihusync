@@ -37,9 +37,7 @@ async def login_zhihu():
 
         try:
             # 等待跳转到首页或个人主页
-            await page.wait_for_url(
-                lambda url: "zhihu.com" in url and "signin" not in url, timeout=300000  # 5分钟超时
-            )
+            await page.wait_for_url(lambda url: "zhihu.com" in url and "signin" not in url, timeout=300000)  # 5分钟超时
 
             logger.info("登录成功!")
 

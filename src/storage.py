@@ -55,9 +55,7 @@ class StorageManager:
         "pic1.zhimg.com",
     ]
 
-    def __init__(
-        self, html_path: str, static_path: str, images_path: str, download_images: bool = True
-    ):
+    def __init__(self, html_path: str, static_path: str, images_path: str, download_images: bool = True):
         """初始化存储管理器.
 
         Args:
@@ -113,9 +111,7 @@ class StorageManager:
         """
         return hashlib.md5(content.encode()).hexdigest()[:length]
 
-    def get_answer_filepath(
-        self, answer_id: str, question_title: str, content: str | None = None
-    ) -> Path:
+    def get_answer_filepath(self, answer_id: str, question_title: str, content: str | None = None) -> Path:
         """生成回答文件路径.
 
         格式: {html_path}/{question_title}_{hash}_{answer_id}.html
@@ -178,9 +174,7 @@ class StorageManager:
         logger.info(f"保存 HTML: {filepath}")
         return str(filepath)
 
-    def _build_full_html(
-        self, question_title: str, content_html: str, metadata: dict = None
-    ) -> str:
+    def _build_full_html(self, question_title: str, content_html: str, metadata: dict = None) -> str:
         """构建完整的 HTML 文档 - 使用知乎样式.
 
         Args:
@@ -848,9 +842,7 @@ body {{
 
             # 下载高清头像
             async with aiohttp.ClientSession() as session:
-                async with session.get(
-                    hd_avatar_url, timeout=aiohttp.ClientTimeout(total=30)
-                ) as response:
+                async with session.get(hd_avatar_url, timeout=aiohttp.ClientTimeout(total=30)) as response:
                     if response.status == 200:
                         content = await response.read()
                         # 检查下载的内容是否有效
@@ -940,9 +932,7 @@ body {{
             footer_marker = "<!-- 底部信息 -->"
             if footer_marker in html_content:
                 # 在底部信息之前插入评论
-                new_html = html_content.replace(
-                    footer_marker, f"{comments_html}\n            {footer_marker}"
-                )
+                new_html = html_content.replace(footer_marker, f"{comments_html}\n            {footer_marker}")
             else:
                 # 如果没有找到标记，在 </body> 之前插入
                 body_end = "</body>"

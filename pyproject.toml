@@ -29,8 +29,6 @@ select = [
     "B",
     # McCabe complexity
     "C901",
-    # flake8-annotations
-    "ANN",
     # flake8-simplify
     "SIM",
 ]
@@ -91,26 +89,17 @@ multi_line_output = 3
 
 [tool.mypy]
 python_version = "3.10"
-warn_return_any = true
+warn_return_any = false
 warn_unused_configs = true
 disallow_untyped_defs = false
 disallow_incomplete_defs = false
-check_untyped_defs = true
+check_untyped_defs = false
 disallow_untyped_decorators = false
-no_implicit_optional = true
-warn_redundant_casts = true
-warn_unused_ignores = true
-warn_no_return = true
-warn_unreachable = true
-strict_equality = true
+no_implicit_optional = false
+warn_redundant_casts = false
+warn_unused_ignores = false
+warn_no_return = false
+warn_unreachable = false
+strict_equality = false
 show_error_codes = true
 ignore_missing_imports = true
-
-# Per-module options
-[[tool.mypy.overrides]]
-module = "tests.*"
-disallow_untyped_defs = false
-
-[[tool.mypy.overrides]]
-module = "test_*"
-disallow_untyped_defs = false

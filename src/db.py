@@ -161,9 +161,7 @@ class DatabaseManager:
         finally:
             session.close()
 
-    def update_user_info(
-        self, user_id: str, name: str = None, avatar_url: str = None, headline: str = None
-    ) -> bool:
+    def update_user_info(self, user_id: str, name: str = None, avatar_url: str = None, headline: str = None) -> bool:
         """更新用户信息.
 
         Args:
@@ -282,9 +280,7 @@ class DatabaseManager:
         """
         session = self.get_session()
         try:
-            query = (
-                session.query(Answer).filter_by(user_id=user_id).order_by(Answer.liked_time.desc())
-            )
+            query = session.query(Answer).filter_by(user_id=user_id).order_by(Answer.liked_time.desc())
             if limit:
                 query = query.limit(limit)
             return query.all()
@@ -307,9 +303,7 @@ class DatabaseManager:
         finally:
             session.close()
 
-    def get_all_answers(
-        self, limit: int | None = None, offset: int = 0, user_id: str | None = None
-    ) -> list[Answer]:
+    def get_all_answers(self, limit: int | None = None, offset: int = 0, user_id: str | None = None) -> list[Answer]:
         """获取所有回答.
 
         Args:

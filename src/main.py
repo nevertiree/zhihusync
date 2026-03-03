@@ -138,9 +138,7 @@ class ZhihuSyncService:
                 max_comments=self.config.zhihu.max_comments,
             ) as crawler:
                 # 扫描点赞内容
-                new_items, updated_items = await crawler.scan_likes(
-                    max_items=self.config.zhihu.max_items_per_scan
-                )
+                new_items, updated_items = await crawler.scan_likes(max_items=self.config.zhihu.max_items_per_scan)
 
                 # 同步评论
                 if self.config.zhihu.save_comments:

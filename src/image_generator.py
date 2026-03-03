@@ -15,7 +15,6 @@ import asyncio
 import hashlib
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, Tuple
 
 from loguru import logger
 from playwright.async_api import Browser, BrowserContext, async_playwright
@@ -68,8 +67,8 @@ class ImageGenerator:
         self.viewport_height = self.DEFAULT_VIEWPORT_HEIGHT
         self.device_scale_factor = device_scale_factor
 
-        self._browser: Optional[Browser] = None
-        self._context: Optional[BrowserContext] = None
+        self._browser: Browser | None = None
+        self._context: BrowserContext | None = None
         self._playwright = None
 
         logger.info(f"图片生成器初始化: {output_dir}, {self.viewport_width}x{self.viewport_height}")
@@ -158,7 +157,7 @@ class ImageGenerator:
     async def generate_from_html_file(
         self,
         html_path: str,
-        output_path: Optional[str] = None,
+        output_path: str | None = None,
         full_page: bool = True,
         add_watermark: bool = True,
         clip_to_content: bool = True,
@@ -333,8 +332,8 @@ class ImageGenerator:
     async def generate_from_url(
         self,
         url: str,
-        output_path: Optional[str] = None,
-        wait_for_selector: Optional[str] = ".zhihu-card",
+        output_path: str | None = None,
+        wait_for_selector: str | None = ".zhihu-card",
         full_page: bool = True,
     ) -> str:
         """从 URL 生成长图.
@@ -456,9 +455,7 @@ class ImageGenerator:
 
 
 # 同步包装函数（方便非异步代码调用）
-def generate_image_sync(
-    html_path: str, output_dir: str = "/app/data/static/images", **kwargs
-) -> str:
+def generate_image_sync(html_path: str, output_dir: str = "/app/data/static/images", **kwargs) -> str:
     """同步方式生成图片（方便调用）.
 
     Args:
@@ -481,7 +478,7 @@ async def generate_answer_image(
     html_path: str,
     answer_id: str = "",
     output_dir: str = "/app/data/static/images",
-) -> Tuple[bool, str]:
+) -> tuple[bool, str]:
     """生成回答图片的便捷函数.
 
     Args:
