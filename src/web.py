@@ -91,9 +91,9 @@ class ConfigUpdate(BaseModel):
     # 知乎设置
     user_id: str
     scan_interval: int = 60
-    max_items_per_scan: int = 50
+    max_items_per_scan: int = -1  # -1 表示无限制
     save_comments: bool = True
-    max_comments: int = 100
+    max_comments: int = -1  # -1 表示无限制
     sync_likes: bool = True
     sync_created: bool = False
     skip_video: bool = True
@@ -508,6 +508,7 @@ async def do_sync():
             storage_manager=storage,
             headless=True,
             request_delay=config.browser.request_delay,
+            max_comments=config.zhihu.max_comments,
         ) as crawler:
 
             def progress_callback(current, total):

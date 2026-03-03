@@ -31,6 +31,7 @@ class ZhihuCrawler:
         headless: bool = True,
         request_delay: float = 2.0,
         browser_type: str = "auto",
+        max_comments: int = -1,
     ):
         """初始化爬虫.
 
@@ -41,6 +42,7 @@ class ZhihuCrawler:
             headless: 是否使用无头模式.
             request_delay: 请求间隔(秒).
             browser_type: 浏览器类型(auto/chromium/firefox/webkit/edge).
+            max_comments: 每篇回答最大评论数，-1表示无限制.
         """
         self.user_id = user_id
         self.db = db_manager
@@ -48,6 +50,7 @@ class ZhihuCrawler:
         self.headless = headless
         self.request_delay = request_delay
         self.browser_type = browser_type  # auto, chromium, firefox, webkit, edge
+        self.max_comments = max_comments
 
         self.browser: Browser | None = None
         self.context: BrowserContext | None = None
@@ -1226,8 +1229,10 @@ class ZhihuCrawler:
                 )
                 return
 
-            logger.info(f"获取评论: {answer_id} (预期 {answer.comment_count} 条)")
-            comments_data = await self.fetch_comments(answer_id, limit=20)
+            # 计算评论获取上限，-1 表示使用较大默认值
+            comment_limit = 1000 if self.max_comments < 0 else self.max_comments
+            logger.info(f"获取评论: {answer_id} (预期 {answer.comment_count} 条, 上限 {comment_limit} 条)")
+            comments_data = await self.fetch_comments(answer_id, limit=comment_limit)
             logger.info(f"评论 API 返回 {len(comments_data)} 条数据")
 
             if not comments_data:
@@ -1290,8 +1295,11 @@ class ZhihuCrawler:
         processed_ids.update(existing_answers)
         logger.info(f"已有 {len(processed_ids)} 条回答，将跳过重复内容")
 
-        while scanned < max_items:
-            batch_size = min(limit, max_items - scanned)
+        # -1 表示无限制
+        no_limit = max_items < 0
+
+        while no_limit or scanned < max_items:
+            batch_size = limit if no_limit else min(limit, max_items - scanned)
             activities = await self.fetch_likes(limit=batch_size, offset=offset)
 
             if not activities:
@@ -1315,7 +1323,7 @@ class ZhihuCrawler:
                 if answer_id and answer_id in processed_ids:
                     logger.debug(f"跳过已处理的回答: {answer_id}")
                     scanned += 1
-                    if scanned >= max_items:
+                    if not no_limit and scanned >= max_items:
                         break
                     continue
 
@@ -1334,9 +1342,9 @@ class ZhihuCrawler:
                 scanned += 1
 
                 if progress_callback:
-                    progress_callback(scanned, max_items)
+                    progress_callback(scanned, max_items if not no_limit else -1)
 
-                if scanned >= max_items:
+                if not no_limit and scanned >= max_items:
                     break
 
             logger.info(f"本批处理: {len(activities)} 条，新增: {batch_new} 条，累计: {scanned}")

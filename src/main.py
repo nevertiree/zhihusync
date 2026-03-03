@@ -135,6 +135,7 @@ class ZhihuSyncService:
                 storage_manager=self.storage,
                 headless=self.config.browser.headless,
                 request_delay=self.config.browser.request_delay,
+                max_comments=self.config.zhihu.max_comments,
             ) as crawler:
                 # 扫描点赞内容
                 new_items, updated_items = await crawler.scan_likes(
