@@ -5,19 +5,17 @@ import json
 from contextlib import asynccontextmanager
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
-
-from fastapi import BackgroundTasks, FastAPI, HTTPException, Query, Request
-from fastapi.responses import FileResponse
-from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
-from loguru import logger
-from pydantic import BaseModel
 
 from config_loader import load_config
 from crawler import ZhihuCrawler
 from db import Answer, DatabaseManager, SyncLog
+from fastapi import BackgroundTasks, FastAPI, HTTPException, Query, Request
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 from image_generator import ImageGenerator
+from loguru import logger
+from pydantic import BaseModel
 from storage import StorageManager
 
 # 全局状态
@@ -75,6 +73,13 @@ app.mount(
     name="html_files",
 )
 
+# 挂载静态资源目录以便访问生成的图片
+app.mount(
+    "/data/static",
+    StaticFiles(directory=config.storage.static_path),
+    name="data_static",
+)
+
 
 # ============ 数据模型 ============
 
@@ -110,7 +115,7 @@ class StatsResponse(BaseModel):
     total_comments: int
     with_comments: int
     deleted_answers: int
-    last_sync: Optional[str]
+    last_sync: str | None
     sync_status: str
 
 
@@ -123,7 +128,7 @@ class AnswerItem(BaseModel):
     voteup_count: int
     comment_count: int
     synced_at: str
-    html_path: Optional[str]
+    html_path: str | None
     original_url: str
 
 
@@ -250,7 +255,7 @@ async def update_config(config_update: ConfigUpdate):
         import yaml
 
         if config_path.exists():
-            with open(config_path, "r", encoding="utf-8") as f:
+            with open(config_path, encoding="utf-8") as f:
                 config_data = yaml.safe_load(f) or {}
         else:
             config_data = {}
@@ -329,7 +334,7 @@ async def check_cookies():
 
     if exists:
         try:
-            with open(cookie_file, "r", encoding="utf-8") as f:
+            with open(cookie_file, encoding="utf-8") as f:
                 data = json.load(f)
             # 检查是否有 cookies (支持数组或对象格式)
             has_cookies = False
@@ -354,7 +359,7 @@ async def test_cookies():
 
     try:
         # 加载 Cookie 文件检查格式
-        with open(cookie_file, "r", encoding="utf-8") as f:
+        with open(cookie_file, encoding="utf-8") as f:
             cookie_data = json.load(f)
 
         if not cookie_data.get("cookies") and not cookie_data.get("origins"):
@@ -530,7 +535,7 @@ async def get_logs(lines: int = 100):
         return {"logs": []}
 
     try:
-        with open(log_file, "r", encoding="utf-8", errors="ignore") as f:
+        with open(log_file, encoding="utf-8", errors="ignore") as f:
             all_lines = f.readlines()
             return {"logs": all_lines[-lines:]}
     except Exception as e:
