@@ -521,6 +521,11 @@ body {
   color: var(--text-secondary);
 }
 
+.badge-info {
+  background: rgba(0, 102, 255, 0.1);
+  color: var(--primary);
+}
+
 /* 进度条 */
 .progress-bar-container {
   height: 8px;
