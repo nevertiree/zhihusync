@@ -10,7 +10,7 @@ from typing import Any
 from config_loader import load_config
 from crawler import ZhihuCrawler
 from db import Answer, DatabaseManager, SyncLog
-from fastapi import BackgroundTasks, FastAPI, HTTPException, Query, Request
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -495,11 +495,18 @@ async def test_cookies():
         raise HTTPException(status_code=500, detail=f"测试失败: {str(e)}")
 
 
-async def do_sync():
-    """执行同步任务"""
+async def do_sync(sync_type: str = "manual"):
+    """执行同步任务.
+
+    Args:
+        sync_type: 同步类型 (manual/scheduled/full).
+    """
     app_state["sync_status"] = "running"
     app_state["sync_progress"] = 0
     app_state["sync_message"] = "正在初始化..."
+
+    # 创建同步日志
+    log_id = db.create_sync_log(user_id=config.zhihu.user_id, sync_type=sync_type)
 
     try:
         async with ZhihuCrawler(
@@ -512,8 +519,9 @@ async def do_sync():
         ) as crawler:
 
             def progress_callback(current, total):
-                app_state["sync_progress"] = int(current / total * 100)
-                app_state["sync_message"] = f"正在同步: {current}/{total}"
+                app_state["sync_progress"] = int(current / total * 100) if total > 0 else 0
+                total_str = str(total) if total > 0 else "?"
+                app_state["sync_message"] = f"正在同步: {current}/{total_str}"
 
             app_state["sync_message"] = "正在扫描点赞内容..."
             new_items, updated_items = await crawler.scan_likes(
@@ -524,27 +532,37 @@ async def do_sync():
                 app_state["sync_message"] = "正在同步评论..."
                 await crawler.sync_all_comments()
 
+            # 更新同步日志
+            db.update_sync_log(
+                log_id=log_id,
+                status="success",
+                items_scanned=new_items + updated_items,
+                items_new=new_items,
+                items_updated=updated_items,
+            )
+
             app_state["sync_status"] = "success"
             app_state["sync_message"] = f"同步完成! 新增 {new_items} 条, 更新 {updated_items} 条"
             app_state["last_sync"] = get_beijing_now().isoformat()
 
     except Exception as e:
+        db.update_sync_log(log_id=log_id, status="failed", error_message=str(e))
         app_state["sync_status"] = "failed"
         app_state["sync_message"] = f"同步失败: {str(e)}"
         raise
 
 
 @app.post("/api/sync/start")
-async def start_sync(background_tasks: BackgroundTasks):
-    """开始同步"""
+async def start_sync():
+    """开始同步（手工增量同步）"""
     if app_state["sync_status"] == "running":
         return {"status": "running", "message": "同步任务已在运行中"}
 
     if not config.zhihu.user_id:
         raise HTTPException(status_code=400, detail="未配置用户ID")
 
-    # 创建异步任务
-    app_state["sync_task"] = asyncio.create_task(do_sync())
+    # 创建异步任务，标记为手工同步
+    app_state["sync_task"] = asyncio.create_task(do_sync(sync_type="manual"))
 
     return {"status": "started", "message": "同步任务已启动"}
 
@@ -577,12 +595,21 @@ async def start_init_sync():
     if app_state["sync_task"] and not app_state["sync_task"].done():
         return {"status": "error", "message": "已有同步任务在运行"}
 
+    if not config.zhihu.user_id:
+        raise HTTPException(status_code=400, detail="未配置用户ID")
+
     async def do_init_sync():
         """执行初始化同步"""
+        # 创建同步日志，标记为全量同步
+        log_id = db.create_sync_log(user_id=config.zhihu.user_id, sync_type="full")
+
         try:
             app_state["sync_status"] = "running"
-            app_state["sync_message"] = "初始化采集中..."
+            app_state["sync_message"] = "全量同步中..."
             app_state["sync_progress"] = 0
+
+            new_items = 0
+            updated_items = 0
 
             def progress_callback(current: int, total: int):
                 if total > 0:
@@ -601,25 +628,35 @@ async def start_init_sync():
                 max_comments=config.zhihu.max_comments_per_answer,
             ) as crawler:
                 # 使用 init_mode=True 进行全量采集
-                await crawler.scan_likes(
+                new_items, updated_items = await crawler.scan_likes(
                     max_items=-1,  # 无限制
                     progress_callback=progress_callback,
                     init_mode=True,
                 )
 
+            # 更新同步日志
+            db.update_sync_log(
+                log_id=log_id,
+                status="success",
+                items_scanned=new_items + updated_items,
+                items_new=new_items,
+                items_updated=updated_items,
+            )
+
             app_state["sync_status"] = "success"
-            app_state["sync_message"] = "初始化采集完成"
+            app_state["sync_message"] = f"全量同步完成! 新增 {new_items} 条, 更新 {updated_items} 条"
             app_state["last_sync"] = get_beijing_now().isoformat()
 
         except Exception as e:
-            logger.exception(f"初始化同步失败: {e}")
+            logger.exception(f"全量同步失败: {e}")
+            db.update_sync_log(log_id=log_id, status="failed", error_message=str(e))
             app_state["sync_status"] = "failed"
-            app_state["sync_message"] = f"初始化失败: {e}"
+            app_state["sync_message"] = f"全量同步失败: {e}"
 
     # 创建异步任务
     app_state["sync_task"] = asyncio.create_task(do_init_sync())
 
-    return {"status": "started", "message": "初始化采集已启动（将爬取全部历史数据）"}
+    return {"status": "started", "message": "全量同步已启动（将爬取全部历史数据）"}
 
 
 from sqlalchemy import or_
@@ -699,6 +736,7 @@ async def get_sync_history(page: int = 1, page_size: int = 10):
                     "started_at": log.started_at.isoformat() if log.started_at else None,
                     "ended_at": log.ended_at.isoformat() if log.ended_at else None,
                     "status": log.status,
+                    "sync_type": log.sync_type or "manual",  # 兼容旧数据
                     "items_scanned": log.items_scanned,
                     "items_new": log.items_new,
                     "items_updated": log.items_updated,

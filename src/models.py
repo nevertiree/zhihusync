@@ -216,6 +216,7 @@ class SyncLog(Base):
     started_at = Column(DateTime, default=get_beijing_now_naive, comment="开始时间")
     ended_at = Column(DateTime, comment="结束时间")
     status = Column(String(20), comment="状态: running/success/failed")
+    sync_type = Column(String(20), default="manual", comment="同步类型: manual/scheduled/full")
     items_scanned = Column(Integer, default=0, comment="扫描条目数")
     items_new = Column(Integer, default=0, comment="新增条目数")
     items_updated = Column(Integer, default=0, comment="更新条目数")

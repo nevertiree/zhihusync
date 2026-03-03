@@ -392,18 +392,19 @@ class DatabaseManager:
 
     # ========== 同步日志 ==========
 
-    def create_sync_log(self, user_id: str | None = None) -> int:
+    def create_sync_log(self, user_id: str | None = None, sync_type: str = "manual") -> int:
         """创建同步日志.
 
         Args:
             user_id: 用户ID.
+            sync_type: 同步类型 (manual/scheduled/full).
 
         Returns:
             int: 日志ID.
         """
         session = self.get_session()
         try:
-            log = SyncLog(status="running", user_id=user_id)
+            log = SyncLog(status="running", user_id=user_id, sync_type=sync_type)
             session.add(log)
             session.commit()
             return log.id

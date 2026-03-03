@@ -52,10 +52,16 @@
 
 <div class="page-header">
     <h2>📊 仪表盘</h2>
-    <button class="btn btn-primary" id="sync-btn" onclick="startSync()">
-        <span class="icon">🔄</span>
-        <span id="sync-btn-text">开始同步</span>
-    </button>
+    <div class="sync-actions">
+        <button class="btn btn-primary" id="sync-btn" onclick="startSync()" title="增量同步：只同步新增的点赞">
+            <span class="icon">🔄</span>
+            <span id="sync-btn-text">立即同步</span>
+        </button>
+        <button class="btn btn-warning" id="full-sync-btn" onclick="startFullSync()" title="全量同步：重新爬取全部历史点赞">
+            <span class="icon">🚀</span>
+            <span>全量同步</span>
+        </button>
+    </div>
 </div>
 
 <!-- 统计卡片 -->
@@ -128,6 +134,7 @@
             <thead>
                 <tr>
                     <th>时间</th>
+                    <th>类型</th>
                     <th>状态</th>
                     <th>扫描数</th>
                     <th>新增</th>
@@ -414,6 +421,51 @@
     padding: 40px;
     color: var(--text-muted);
 }
+
+/* Sync Actions */
+.sync-actions {
+    display: flex;
+    gap: 12px;
+}
+
+.sync-actions .btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.btn-warning {
+    background: var(--warning);
+    color: white;
+    border: none;
+}
+
+.btn-warning:hover:not(:disabled) {
+    background: #d48806;
+}
+
+.sync-type-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.sync-type-manual {
+    background: rgba(0, 102, 255, 0.1);
+    color: var(--primary);
+}
+
+.sync-type-scheduled {
+    background: rgba(82, 196, 26, 0.1);
+    color: var(--success);
+}
+
+.sync-type-full {
+    background: rgba(250, 173, 20, 0.1);
+    color: var(--warning);
+}
 </style>
 
 <script>
@@ -596,7 +648,7 @@ async function checkSyncStatus() {
     }
 }
 
-// 开始同步
+// 开始同步（增量）
 async function startSync() {
     try {
         const res = await fetch('/api/sync/start', { method: 'POST' });
@@ -604,6 +656,27 @@ async function startSync() {
 
         if (res.ok) {
             showToast('同步任务已启动', 'success');
+            checkSyncStatus();
+        } else {
+            showToast(data.detail || '启动失败', 'error');
+        }
+    } catch (e) {
+        showToast('启动失败: ' + e.message, 'error');
+    }
+}
+
+// 开始全量同步
+async function startFullSync() {
+    if (!confirm('确定要开始全量同步吗？\n\n这将：\n- 重新爬取全部历史点赞数据\n- 无视已存在的数据，强制更新\n- 可能需要较长时间\n\n建议仅在首次使用或数据异常时执行。')) {
+        return;
+    }
+
+    try {
+        const res = await fetch('/api/sync/init', { method: 'POST' });
+        const data = await res.json();
+
+        if (res.ok) {
+            showToast('全量同步已启动', 'success');
             checkSyncStatus();
         } else {
             showToast(data.detail || '启动失败', 'error');
@@ -666,6 +739,14 @@ async function loadSyncHistory() {
                 'running': '进行中'
             }[log.status] || log.status;
 
+            // 同步类型显示
+            const syncTypeConfig = {
+                'manual': { text: '手工同步', class: 'sync-type-manual' },
+                'scheduled': { text: '定时同步', class: 'sync-type-scheduled' },
+                'full': { text: '全量同步', class: 'sync-type-full' }
+            };
+            const typeConfig = syncTypeConfig[log.sync_type] || { text: '手工同步', class: 'sync-type-manual' };
+
             const started = new Date(log.started_at);
             const ended = log.ended_at ? new Date(log.ended_at) : null;
             const duration = ended
@@ -675,6 +756,7 @@ async function loadSyncHistory() {
             return `
                 <tr>
                     <td>${formatBeijingTime(log.started_at)}</td>
+                    <td><span class="sync-type-badge ${typeConfig.class}">${typeConfig.text}</span></td>
                     <td><span class="badge ${statusClass}">${statusText}</span></td>
                     <td>${log.items_scanned || 0}</td>
                     <td>${log.items_new || 0}</td>
