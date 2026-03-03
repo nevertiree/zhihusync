@@ -1116,6 +1116,11 @@ class ZhihuCrawler:
             else:
                 self.updated_items += 1
 
+            # 如果有评论，立即获取
+            if comment_count > 0:
+                logger.debug(f"回答有 {comment_count} 条评论，开始获取...")
+                await self.process_comments(answer_id)
+
             return True
 
         except Exception as e:
