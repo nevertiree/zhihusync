@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+build/
+
+# Data and logs
+data/
+logs/
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Test files
+test/
+coverage/
+
+# Large files
+*.min.js
+*.min.css
+
+# Templates (handled separately if needed)
+templates/*.html
