@@ -7,25 +7,127 @@
     <h2>⚙️ 配置管理</h2>
 </div>
 
-<!-- 配置指南 -->
-<div class="card card-info">
+<!-- 配置指南卡片（默认折叠，可通过开关展开） -->
+<div class="card card-info" id="guide-card" style="display: none;">
     <div class="card-header">
         <h3>📖 配置指南</h3>
+        <button class="btn btn-sm btn-secondary" onclick="toggleGuide()">收起</button>
     </div>
     <div class="card-body">
+        <!-- 部署环境选择 -->
+        <div class="guide-section">
+            <h4>🖥️ 部署环境</h4>
+            <div class="env-selector">
+                <button class="env-btn active" data-env="nas" onclick="switchEnv('nas')">
+                    <span class="env-icon">🗄️</span>
+                    <span>NAS部署</span>
+                </button>
+                <button class="env-btn" data-env="windows" onclick="switchEnv('windows')">
+                    <span class="env-icon">🪟</span>
+                    <span>Windows部署</span>
+                </button>
+                <button class="env-btn" data-env="linux" onclick="switchEnv('linux')">
+                    <span class="env-icon">🐧</span>
+                    <span>Linux部署</span>
+                </button>
+            </div>
+            <div class="env-content" id="env-nas">
+                <div class="guide-tip">
+                    <strong>💡 NAS Docker 部署存储映射：</strong>
+                    <ul>
+                        <li>HTML存储: <code>./data/html</code> → <code>/app/data/html</code></li>
+                        <li>数据库: <code>./data/meta</code> → <code>/app/data/meta</code></li>
+                        <li>静态文件: <code>./data/static</code> → <code>/app/data/static</code></li>
+                        <li>配置文件: <code>./config</code> → <code>/app/config</code></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="env-content" id="env-windows" style="display: none;">
+                <div class="guide-tip">
+                    <strong>💡 Windows 本地部署：</strong>
+                    <ul>
+                        <li>数据目录: <code>./data</code> (程序同级目录)</li>
+                        <li>配置文件: <code>./config/config.yaml</code></li>
+                        <li>建议使用 PowerShell 或 CMD 运行</li>
+                        <li>需要安装 Playwright: <code>playwright install chromium</code></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="env-content" id="env-linux" style="display: none;">
+                <div class="guide-tip">
+                    <strong>💡 Linux 本地部署：</strong>
+                    <ul>
+                        <li>数据目录: <code>~/.zhihusync/data</code> 或 <code>./data</code></li>
+                        <li>配置文件: <code>~/.zhihusync/config.yaml</code> 或 <code>./config/config.yaml</code></li>
+                        <li>建议使用 systemd 服务运行</li>
+                        <li>需要安装浏览器依赖: <code>playwright install-deps chromium</code></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
         <div class="guide-section">
             <h4>🔑 第一步：配置 Cookie（必需）</h4>
             <p>知乎需要登录后才能访问点赞内容，请按以下步骤获取 Cookie：</p>
-            <ol class="guide-steps">
-                <li>在电脑浏览器中打开 <a href="https://www.zhihu.com" target="_blank">zhihu.com</a> 并登录</li>
-                <li>按 <kbd>F12</kbd> 打开开发者工具</li>
-                <li>切换到 <strong>Application/应用</strong> 标签</li>
-                <li>在左侧选择 <strong>Cookies</strong> → <code>https://www.zhihu.com</code></li>
-                <li>复制所有 Cookie 内容（或使用 EditThisCookie 插件导出 JSON）</li>
-                <li>将内容粘贴到下方的 Cookie 输入框中</li>
-            </ol>
+
+            <!-- 浏览器选择 -->
+            <div class="browser-selector">
+                <button class="browser-btn active" data-browser="chrome" onclick="switchBrowser('chrome')">Chrome</button>
+                <button class="browser-btn" data-browser="edge" onclick="switchBrowser('edge')">Edge</button>
+                <button class="browser-btn" data-browser="firefox" onclick="switchBrowser('firefox')">Firefox</button>
+                <button class="browser-btn" data-browser="safari" onclick="switchBrowser('safari')">Safari</button>
+            </div>
+
+            <!-- Chrome 指引 -->
+            <div class="browser-content" id="browser-chrome">
+                <ol class="guide-steps">
+                    <li>打开 Chrome 浏览器，访问 <a href="https://www.zhihu.com" target="_blank">zhihu.com</a> 并登录</li>
+                    <li>按 <kbd>F12</kbd> 或 <kbd>Ctrl+Shift+I</kbd> 打开开发者工具</li>
+                    <li>切换到 <strong>Application/应用</strong> 标签</li>
+                    <li>在左侧选择 <strong>Cookies</strong> → <code>https://www.zhihu.com</code></li>
+                    <li>右键点击表格 → <strong>Copy all / 复制全部</strong></li>
+                    <li>将内容粘贴到下方的 Cookie 输入框中</li>
+                </ol>
+            </div>
+
+            <!-- Edge 指引 -->
+            <div class="browser-content" id="browser-edge" style="display: none;">
+                <ol class="guide-steps">
+                    <li>打开 Edge 浏览器，访问 <a href="https://www.zhihu.com" target="_blank">zhihu.com</a> 并登录</li>
+                    <li>按 <kbd>F12</kbd> 或 <kbd>Ctrl+Shift+I</kbd> 打开开发者工具</li>
+                    <li>切换到 <strong>应用程序</strong> 标签</li>
+                    <li>在左侧选择 <strong>Cookie</strong> → <code>https://www.zhihu.com</code></li>
+                    <li>右键点击表格 → <strong>复制全部</strong></li>
+                    <li>将内容粘贴到下方的 Cookie 输入框中</li>
+                </ol>
+            </div>
+
+            <!-- Firefox 指引 -->
+            <div class="browser-content" id="browser-firefox" style="display: none;">
+                <ol class="guide-steps">
+                    <li>打开 Firefox 浏览器，访问 <a href="https://www.zhihu.com" target="_blank">zhihu.com</a> 并登录</li>
+                    <li>按 <kbd>F12</kbd> 或 <kbd>Ctrl+Shift+K</kbd> 打开开发者工具</li>
+                    <li>切换到 <strong>存储</strong> 标签</li>
+                    <li>在左侧选择 <strong>Cookies</strong> → <code>https://www.zhihu.com</code></li>
+                    <li>右键点击表格 → <strong>复制全部</strong></li>
+                    <li>将内容粘贴到下方的 Cookie 输入框中</li>
+                </ol>
+            </div>
+
+            <!-- Safari 指引 -->
+            <div class="browser-content" id="browser-safari" style="display: none;">
+                <ol class="guide-steps">
+                    <li>打开 Safari，偏好设置 → 高级 → 勾选"在菜单栏中显示开发菜单"</li>
+                    <li>访问 <a href="https://www.zhihu.com" target="_blank">zhihu.com</a> 并登录</li>
+                    <li>点击菜单栏 <strong>开发 → 显示 JavaScript 控制台</strong></li>
+                    <li>切换到 <strong>存储</strong> 标签</li>
+                    <li>选择 <strong>Cookies</strong> → <code>zhihu.com</code></li>
+                    <li>导出或手动复制 Cookie 值</li>
+                </ol>
+            </div>
+
             <div class="guide-tip">
-                <strong>💡 提示：</strong>Cookie 会定期过期，如果同步失败，请重新获取并更新。
+                <strong>💡 替代方案：</strong>安装 EditThisCookie 浏览器扩展，点击扩展图标 → Export → 复制 JSON 格式
             </div>
         </div>
 
@@ -37,19 +139,16 @@
                 <li>从 URL 中提取用户 ID<br>
                     例如：<code>https://www.zhihu.com/people/<strong>zhang-san-123</strong></code><br>
                     用户 ID 就是 <code>zhang-san-123</code></li>
-                <li>将用户 ID 填入下方输入框</li>
+                <li>切换到"基本设置"标签页，将用户 ID 填入输入框</li>
             </ol>
         </div>
-
-        <div class="guide-section">
-            <h4>⚙️ 第三步：高级设置（可选）</h4>
-            <ul>
-                <li><strong>扫描间隔</strong>：自动同步的时间间隔（分钟），建议 30-120 分钟</li>
-                <li><strong>最大条目数</strong>：每次同步最多获取多少条新内容</li>
-                <li><strong>保存评论</strong>：是否同时备份评论内容</li>
-            </ul>
-        </div>
     </div>
+</div>
+
+<!-- 指南开关 -->
+<div class="guide-toggle-bar" id="guide-toggle-bar">
+    <span>📖 需要帮助？查看配置指南</span>
+    <button class="btn btn-sm btn-primary" onclick="toggleGuide()">展开指南</button>
 </div>
 
 <!-- Cookie 配置 -->
@@ -62,39 +161,12 @@
         <div class="form-group">
             <label class="form-label">
                 知乎 Cookie
-                <span class="tooltip" title="从浏览器开发者工具中复制 Cookie">ℹ️</span>
+                <span class="tooltip" title="从浏览器开发者工具复制 Cookie，支持 EditThisCookie JSON 格式或纯文本格式">ℹ️</span>
             </label>
             <textarea class="form-textarea" id="cookie-input" rows="6"
                 placeholder="粘贴从浏览器获取的 Cookie JSON..."></textarea>
             <div class="form-help">
-                <details>
-                    <summary>📋 如何获取 Cookie？（点击查看详细步骤）</summary>
-                    <div class="help-details">
-                        <h5>方法一：手动复制（推荐）</h5>
-                        <ol>
-                            <li>在浏览器中登录知乎</li>
-                            <li>按 F12 打开开发者工具</li>
-                            <li>切换到 Application/应用 标签</li>
-                            <li>选择 Cookies → https://www.zhihu.com</li>
-                            <li>右键点击表格 → Copy all / 复制全部</li>
-                        </ol>
-
-                        <h5>方法二：使用 EditThisCookie 插件</h5>
-                        <ol>
-                            <li>安装 EditThisCookie 浏览器扩展</li>
-                            <li>登录知乎后，点击扩展图标</li>
-                            <li>选择 "Export" → "Export as JSON"</li>
-                            <li>复制导出的 JSON 内容</li>
-                        </ol>
-
-                        <h5>方法三：使用控制台命令</h5>
-                        <pre><code>// 在 Console 标签页执行
-JSON.stringify(document.cookie.split(';').map(c => {
-  const [n, ...v] = c.trim().split('=');
-  return {name: n, value: v.join('='), domain: '.zhihu.com'};
-}))</code></pre>
-                    </div>
-                </details>
+                <span class="help-link" onclick="toggleGuide()">📖 如何获取 Cookie？（点击展开指南）</span>
             </div>
         </div>
         <div class="form-actions">
@@ -106,90 +178,392 @@ JSON.stringify(document.cookie.split(';').map(c => {
     </div>
 </div>
 
-<!-- 基本配置 -->
-<div class="card">
-    <div class="card-header">
-        <h3>🔧 基本设置</h3>
-    </div>
-    <div class="card-body">
-        <form id="config-form">
-            <div class="form-row">
-                <div class="form-col">
-                    <div class="form-group">
-                        <label class="form-label">知乎用户 ID <span class="required">*</span></label>
-                        <input type="text" class="form-input" id="user-id"
-                            placeholder="例如: zhang-san-123">
-                        <div class="form-help">
-                            从你的知乎个人主页 URL 获取，例如：<br>
-                            https://www.zhihu.com/people/<strong>zhang-san-123</strong>
+<!-- Tab 导航 -->
+<div class="config-tabs">
+    <button class="tab-btn active" data-tab="basic" onclick="switchTab('basic')">
+        <span class="tab-icon">🔧</span>
+        <span class="tab-text">基本设置</span>
+    </button>
+    <button class="tab-btn" data-tab="browser" onclick="switchTab('browser')">
+        <span class="tab-icon">🌐</span>
+        <span class="tab-text">浏览器</span>
+    </button>
+    <button class="tab-btn" data-tab="storage" onclick="switchTab('storage')">
+        <span class="tab-icon">💾</span>
+        <span class="tab-text">存储</span>
+    </button>
+    <button class="tab-btn" data-tab="logging" onclick="switchTab('logging')">
+        <span class="tab-icon">📝</span>
+        <span class="tab-text">日志</span>
+    </button>
+</div>
+
+<!-- 基本设置 Tab -->
+<div class="tab-content active" id="tab-basic">
+    <div class="card">
+        <div class="card-header">
+            <h3>🔧 知乎设置</h3>
+        </div>
+        <div class="card-body">
+            <form id="config-form">
+                <div class="form-row">
+                    <div class="form-col">
+                        <div class="form-group">
+                            <label class="form-label">
+                                知乎用户 ID
+                                <span class="required">*</span>
+                                <span class="tooltip" title="从你的知乎个人主页 URL 获取，例如：https://www.zhihu.com/people/zhang-san-123">ℹ️</span>
+                            </label>
+                            <input type="text" class="form-input" id="user-id"
+                                placeholder="例如: zhang-san-123">
+                            <div class="form-help">访问知乎个人主页，URL 中 /people/ 后面的部分</div>
+                        </div>
+                    </div>
+                    <div class="form-col">
+                        <div class="form-group">
+                            <label class="form-label">
+                                扫描间隔 (分钟)
+                                <span class="tooltip" title="自动同步的时间间隔，建议 30-120 分钟">ℹ️</span>
+                            </label>
+                            <input type="number" class="form-input" id="scan-interval"
+                                value="60" min="5" max="1440">
+                            <div class="form-help">建议 30-120 分钟，避免请求过于频繁</div>
                         </div>
                     </div>
                 </div>
-                <div class="form-col">
-                    <div class="form-group">
-                        <label class="form-label">扫描间隔 (分钟)</label>
-                        <input type="number" class="form-input" id="scan-interval"
-                            value="60" min="5" max="1440">
-                        <div class="form-help">建议 30-120 分钟，避免请求过于频繁</div>
+
+                <div class="form-row">
+                    <div class="form-col">
+                        <div class="form-group">
+                            <label class="form-label">
+                                每次扫描最大条目
+                                <span class="tooltip" title="每次同步最多获取多少条新内容">ℹ️</span>
+                            </label>
+                            <input type="number" class="form-input" id="max-items"
+                                value="50" min="10" max="500">
+                        </div>
+                    </div>
+                    <div class="form-col">
+                        <div class="form-group">
+                            <label class="form-label">每篇最大评论数</label>
+                            <input type="number" class="form-input" id="max-comments"
+                                value="100" min="0" max="500">
+                            <div class="form-help">0 表示不限制</div>
+                        </div>
                     </div>
                 </div>
-            </div>
 
-            <div class="form-row">
-                <div class="form-col">
-                    <div class="form-group">
-                        <label class="form-label">每次扫描最大条目</label>
-                        <input type="number" class="form-input" id="max-items"
-                            value="50" min="10" max="500">
+                <div class="form-row">
+                    <div class="form-col">
+                        <div class="form-group">
+                            <label class="form-label">同步点赞内容</label>
+                            <select class="form-select" id="sync-likes">
+                                <option value="true">是</option>
+                                <option value="false">否</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-col">
+                        <div class="form-group">
+                            <label class="form-label">
+                                同步创作内容
+                                <span class="tooltip" title="同步自己发布的文章和回答">ℹ️</span>
+                            </label>
+                            <select class="form-select" id="sync-created">
+                                <option value="true">是</option>
+                                <option value="false" selected>否</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
-                <div class="form-col">
-                    <div class="form-group">
-                        <label class="form-label">是否保存评论</label>
-                        <select class="form-select" id="save-comments">
-                            <option value="true">是</option>
-                            <option value="false">否</option>
-                        </select>
+
+                <div class="form-row">
+                    <div class="form-col">
+                        <div class="form-group">
+                            <label class="form-label">跳过视频内容</label>
+                            <select class="form-select" id="skip-video">
+                                <option value="true">是</option>
+                                <option value="false">否</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-col">
+                        <div class="form-group">
+                            <label class="form-label">
+                                最小赞同数过滤
+                                <span class="tooltip" title="只保存赞同数≥此值的内容，0表示不过滤">ℹ️</span>
+                            </label>
+                            <input type="number" class="form-input" id="min-voteup"
+                                value="0" min="0" max="100000">
+                        </div>
                     </div>
                 </div>
-            </div>
 
-            <div class="form-group">
-                <label class="form-label">无头模式</label>
-                <select class="form-select" id="headless">
-                    <option value="true">是 (后台运行，推荐)</option>
-                    <option value="false">否 (显示浏览器窗口)</option>
-                </select>
-                <div class="form-help">调试时可关闭无头模式查看浏览器操作</div>
-            </div>
+                <div class="form-group">
+                    <label class="form-label">保存评论</label>
+                    <select class="form-select" id="save-comments">
+                        <option value="true">是</option>
+                        <option value="false">否</option>
+                    </select>
+                </div>
 
-            <div class="form-actions">
-                <button type="submit" class="btn btn-primary">保存配置</button>
-                <button type="button" class="btn btn-secondary" onclick="loadConfig()">重置</button>
-            </div>
-        </form>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">保存配置</button>
+                    <button type="button" class="btn btn-secondary" onclick="loadConfig()">重置</button>
+                </div>
+            </form>
+        </div>
     </div>
 </div>
 
-<!-- 存储路径 (只读) -->
-<div class="card">
-    <div class="card-header">
-        <h3>📁 存储路径</h3>
+<!-- 浏览器设置 Tab -->
+<div class="tab-content" id="tab-browser">
+    <div class="card">
+        <div class="card-header">
+            <h3>🌐 浏览器设置</h3>
+        </div>
+        <div class="card-body">
+            <form id="browser-config-form">
+                <div class="form-row">
+                    <div class="form-col">
+                        <div class="form-group">
+                            <label class="form-label">
+                                无头模式
+                                <span class="tooltip" title="后台运行浏览器，调试时可关闭查看操作过程">ℹ️</span>
+                            </label>
+                            <select class="form-select" id="headless">
+                                <option value="true">是 (后台运行，推荐)</option>
+                                <option value="false">否 (显示浏览器窗口)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-col">
+                        <div class="form-group">
+                            <label class="form-label">浏览器类型</label>
+                            <select class="form-select" id="browser-type">
+                                <option value="chromium">Chromium (推荐)</option>
+                                <option value="firefox">Firefox</option>
+                                <option value="webkit">WebKit</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-col">
+                        <div class="form-group">
+                            <label class="form-label">
+                                页面超时 (秒)
+                                <span class="tooltip" title="页面加载最大等待时间">ℹ️</span>
+                            </label>
+                            <input type="number" class="form-input" id="timeout"
+                                value="30" min="10" max="300">
+                        </div>
+                    </div>
+                    <div class="form-col">
+                        <div class="form-group">
+                            <label class="form-label">
+                                请求间隔 (秒)
+                                <span class="tooltip" title="请求间隔，避免过于频繁被限流">ℹ️</span>
+                            </label>
+                            <input type="number" class="form-input" id="request-delay"
+                                value="2" min="0.5" max="10" step="0.5">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-col">
+                        <div class="form-group">
+                            <label class="form-label">窗口宽度</label>
+                            <input type="number" class="form-input" id="window-width"
+                                value="1920" min="800" max="3840">
+                        </div>
+                    </div>
+                    <div class="form-col">
+                        <div class="form-group">
+                            <label class="form-label">窗口高度</label>
+                            <input type="number" class="form-input" id="window-height"
+                                value="1080" min="600" max="2160">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-col">
+                        <div class="form-group">
+                            <label class="form-label">
+                                滚动延迟 (毫秒)
+                                <span class="tooltip" title="每次滚动后的等待时间，影响内容加载">ℹ️</span>
+                            </label>
+                            <input type="number" class="form-input" id="scroll-delay"
+                                value="800" min="100" max="5000">
+                        </div>
+                    </div>
+                    <div class="form-col">
+                        <div class="form-group">
+                            <label class="form-label">
+                                最大滚动轮数
+                                <span class="tooltip" title="每次同步最多滚动多少轮，控制同步内容量">ℹ️</span>
+                            </label>
+                            <input type="number" class="form-input" id="max-scroll-rounds"
+                                value="20" min="1" max="100">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">
+                        代理服务器
+                        <span class="tooltip" title="HTTP/HTTPS代理，例如：http://127.0.0.1:7890">ℹ️</span>
+                    </label>
+                    <input type="text" class="form-input" id="proxy"
+                        placeholder="例如: http://127.0.0.1:7890 或 socks5://127.0.0.1:1080">
+                    <div class="form-help">留空表示不使用代理</div>
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">保存配置</button>
+                    <button type="button" class="btn btn-secondary" onclick="loadConfig()">重置</button>
+                </div>
+            </form>
+        </div>
     </div>
-    <div class="card-body">
-        <div class="form-row">
-            <div class="form-col">
-                <div class="form-group">
-                    <label class="form-label">HTML 存储路径</label>
-                    <input type="text" class="form-input" id="html-path" readonly>
+</div>
+
+<!-- 存储设置 Tab -->
+<div class="tab-content" id="tab-storage">
+    <div class="card">
+        <div class="card-header">
+            <h3>💾 存储设置</h3>
+        </div>
+        <div class="card-body">
+            <form id="storage-config-form">
+                <div class="form-row">
+                    <div class="form-col">
+                        <div class="form-group">
+                            <label class="form-label">HTML 存储路径</label>
+                            <input type="text" class="form-input" id="html-path" readonly>
+                        </div>
+                    </div>
+                    <div class="form-col">
+                        <div class="form-group">
+                            <label class="form-label">数据库路径</label>
+                            <input type="text" class="form-input" id="db-path" readonly>
+                        </div>
+                    </div>
                 </div>
-            </div>
-            <div class="form-col">
-                <div class="form-group">
-                    <label class="form-label">数据库路径</label>
-                    <input type="text" class="form-input" id="db-path" readonly>
+
+                <div class="form-row">
+                    <div class="form-col">
+                        <div class="form-group">
+                            <label class="form-label">下载图片</label>
+                            <select class="form-select" id="download-images">
+                                <option value="true">是</option>
+                                <option value="false">否</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-col">
+                        <div class="form-group">
+                            <label class="form-label">下载头像</label>
+                            <select class="form-select" id="download-avatars">
+                                <option value="true">是</option>
+                                <option value="false">否</option>
+                            </select>
+                        </div>
+                    </div>
                 </div>
-            </div>
+
+                <div class="form-row">
+                    <div class="form-col">
+                        <div class="form-group">
+                            <label class="form-label">
+                                压缩 HTML
+                                <span class="tooltip" title="压缩可减少文件大小，但会影响可读性">ℹ️</span>
+                            </label>
+                            <select class="form-select" id="compress-html">
+                                <option value="true">是</option>
+                                <option value="false" selected>否</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-col">
+                        <div class="form-group">
+                            <label class="form-label">启用自动备份</label>
+                            <select class="form-select" id="backup-enabled">
+                                <option value="true">是</option>
+                                <option value="false" selected>否</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">备份间隔 (天)</label>
+                    <input type="number" class="form-input" id="backup-interval-days"
+                        value="7" min="1" max="30">
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">保存配置</button>
+                    <button type="button" class="btn btn-secondary" onclick="loadConfig()">重置</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- 日志设置 Tab -->
+<div class="tab-content" id="tab-logging">
+    <div class="card">
+        <div class="card-header">
+            <h3>📝 日志设置</h3>
+        </div>
+        <div class="card-body">
+            <form id="logging-config-form">
+                <div class="form-row">
+                    <div class="form-col">
+                        <div class="form-group">
+                            <label class="form-label">
+                                日志级别
+                                <span class="tooltip" title="DEBUG最详细，ERROR只记录错误">ℹ️</span>
+                            </label>
+                            <select class="form-select" id="log-level">
+                                <option value="DEBUG">DEBUG (调试)</option>
+                                <option value="INFO" selected>INFO (信息)</option>
+                                <option value="WARNING">WARNING (警告)</option>
+                                <option value="ERROR">ERROR (错误)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-col">
+                        <div class="form-group">
+                            <label class="form-label">输出到控制台</label>
+                            <select class="form-select" id="console-output">
+                                <option value="true">是</option>
+                                <option value="false">否</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">
+                        记录 SQL 语句
+                        <span class="tooltip" title="仅DEBUG级别有效，会产生大量日志">ℹ️</span>
+                    </label>
+                    <select class="form-select" id="log-sql">
+                        <option value="true">是</option>
+                        <option value="false" selected>否</option>
+                    </select>
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">保存配置</button>
+                    <button type="button" class="btn btn-secondary" onclick="loadConfig()">重置</button>
+                </div>
+            </form>
         </div>
     </div>
 </div>
@@ -222,6 +596,177 @@ JSON.stringify(document.cookie.split(';').map(c => {
 
 {% block scripts %}
 <style>
+/* Tab 样式 */
+.config-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 20px;
+    background: var(--bg-secondary);
+    padding: 8px;
+    border-radius: 12px;
+    border: 1px solid var(--border-color);
+}
+
+.tab-btn {
+    flex: 1;
+    padding: 12px 16px;
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 14px;
+    font-weight: 500;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.tab-btn:hover {
+    background: var(--bg-primary);
+    color: var(--text-primary);
+}
+
+.tab-btn.active {
+    background: var(--primary);
+    color: white;
+}
+
+.tab-icon {
+    font-size: 16px;
+}
+
+/* Tab 内容 */
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
+    animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* 指南开关条 */
+.guide-toggle-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 20px;
+    background: linear-gradient(135deg, rgba(0, 102, 255, 0.05), rgba(0, 102, 255, 0.1));
+    border: 1px dashed var(--primary);
+    border-radius: 12px;
+    margin-bottom: 20px;
+    font-size: 14px;
+    color: var(--text-secondary);
+}
+
+/* 环境选择器 */
+.env-selector, .browser-selector {
+    display: flex;
+    gap: 8px;
+    margin: 16px 0;
+    flex-wrap: wrap;
+}
+
+.env-btn, .browser-btn {
+    padding: 10px 16px;
+    border: 2px solid var(--border-color);
+    background: var(--bg-primary);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 13px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.env-btn:hover, .browser-btn:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+}
+
+.env-btn.active, .browser-btn.active {
+    border-color: var(--primary);
+    background: var(--primary);
+    color: white;
+}
+
+.env-icon {
+    font-size: 16px;
+}
+
+/* 环境内容区 */
+.env-content, .browser-content {
+    margin-top: 12px;
+}
+
+/* Tooltip 增强 */
+.tooltip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    background: var(--bg-secondary);
+    border-radius: 50%;
+    font-size: 11px;
+    cursor: help;
+    position: relative;
+    margin-left: 4px;
+}
+
+.tooltip:hover::after {
+    content: attr(title);
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 8px 12px;
+    background: var(--bg-dark);
+    color: white;
+    font-size: 12px;
+    border-radius: 6px;
+    white-space: nowrap;
+    z-index: 100;
+    margin-bottom: 6px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.tooltip:hover::before {
+    content: '';
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 6px solid transparent;
+    border-top-color: var(--bg-dark);
+    margin-bottom: -6px;
+    z-index: 100;
+}
+
+/* 帮助链接 */
+.help-link {
+    color: var(--primary);
+    cursor: pointer;
+    text-decoration: underline;
+    text-decoration-style: dashed;
+    text-underline-offset: 3px;
+}
+
+.help-link:hover {
+    text-decoration-style: solid;
+}
+
+/* 原有的 guide-section 样式 */
 .guide-section {
     margin-bottom: 24px;
     padding-bottom: 24px;
@@ -259,33 +804,11 @@ JSON.stringify(document.cookie.split(';').map(c => {
     margin-top: 16px;
     border-radius: 0 8px 8px 0;
 }
-.help-details {
-    background: #f8f9fa;
-    padding: 16px;
-    border-radius: 8px;
-    margin-top: 12px;
-}
-.help-details h5 {
-    font-weight: 600;
-    margin: 16px 0 8px;
-    color: var(--text-primary);
-}
-.help-details h5:first-child {
-    margin-top: 0;
-}
-.help-details pre {
-    background: #1a1a2e;
-    color: #e0e0e0;
-    padding: 12px;
-    border-radius: 8px;
-    overflow-x: auto;
-    font-size: 12px;
-}
-.help-details ol {
+.guide-tip ul {
     margin: 8px 0;
     padding-left: 20px;
 }
-.help-details li {
+.guide-tip li {
     margin: 4px 0;
 }
 kbd {
@@ -352,13 +875,116 @@ kbd {
     background: rgba(255,255,255,0.5);
     border-radius: 4px;
 }
+
+/* 响应式 */
+@media (max-width: 768px) {
+    .config-tabs {
+        flex-wrap: wrap;
+    }
+    .tab-btn {
+        flex: 1 1 calc(50% - 4px);
+        padding: 10px;
+        font-size: 13px;
+    }
+    .tab-text {
+        display: none;
+    }
+    .env-selector, .browser-selector {
+        justify-content: center;
+    }
+}
 </style>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     loadConfig();
     checkCookieStatus();
+    checkGuideVisibility();
 });
+
+// 检查是否显示指南（首次访问或主要配置为空）
+function checkGuideVisibility() {
+    const guideClosed = localStorage.getItem('guideClosed');
+    const guideCard = document.getElementById('guide-card');
+    const guideToggleBar = document.getElementById('guide-toggle-bar');
+
+    // 检查主要配置是否已设置
+    const userId = document.getElementById('user-id').value;
+
+    if (!guideClosed && !userId) {
+        // 首次访问或未配置，显示指南
+        guideCard.style.display = 'block';
+        guideToggleBar.style.display = 'none';
+    } else {
+        // 已配置过，默认收起指南
+        guideCard.style.display = 'none';
+        guideToggleBar.style.display = 'flex';
+    }
+}
+
+// 切换指南显示
+function toggleGuide() {
+    const guideCard = document.getElementById('guide-card');
+    const guideToggleBar = document.getElementById('guide-toggle-bar');
+    const isVisible = guideCard.style.display !== 'none';
+
+    if (isVisible) {
+        guideCard.style.display = 'none';
+        guideToggleBar.style.display = 'flex';
+        localStorage.setItem('guideClosed', 'true');
+    } else {
+        guideCard.style.display = 'block';
+        guideToggleBar.style.display = 'none';
+        guideCard.scrollIntoView({ behavior: 'smooth' });
+    }
+}
+
+// Tab 切换
+function switchTab(tabName) {
+    // 更新按钮状态
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.remove('active');
+        if (btn.dataset.tab === tabName) {
+            btn.classList.add('active');
+        }
+    });
+
+    // 更新内容显示
+    document.querySelectorAll('.tab-content').forEach(content => {
+        content.classList.remove('active');
+    });
+    document.getElementById('tab-' + tabName).classList.add('active');
+}
+
+// 环境切换
+function switchEnv(env) {
+    document.querySelectorAll('.env-btn').forEach(btn => {
+        btn.classList.remove('active');
+        if (btn.dataset.env === env) {
+            btn.classList.add('active');
+        }
+    });
+
+    document.querySelectorAll('.env-content').forEach(content => {
+        content.style.display = 'none';
+    });
+    document.getElementById('env-' + env).style.display = 'block';
+}
+
+// 浏览器切换
+function switchBrowser(browser) {
+    document.querySelectorAll('.browser-btn').forEach(btn => {
+        btn.classList.remove('active');
+        if (btn.dataset.browser === browser) {
+            btn.classList.add('active');
+        }
+    });
+
+    document.querySelectorAll('.browser-content').forEach(content => {
+        content.style.display = 'none';
+    });
+    document.getElementById('browser-' + browser).style.display = 'block';
+}
 
 // 加载配置
 async function loadConfig() {
@@ -366,13 +992,44 @@ async function loadConfig() {
         const res = await fetch('/api/config');
         const data = await res.json();
 
+        // 知乎设置
         document.getElementById('user-id').value = data.user_id || '';
         document.getElementById('scan-interval').value = data.scan_interval || 60;
         document.getElementById('max-items').value = data.max_items_per_scan || 50;
         document.getElementById('save-comments').value = String(data.save_comments !== false);
+        document.getElementById('max-comments').value = data.max_comments || 100;
+        document.getElementById('sync-likes').value = String(data.sync_likes !== false);
+        document.getElementById('sync-created').value = String(data.sync_created === true);
+        document.getElementById('skip-video').value = String(data.skip_video !== false);
+        document.getElementById('min-voteup').value = data.min_voteup || 0;
+
+        // 浏览器设置
         document.getElementById('headless').value = String(data.headless !== false);
+        document.getElementById('browser-type').value = data.browser_type || 'chromium';
+        document.getElementById('timeout').value = data.timeout || 30;
+        document.getElementById('request-delay').value = data.request_delay || 2.0;
+        document.getElementById('proxy').value = data.proxy || '';
+        document.getElementById('window-width').value = data.window_width || 1920;
+        document.getElementById('window-height').value = data.window_height || 1080;
+        document.getElementById('scroll-delay').value = data.scroll_delay || 800;
+        document.getElementById('max-scroll-rounds').value = data.max_scroll_rounds || 20;
+
+        // 存储设置
         document.getElementById('html-path').value = data.html_path || '';
         document.getElementById('db-path').value = data.db_path || '';
+        document.getElementById('download-images').value = String(data.download_images !== false);
+        document.getElementById('download-avatars').value = String(data.download_avatars !== false);
+        document.getElementById('compress-html').value = String(data.compress_html === true);
+        document.getElementById('backup-enabled').value = String(data.backup_enabled === true);
+        document.getElementById('backup-interval-days').value = data.backup_interval_days || 7;
+
+        // 日志设置
+        document.getElementById('log-level').value = data.log_level || 'INFO';
+        document.getElementById('console-output').value = String(data.console_output !== false);
+        document.getElementById('log-sql').value = String(data.log_sql === true);
+
+        // 加载完成后检查是否需要显示指南
+        checkGuideVisibility();
     } catch (e) {
         showToast('加载配置失败: ' + e.message, 'error');
     }
@@ -381,19 +1038,63 @@ async function loadConfig() {
 // 保存配置
 document.getElementById('config-form').addEventListener('submit', async function(e) {
     e.preventDefault();
+    await saveAllConfig();
+});
+
+document.getElementById('browser-config-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    await saveAllConfig();
+});
+
+document.getElementById('storage-config-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    await saveAllConfig();
+});
+
+document.getElementById('logging-config-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    await saveAllConfig();
+});
+
+// 保存所有配置
+async function saveAllConfig() {
+    const userId = document.getElementById('user-id').value.trim();
+    if (!userId) {
+        showToast('请填写用户 ID', 'error');
+        // 切换到基本设置标签
+        switchTab('basic');
+        document.getElementById('user-id').focus();
+        return;
+    }
 
     const config = {
-        user_id: document.getElementById('user-id').value.trim(),
+        user_id: userId,
         scan_interval: parseInt(document.getElementById('scan-interval').value),
         max_items_per_scan: parseInt(document.getElementById('max-items').value),
         save_comments: document.getElementById('save-comments').value === 'true',
-        headless: document.getElementById('headless').value === 'true'
+        max_comments: parseInt(document.getElementById('max-comments').value),
+        sync_likes: document.getElementById('sync-likes').value === 'true',
+        sync_created: document.getElementById('sync-created').value === 'true',
+        skip_video: document.getElementById('skip-video').value === 'true',
+        min_voteup: parseInt(document.getElementById('min-voteup').value),
+        headless: document.getElementById('headless').value === 'true',
+        browser_type: document.getElementById('browser-type').value,
+        timeout: parseInt(document.getElementById('timeout').value),
+        request_delay: parseFloat(document.getElementById('request-delay').value),
+        proxy: document.getElementById('proxy').value.trim(),
+        window_width: parseInt(document.getElementById('window-width').value),
+        window_height: parseInt(document.getElementById('window-height').value),
+        scroll_delay: parseInt(document.getElementById('scroll-delay').value),
+        max_scroll_rounds: parseInt(document.getElementById('max-scroll-rounds').value),
+        download_images: document.getElementById('download-images').value === 'true',
+        download_avatars: document.getElementById('download-avatars').value === 'true',
+        compress_html: document.getElementById('compress-html').value === 'true',
+        backup_enabled: document.getElementById('backup-enabled').value === 'true',
+        backup_interval_days: parseInt(document.getElementById('backup-interval-days').value),
+        log_level: document.getElementById('log-level').value,
+        console_output: document.getElementById('console-output').value === 'true',
+        log_sql: document.getElementById('log-sql').value === 'true',
     };
-
-    if (!config.user_id) {
-        showToast('请填写用户 ID', 'error');
-        return;
-    }
 
     try {
         const res = await fetch('/api/config', {
@@ -404,6 +1105,8 @@ document.getElementById('config-form').addEventListener('submit', async function
 
         if (res.ok) {
             showToast('配置已保存', 'success');
+            // 保存成功后更新指南显示状态
+            checkGuideVisibility();
         } else {
             const data = await res.json();
             showToast(data.detail || '保存失败', 'error');
@@ -411,7 +1114,7 @@ document.getElementById('config-form').addEventListener('submit', async function
     } catch (e) {
         showToast('保存失败: ' + e.message, 'error');
     }
-});
+}
 
 // 检查 Cookie 状态
 async function checkCookieStatus() {
@@ -441,7 +1144,6 @@ async function testCookie() {
     const btn = document.getElementById('test-cookie-btn');
     const resultDiv = document.getElementById('cookie-test-result');
 
-    // 设置加载状态
     btn.disabled = true;
     btn.textContent = '⏳ 测试中...';
     resultDiv.style.display = 'block';
@@ -496,12 +1198,10 @@ async function saveCookie() {
     }
 
     try {
-        // 尝试解析 JSON
         let cookieData;
         try {
             cookieData = JSON.parse(input);
         } catch (e) {
-            // 如果不是 JSON，尝试构造 storage state 格式
             cookieData = {
                 cookies: input.split(';').map(c => {
                     const [name, ...value] = c.trim().split('=');
@@ -515,7 +1215,6 @@ async function saveCookie() {
             };
         }
 
-        // 确保格式正确
         if (Array.isArray(cookieData)) {
             cookieData = {cookies: cookieData};
         }

@@ -25,6 +25,10 @@ class ZhihuConfig(BaseModel):
         max_items_per_scan: 每次扫描最大条目数.
         save_comments: 是否保存评论.
         max_comments: 每篇文章最大评论数.
+        sync_likes: 是否同步点赞内容.
+        sync_created: 是否同步创作内容.
+        skip_video: 是否跳过视频内容.
+        min_voteup: 最小赞同数过滤.
     """
 
     user_id: str = ""
@@ -32,6 +36,10 @@ class ZhihuConfig(BaseModel):
     max_items_per_scan: int = 50
     save_comments: bool = True
     max_comments: int = 100
+    sync_likes: bool = True  # 同步点赞
+    sync_created: bool = False  # 同步创作
+    skip_video: bool = True  # 跳过视频
+    min_voteup: int = 0  # 最小赞同数
 
 
 class StorageConfig(BaseModel):
@@ -43,6 +51,10 @@ class StorageConfig(BaseModel):
         static_path: 静态文件路径.
         download_images: 是否下载图片.
         images_path: 图片保存路径.
+        download_avatars: 是否下载头像.
+        compress_html: 是否压缩HTML.
+        backup_enabled: 是否启用备份.
+        backup_interval_days: 备份间隔天数.
     """
 
     html_path: str = "/app/data/html"
@@ -50,6 +62,10 @@ class StorageConfig(BaseModel):
     static_path: str = "/app/data/static"
     download_images: bool = True
     images_path: str = "/app/data/static/images"
+    download_avatars: bool = True  # 下载头像
+    compress_html: bool = False  # 压缩HTML
+    backup_enabled: bool = False  # 启用备份
+    backup_interval_days: int = 7  # 备份间隔
 
 
 class BrowserConfig(BaseModel):
@@ -61,6 +77,11 @@ class BrowserConfig(BaseModel):
         timeout: 页面加载超时时间(秒).
         request_delay: 请求间隔时间(秒).
         user_agent: User-Agent字符串.
+        proxy: 代理服务器地址.
+        window_width: 浏览器窗口宽度.
+        window_height: 浏览器窗口高度.
+        scroll_delay: 滚动延迟(毫秒).
+        max_scroll_rounds: 最大滚动轮数.
     """
 
     headless: bool = True
@@ -68,6 +89,11 @@ class BrowserConfig(BaseModel):
     timeout: int = 30
     request_delay: float = 2.0
     user_agent: str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.0"
+    proxy: str = ""  # 代理服务器
+    window_width: int = 1920  # 窗口宽度
+    window_height: int = 1080  # 窗口高度
+    scroll_delay: int = 800  # 滚动延迟(ms)
+    max_scroll_rounds: int = 20  # 最大滚动轮数
 
 
 class LoggingConfig(BaseModel):
@@ -79,6 +105,9 @@ class LoggingConfig(BaseModel):
         file: 日志文件路径.
         rotation: 日志轮转大小.
         retention: 日志保留时间.
+        console_output: 是否输出到控制台.
+        max_file_size: 单个日志文件最大大小(MB).
+        log_sql: 是否记录SQL语句.
     """
 
     level: str = "INFO"
@@ -87,6 +116,9 @@ class LoggingConfig(BaseModel):
     file: str = "/app/data/meta/zhihusync.log"
     rotation: str = "10 MB"
     retention: str = "30 days"
+    console_output: bool = True  # 输出到控制台
+    max_file_size: int = 50  # 单个日志最大MB
+    log_sql: bool = False  # 记录SQL
 
 
 class AppConfig(BaseSettings):
