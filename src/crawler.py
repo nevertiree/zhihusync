@@ -211,6 +211,7 @@ class ZhihuCrawler:
 
             # 创建页面访问知乎以便添加 cookie
             self.page = await self.context.new_page()
+            assert self.page is not None  # noqa: S101
             await self.page.goto("https://www.zhihu.com", wait_until="domcontentloaded", timeout=10000)
 
             # 使用 JavaScript 批量设置 cookie
@@ -227,6 +228,7 @@ class ZhihuCrawler:
                         document.cookie = "{name}=" + encodeURIComponent("{value}") +
                         "; domain={domain}; path={path}";
                     }}"""
+                    assert self.page is not None  # noqa: S101
                     await self.page.evaluate(js_code)
                     success_count += 1
                 except Exception as e:
@@ -290,10 +292,12 @@ class ZhihuCrawler:
         logger.info("测试登录状态...")
 
         try:
+            assert self.page is not None  # noqa: S101
             # 访问知乎首页
             await self.page.goto(f"{self.ZHIHU_BASE}", timeout=30000)
 
             # 检查是否有登录态
+            assert self.page is not None  # noqa: S101
             # 方法1: 检查 localStorage 中的用户信息
             user_info = await self.page.evaluate(
                 """
@@ -309,11 +313,13 @@ class ZhihuCrawler:
             )
 
             # 方法2: 检查页面上的用户头像或昵称元素
+            assert self.page is not None  # noqa: S101
             has_user_menu = (
                 await self.page.locator("[data-za-detail-view-path-module='TopNavBar'] .AppHeader-profile").count() > 0
             )
 
             # 方法3: 尝试访问 API 获取当前用户信息
+            assert self.page is not None  # noqa: S101
             me_response = None
             try:
                 await self.page.goto(f"{self.API_BASE}/me", timeout=10000)
@@ -342,6 +348,7 @@ class ZhihuCrawler:
                 user_id = me_response.get("url_token") or me_response.get("id")
 
             # 获取当前页面 URL 判断是否被重定向到登录页
+            assert self.page is not None  # noqa: S101
             current_url = self.page.url
             if "signin" in current_url or "login" in current_url:
                 is_logged_in = False
@@ -374,10 +381,12 @@ class ZhihuCrawler:
         """等待用户登录"""
         logger.info("请登录知乎...")
 
+        assert self.page is not None  # noqa: S101
         await self.page.goto(f"{self.ZHIHU_BASE}/signin")
 
         # 等待跳转到首页或个人主页
         try:
+            assert self.page is not None  # noqa: S101
             await self.page.wait_for_url(lambda url: "zhihu.com" in url and "signin" not in url, timeout=timeout * 1000)
             logger.info("登录成功")
             return True
@@ -395,13 +404,12 @@ class ZhihuCrawler:
                 pass
         return None
 
-    def _parse_timestamp(self, ts: int or str) -> datetime:
+    def _parse_timestamp(self, ts: int | str) -> datetime:
         """解析时间戳"""
-        if isinstance(ts, str):
-            ts = int(ts)
-        if ts > 1e12:  # 毫秒时间戳
-            ts = ts / 1000
-        return datetime.fromtimestamp(ts)
+        ts_float = float(ts)
+        if ts_float > 1e12:  # 毫秒时间戳
+            ts_float = ts_float / 1000
+        return datetime.fromtimestamp(ts_float)
 
     async def _delay(self):
         """请求延迟"""
@@ -414,10 +422,12 @@ class ZhihuCrawler:
             logger.info(f"获取用户资料: {url}")
 
             await self._delay()
+            assert self.page is not None  # noqa: S101
             await self.page.goto(url, wait_until="networkidle")
             await asyncio.sleep(1)
 
             # 提取用户信息
+            assert self.page is not None  # noqa: S101
             user_info = await self.page.evaluate(
                 """
                 () => {
@@ -510,10 +520,12 @@ class ZhihuCrawler:
         logger.info(f"访问用户主页: {url}")
 
         await self._delay()
+        assert self.page is not None  # noqa: S101
         await self.page.goto(url)
 
         # 等待页面加载
         try:
+            assert self.page is not None  # noqa: S101
             await self.page.wait_for_load_state("networkidle", timeout=10000)
             await asyncio.sleep(2)
         except Exception:
@@ -521,7 +533,7 @@ class ZhihuCrawler:
 
         # 增量滚动：分批滚动并解析，避免长时间等待
         logger.info(f"开始增量滚动，目标数量: {limit}...")
-        all_activities = []
+        all_activities: list[dict] = []
         last_count = 0
         no_new_content_count = 0
         max_no_new_content = 3
@@ -533,6 +545,7 @@ class ZhihuCrawler:
             logger.debug(f"第 {scroll_round} 轮滚动...")
 
             # 每次滚动3次
+            assert self.page is not None  # noqa: S101
             for _ in range(3):
                 await self.page.evaluate(
                     """() => {
@@ -542,6 +555,7 @@ class ZhihuCrawler:
                 await asyncio.sleep(0.8)
 
             # 获取当前页面内容并解析
+            assert self.page is not None  # noqa: S101
             content = await self.page.content()
             activities = self._parse_activities_from_html(content)
 
@@ -565,6 +579,7 @@ class ZhihuCrawler:
 
                 # 尝试点击"查看更多"按钮
                 try:
+                    assert self.page is not None  # noqa: S101
                     has_more = await self.page.evaluate(
                         """() => {
                             const btn = document.querySelector(
@@ -596,20 +611,22 @@ class ZhihuCrawler:
             logger.info(f"共解析到 {len(all_activities)} 条，返回 [{offset}:{offset + limit}]")
             return all_activities[offset : offset + limit]
 
-        # 如果页面解析失败，尝试访问 API
+        # 如果页面解析失败，尝试直接访问 API
         logger.info("页面解析失败，尝试直接访问 API...")
         api_url = f"{self.API_BASE}/members/{self.user_id}/activities?limit={limit}&offset={offset}"
 
         await self._delay()
+        assert self.page is not None  # noqa: S101
         await self.page.goto(api_url)
 
+        assert self.page is not None  # noqa: S101
         content = await self.page.content()
         soup = BeautifulSoup(content, "lxml")
-        text = soup.find("pre")
+        text_elem = soup.find("pre")
 
-        if text:
+        if isinstance(text_elem, Tag):
             try:
-                raw_text = text.get_text()
+                raw_text = text_elem.get_text()
                 data = json.loads(raw_text)
                 activities = data.get("data", [])
                 paging = data.get("paging", {})
@@ -668,15 +685,17 @@ class ZhihuCrawler:
         # 获取用户ID
         name_elem = author_info.select_one("a.UserLink-link")
         if name_elem:
-            href = name_elem.get("href", "")
-            # 提取用户ID，处理多种格式
-            if "/people/" in href:
-                author_id = href.split("/people/")[-1].split("?")[0].strip("/")
-            elif href.startswith("//"):
-                # 格式: //www.zhihu.com/people/xxx
-                author_id = href.split("/")[-1].split("?")[0]
-            else:
-                author_id = href.strip("/")
+            href_val = name_elem.get("href", "")
+            # 确保 href 是字符串类型
+            if isinstance(href_val, str):
+                # 提取用户ID，处理多种格式
+                if "/people/" in href_val:
+                    author_id = href_val.split("/people/")[-1].split("?")[0].strip("/")
+                elif href_val.startswith("//"):
+                    # 格式: //www.zhihu.com/people/xxx
+                    author_id = href_val.split("/")[-1].split("?")[0]
+                else:
+                    author_id = href_val.strip("/")
 
         # 获取作者签名
         badge = author_info.find("div", class_="AuthorInfo-badgeText")
@@ -754,15 +773,18 @@ class ZhihuCrawler:
         try:
             # 获取活动类型和时间
             meta_div = item.find("div", class_="ActivityItem-meta")
-            if not meta_div:
+            if not isinstance(meta_div, Tag):
                 return None
 
             meta_title = meta_div.find("span", class_="ActivityItem-metaTitle")
+            if not isinstance(meta_title, Tag):
+                return None
             time_span = meta_div.find_all("span")
-            created_time_str = time_span[-1].text if len(time_span) > 1 else ""
+            time_elem = time_span[-1] if len(time_span) > 1 else None
+            created_time_str = time_elem.text if isinstance(time_elem, Tag) else ""
 
             # 只处理点赞活动
-            if not meta_title or "赞同" not in meta_title.text:
+            if "赞同" not in meta_title.text:
                 return None
 
             # 确定类型
@@ -771,11 +793,12 @@ class ZhihuCrawler:
 
             # 获取内容项
             content_item = item.find("div", class_="ContentItem")
-            if not content_item:
+            if not isinstance(content_item, Tag):
                 return None
 
             # 提取 data-zop 属性
-            data_zop = content_item.get("data-zop", "{}")
+            data_zop_val = content_item.get("data-zop", "{}")
+            data_zop = data_zop_val if isinstance(data_zop_val, str) else "{}"
             try:
                 zop_data = json.loads(data_zop)
             except json.JSONDecodeError:
@@ -788,24 +811,25 @@ class ZhihuCrawler:
             question_title = ""
             question_id = ""
 
-            if title_elem:
+            if isinstance(title_elem, Tag):
                 link = title_elem.find("a")
-                if link:
+                if isinstance(link, Tag):
                     question_title = link.get_text(strip=True)
-                    answer_href = link.get("href", "")
+                    href_val = link.get("href", "")
+                    answer_href = href_val if isinstance(href_val, str) else ""
                     question_id, _ = self._extract_question_info_from_link(answer_href)
 
             # 获取作者信息
             author_info_elem = content_item.find("div", class_="AuthorInfo")
             author_data = {"name": "", "id": "", "headline": ""}
-            if author_info_elem:
+            if isinstance(author_info_elem, Tag):
                 author_data = self._extract_author_info_from_html(author_info_elem)
 
             # 获取赞同数和评论数
             voteup_count = 0
             comment_count = 0
             actions = content_item.find("div", class_="ContentItem-actions")
-            if actions:
+            if isinstance(actions, Tag):
                 voteup_count = self._extract_voteup_count(actions)
                 comment_count = self._extract_comment_count(actions)
 
@@ -863,15 +887,16 @@ class ZhihuCrawler:
         full_url = f"{url}?{'&'.join(f'{k}={v}' for k, v in params.items())}"
 
         await self._delay()
+        assert self.page is not None  # noqa: S101
         await self.page.goto(full_url)
 
         content = await self.page.content()
         soup = BeautifulSoup(content, "lxml")
-        text = soup.find("pre")
+        text_elem = soup.find("pre")
 
-        if text:
+        if isinstance(text_elem, Tag):
             try:
-                return json.loads(text.get_text())
+                return json.loads(text_elem.get_text())
             except json.JSONDecodeError:
                 pass
 
@@ -883,10 +908,12 @@ class ZhihuCrawler:
         url = f"{self.ZHIHU_BASE}/question/{question_id}/answer/{answer_id}"
 
         await self._delay()
+        assert self.page is not None  # noqa: S101
         await self.page.goto(url, wait_until="networkidle")
 
         # 等待内容加载
         try:
+            assert self.page is not None  # noqa: S101
             await self.page.wait_for_selector(".RichContent", timeout=10000)
         except Exception:
             logger.warning(f"等待内容超时: {answer_id}")
@@ -905,6 +932,7 @@ class ZhihuCrawler:
         """点击所有'展开全文'按钮以获取完整内容"""
         try:
             # 查找所有展开按钮
+            assert self.page is not None  # noqa: S101
             expand_buttons = await self.page.query_selector_all(
                 'button.ContentItem-more, button.Button:has-text("阅读全文"), ' 'button.Button:has-text("展开全文")'
             )
@@ -917,6 +945,7 @@ class ZhihuCrawler:
                     continue
 
             # 也尝试通过 JavaScript 点击
+            assert self.page is not None  # noqa: S101
             await self.page.evaluate(
                 """
                 () => {
@@ -934,10 +963,12 @@ class ZhihuCrawler:
 
     async def _get_page_with_styles(self) -> str:
         """获取页面内容并提取关键样式"""
+        assert self.page is not None  # noqa: S101
         # 获取原始 HTML
         html_content = await self.page.content()
 
         # 获取所有样式表内容
+        assert self.page is not None  # noqa: S101
         styles = await self.page.evaluate(
             """
             () => {
@@ -980,15 +1011,17 @@ class ZhihuCrawler:
 
         await self._delay()
         logger.debug(f"请求评论 API: {full_url}")
+        assert self.page is not None  # noqa: S101
         await self.page.goto(full_url)
 
+        assert self.page is not None  # noqa: S101
         content = await self.page.content()
         soup = BeautifulSoup(content, "lxml")
-        text = soup.find("pre")
+        text_elem = soup.find("pre")
 
-        if text:
+        if isinstance(text_elem, Tag):
             try:
-                raw_text = text.get_text()
+                raw_text = text_elem.get_text()
                 logger.debug(f"评论 API 原始响应: {raw_text[:500]}...")
                 data = json.loads(raw_text)
                 comments = data.get("data", [])
@@ -1010,6 +1043,7 @@ class ZhihuCrawler:
 
     async def _scroll_page(self):
         """滚动页面加载内容"""
+        assert self.page is not None  # noqa: S101
         await self.page.evaluate(
             """
             async () => {
@@ -1042,6 +1076,7 @@ class ZhihuCrawler:
 
         # 先点击"查看更多"或"展开"按钮（如果有）
         try:
+            assert self.page is not None  # noqa: S101
             await self.page.evaluate(
                 """
                 () => {
@@ -1071,10 +1106,12 @@ class ZhihuCrawler:
 
         while scroll_attempts < max_scroll_attempts:
             # 滚动到页面底部
+            assert self.page is not None  # noqa: S101
             await self.page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
             await asyncio.sleep(1.5)  # 等待内容加载
 
             # 获取新的页面高度
+            assert self.page is not None  # noqa: S101
             new_height = await self.page.evaluate("document.body.scrollHeight")
 
             if new_height == last_height:
@@ -1140,10 +1177,12 @@ class ZhihuCrawler:
             ]
             for selector in avatar_selectors:
                 avatar_img = author_info_elem.select_one(selector)
-                if avatar_img and avatar_img.get("src"):
-                    author_avatar_url = avatar_img.get("src")
-                    logger.debug(f"提取到作者头像: {author_avatar_url[:60]}...")
-                    break
+                if avatar_img:
+                    src = avatar_img.get("src")
+                    if isinstance(src, str):
+                        author_avatar_url = src
+                        logger.debug(f"提取到作者头像: {author_avatar_url[:60]}...")
+                        break
 
             # 提取作者名（如果API中没有）
             name_elem = author_info_elem.select_one("a.UserLink-link, .AuthorInfo-name")
