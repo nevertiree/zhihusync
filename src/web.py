@@ -677,10 +677,14 @@ async def get_answers(page: int = 1, page_size: int = 20, search: str = ""):
 
         items = []
         for a in answers:
+            # 获取用户信息
+            user = a.user
             items.append(
                 {
                     "id": a.id,
                     "user_id": a.user_id,
+                    "user_name": user.name if user else None,
+                    "user_avatar_url": user.avatar_url if user else None,
                     "question_title": a.question_title,
                     "author_name": a.author_name or "匿名用户",
                     "author_avatar_url": a.author_avatar_url,
