@@ -10,7 +10,6 @@ Examples:
     >>> stats = db.get_stats()
 """
 
-import datetime
 from pathlib import Path
 from typing import Any
 
@@ -18,6 +17,7 @@ from loguru import logger
 from models import AlertConfig, Answer, Base, Comment, SyncLog, User
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
+from timezone_utils import get_beijing_now
 
 
 class DatabaseManager:
@@ -139,7 +139,7 @@ class DatabaseManager:
         try:
             user = session.query(User).filter_by(id=user_id).first()
             if user:
-                user.last_sync_at = datetime.datetime.now()
+                user.last_sync_at = get_beijing_now()
                 user.sync_count += 1
                 session.commit()
         finally:
@@ -221,7 +221,7 @@ class DatabaseManager:
                 for key, value in answer_data.items():
                     if hasattr(existing, key):
                         setattr(existing, key, value)
-                existing.synced_at = datetime.datetime.now()
+                existing.synced_at = get_beijing_now()
                 session.commit()
                 logger.debug(f"更新回答: {answer_data['id']}")
                 return False
@@ -397,7 +397,7 @@ class DatabaseManager:
                     if hasattr(log, key):
                         setattr(log, key, value)
                 if "status" in kwargs:
-                    log.ended_at = datetime.datetime.now()
+                    log.ended_at = get_beijing_now()
                 session.commit()
         finally:
             session.close()
@@ -487,7 +487,7 @@ class DatabaseManager:
                 if hasattr(config, key):
                     setattr(config, key, value)
 
-            config.updated_at = datetime.datetime.now()
+            config.updated_at = get_beijing_now()
             session.commit()
             return True
         except Exception as e:

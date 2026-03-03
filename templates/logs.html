@@ -139,8 +139,8 @@ async function loadHistory(page = 1) {
             return `
                 <tr>
                     <td>${log.id}</td>
-                    <td>${log.started_at ? new Date(log.started_at).toLocaleString() : '-'}</td>
-                    <td>${log.ended_at ? new Date(log.ended_at).toLocaleString() : '-'}</td>
+                    <td>${log.started_at ? new Date(log.started_at).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' }) : '-'}</td>
+                    <td>${log.ended_at ? new Date(log.ended_at).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' }) : '-'}</td>
                     <td><span class="badge ${statusClass}">${statusText}</span></td>
                     <td>${log.items_scanned || 0}</td>
                     <td>${log.items_new || 0}</td>
