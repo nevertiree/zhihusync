@@ -10,6 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Initial support for parsing liked articles (previously only answers were supported)
 - Comprehensive unit tests (43 tests) covering web API, crawler, and storage modules
+- **User profile enhancement**: Fetch and display Zhihu user name, avatar, and headline
+- **Author information**: Display author avatar and headline in answer list
+- **Comment enhancement**: Store commenter avatar URL
+- **Improved scrolling**: Enhanced `_scroll_page_for_activities()` to load more content by scrolling multiple times
 
 ### Fixed
 - Fixed `fetch_likes` method to parse activity data from user profile HTML
