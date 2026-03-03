@@ -1,4 +1,4 @@
-version: '3.8'
+version: "3.8"
 
 services:
   zhihusync:
@@ -45,10 +45,10 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '2.0'
+          cpus: "2.0"
           memory: 2G
         reservations:
-          cpus: '0.5'
+          cpus: "0.5"
           memory: 512M
 
   # 可选: Nginx 用于直接浏览 HTML 备份文件

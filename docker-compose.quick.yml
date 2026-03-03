@@ -1,7 +1,7 @@
 # 快速启动配置 - 使用官方 Playwright 镜像作为基础
 # 无需本地构建基础镜像，下载即用
 
-version: '3.8'
+version: "3.8"
 
 services:
   zhihusync:
@@ -20,7 +20,7 @@ services:
       - ./data/meta:/app/data/meta
       - ./data/static:/app/data/static
       - ./config:/app/config
-      - ./src:/app/src  # 开发模式：代码变更实时生效
+      - ./src:/app/src # 开发模式：代码变更实时生效
       - ./templates:/app/templates
       - ./static:/app/static
 

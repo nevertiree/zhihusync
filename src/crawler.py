@@ -97,9 +97,7 @@ class ZhihuCrawler:
 
     def _get_cookie_file_path(self) -> Path:
         """获取 Cookie 文件路径 - 基于 db_path 所在目录"""
-        db_path = Path(
-            self.db.db_path if hasattr(self.db, "db_path") else "/app/data/meta/zhihusync.db"
-        )
+        db_path = Path(self.db.db_path if hasattr(self.db, "db_path") else "/app/data/meta/zhihusync.db")
         meta_dir = db_path.parent
         return meta_dir / "cookies.json"
 
@@ -213,9 +211,7 @@ class ZhihuCrawler:
 
             # 创建页面访问知乎以便添加 cookie
             self.page = await self.context.new_page()
-            await self.page.goto(
-                "https://www.zhihu.com", wait_until="domcontentloaded", timeout=10000
-            )
+            await self.page.goto("https://www.zhihu.com", wait_until="domcontentloaded", timeout=10000)
 
             # 使用 JavaScript 批量设置 cookie
             success_count = 0
@@ -314,10 +310,7 @@ class ZhihuCrawler:
 
             # 方法2: 检查页面上的用户头像或昵称元素
             has_user_menu = (
-                await self.page.locator(
-                    "[data-za-detail-view-path-module='TopNavBar'] .AppHeader-profile"
-                ).count()
-                > 0
+                await self.page.locator("[data-za-detail-view-path-module='TopNavBar'] .AppHeader-profile").count() > 0
             )
 
             # 方法3: 尝试访问 API 获取当前用户信息
@@ -385,9 +378,7 @@ class ZhihuCrawler:
 
         # 等待跳转到首页或个人主页
         try:
-            await self.page.wait_for_url(
-                lambda url: "zhihu.com" in url and "signin" not in url, timeout=timeout * 1000
-            )
+            await self.page.wait_for_url(lambda url: "zhihu.com" in url and "signin" not in url, timeout=timeout * 1000)
             logger.info("登录成功")
             return True
         except Exception:
@@ -493,9 +484,7 @@ class ZhihuCrawler:
                 # 下载用户头像
                 local_avatar = None
                 if user_info.get("avatar_url"):
-                    local_avatar = await self.storage.download_avatar(
-                        user_info.get("avatar_url"), self.user_id
-                    )
+                    local_avatar = await self.storage.download_avatar(user_info.get("avatar_url"), self.user_id)
 
                 self.db.update_user_info(
                     self.user_id,
@@ -624,9 +613,7 @@ class ZhihuCrawler:
                 data = json.loads(raw_text)
                 activities = data.get("data", [])
                 paging = data.get("paging", {})
-                logger.info(
-                    f"API 返回: {len(activities)} 条记录, total={paging.get('totals', 'unknown')}"
-                )
+                logger.info(f"API 返回: {len(activities)} 条记录, total={paging.get('totals', 'unknown')}")
                 return activities
             except json.JSONDecodeError as e:
                 logger.warning(f"解析 API 响应失败: {e}")
@@ -860,8 +847,7 @@ class ZhihuCrawler:
         try:
             # 查找所有展开按钮
             expand_buttons = await self.page.query_selector_all(
-                'button.ContentItem-more, button.Button:has-text("阅读全文"), '
-                'button.Button:has-text("展开全文")'
+                'button.ContentItem-more, button.Button:has-text("阅读全文"), ' 'button.Button:has-text("展开全文")'
             )
 
             for button in expand_buttons[:5]:  # 限制最多点击5个
@@ -1094,9 +1080,7 @@ class ZhihuCrawler:
                 content_text = content_elem.get_text(separator="\n", strip=True)
             else:
                 content_html = target.get("content", "")
-                content_text = BeautifulSoup(content_html, "lxml").get_text(
-                    separator="\n", strip=True
-                )
+                content_text = BeautifulSoup(content_html, "lxml").get_text(separator="\n", strip=True)
 
             # 提取作者详细信息（头像、名称、签名）
             author_avatar_url = None
@@ -1130,9 +1114,7 @@ class ZhihuCrawler:
                         logger.debug(f"从页面提取到作者名: {author_name_from_page}")
 
                 # 提取签名
-                headline_elem = author_info_elem.select_one(
-                    ".AuthorInfo-badgeText, .AuthorInfo-headline"
-                )
+                headline_elem = author_info_elem.select_one(".AuthorInfo-badgeText, .AuthorInfo-headline")
                 if headline_elem:
                     author_headline = headline_elem.get_text(strip=True)
 
@@ -1147,9 +1129,7 @@ class ZhihuCrawler:
             # 下载作者头像
             local_author_avatar = None
             if author_avatar_url and author_id:
-                local_author_avatar = await self.storage.download_avatar(
-                    author_avatar_url, author_id
-                )
+                local_author_avatar = await self.storage.download_avatar(author_avatar_url, author_id)
                 if local_author_avatar:
                     author_avatar_url = local_author_avatar
 
@@ -1161,9 +1141,7 @@ class ZhihuCrawler:
                 "author_avatar_url": author_avatar_url or "",
                 "voteup_count": voteup_count,
                 "comment_count": comment_count,
-                "updated_time": (
-                    self._parse_timestamp(updated_time).isoformat() if updated_time else ""
-                ),
+                "updated_time": (self._parse_timestamp(updated_time).isoformat() if updated_time else ""),
                 "backup_time": get_beijing_now().isoformat(),
             }
 
@@ -1254,9 +1232,7 @@ class ZhihuCrawler:
                     "content": comment.get("content", ""),
                     "like_count": comment.get("like_count", 0),
                     "created_time": (
-                        self._parse_timestamp(comment.get("created_time", 0))
-                        if comment.get("created_time")
-                        else None
+                        self._parse_timestamp(comment.get("created_time", 0)) if comment.get("created_time") else None
                     ),
                 }
                 self.db.save_comment(comment_info)
@@ -1309,10 +1285,7 @@ class ZhihuCrawler:
             batch_new = 0
             for activity in activities:
                 # 只处理点赞回答
-                if (
-                    activity.get("verb") != "MEMBER_VOTEUP_ARTICLE"
-                    and activity.get("verb") != "MEMBER_VOTEUP_ANSWER"
-                ):
+                if activity.get("verb") != "MEMBER_VOTEUP_ARTICLE" and activity.get("verb") != "MEMBER_VOTEUP_ANSWER":
                     continue
 
                 # 获取回答ID用于去重
@@ -1329,9 +1302,7 @@ class ZhihuCrawler:
 
                 # 解析点赞时间
                 created_time = activity.get("created_time", 0)
-                liked_time = (
-                    self._parse_timestamp(created_time) if created_time else get_beijing_now()
-                )
+                liked_time = self._parse_timestamp(created_time) if created_time else get_beijing_now()
 
                 # 处理回答（会立即保存到数据库和文件）
                 success = await self.process_answer(activity, liked_time)

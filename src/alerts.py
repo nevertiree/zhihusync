@@ -17,12 +17,10 @@ import smtplib
 from datetime import datetime
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from typing import List, Optional
 
 import aiohttp
-from loguru import logger
-
 from db import DatabaseManager
+from loguru import logger
 from models import AlertConfig, AlertHistory
 
 
@@ -49,7 +47,7 @@ class AlertManager:
             db: 数据库管理器实例.
         """
         self.db = db
-        self._config: Optional[AlertConfig] = None
+        self._config: AlertConfig | None = None
         self._load_config()
 
     def _load_config(self):
@@ -69,7 +67,7 @@ class AlertManager:
         finally:
             session.close()
 
-    def get_config(self) -> Optional[AlertConfig]:
+    def get_config(self) -> AlertConfig | None:
         """获取告警配置.
 
         Returns:
@@ -264,7 +262,7 @@ class AlertManager:
         message: str,
         channel: str,
         status: str,
-        error_info: Optional[str] = None,
+        error_info: str | None = None,
     ):
         """记录告警历史.
 
@@ -294,7 +292,7 @@ class AlertManager:
         finally:
             session.close()
 
-    def get_history(self, limit: int = 50) -> List[AlertHistory]:
+    def get_history(self, limit: int = 50) -> list[AlertHistory]:
         """获取告警历史.
 
         Args:
@@ -305,18 +303,13 @@ class AlertManager:
         """
         session = self.db.get_session()
         try:
-            return (
-                session.query(AlertHistory)
-                .order_by(AlertHistory.created_at.desc())
-                .limit(limit)
-                .all()
-            )
+            return session.query(AlertHistory).order_by(AlertHistory.created_at.desc()).limit(limit).all()
         finally:
             session.close()
 
 
 # 全局告警管理器实例
-_alert_manager: Optional[AlertManager] = None
+_alert_manager: AlertManager | None = None
 
 
 def init_alert_manager(db: DatabaseManager):
@@ -335,7 +328,7 @@ def init_alert_manager(db: DatabaseManager):
     return _alert_manager
 
 
-def get_alert_manager() -> Optional[AlertManager]:
+def get_alert_manager() -> AlertManager | None:
     """获取告警管理器实例.
 
     Returns:

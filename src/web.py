@@ -199,12 +199,7 @@ async def get_stats():
     # 获取上次同步时间
     session = db.get_session()
     try:
-        last_log = (
-            session.query(SyncLog)
-            .filter_by(status="success")
-            .order_by(SyncLog.ended_at.desc())
-            .first()
-        )
+        last_log = session.query(SyncLog).filter_by(status="success").order_by(SyncLog.ended_at.desc()).first()
         last_sync = last_log.ended_at.isoformat() if last_log and last_log.ended_at else None
     finally:
         session.close()
@@ -396,9 +391,7 @@ async def update_cookies(cookie_update: CookieUpdate):
             else:
                 # 可能是其他格式，包装成 storage_state
                 storage_state = {
-                    "cookies": (
-                        [cookies_data] if not isinstance(cookies_data.get("name"), list) else []
-                    ),
+                    "cookies": ([cookies_data] if not isinstance(cookies_data.get("name"), list) else []),
                     "origins": [],
                 }
         else:
@@ -582,17 +575,10 @@ async def get_answers(page: int = 1, page_size: int = 20, search: str = ""):
         query = session.query(Answer)
 
         if search:
-            query = query.filter(
-                or_(Answer.question_title.contains(search), Answer.author_name.contains(search))
-            )
+            query = query.filter(or_(Answer.question_title.contains(search), Answer.author_name.contains(search)))
 
         total = query.count()
-        answers = (
-            query.order_by(Answer.liked_time.desc())
-            .offset((page - 1) * page_size)
-            .limit(page_size)
-            .all()
-        )
+        answers = query.order_by(Answer.liked_time.desc()).offset((page - 1) * page_size).limit(page_size).all()
 
         items = []
         for a in answers:

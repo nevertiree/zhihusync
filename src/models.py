@@ -57,9 +57,7 @@ class User(Base):
     headline = Column(String(500), nullable=True, comment="个性签名")
     is_active = Column(Boolean, default=True, comment="是否激活")
     created_at = Column(DateTime, default=get_beijing_now_naive, comment="添加时间")
-    updated_at = Column(
-        DateTime, default=get_beijing_now_naive, onupdate=get_beijing_now_naive, comment="更新时间"
-    )
+    updated_at = Column(DateTime, default=get_beijing_now_naive, onupdate=get_beijing_now_naive, comment="更新时间")
     last_sync_at = Column(DateTime, nullable=True, comment="上次同步时间")
     sync_count = Column(Integer, default=0, comment="同步次数")
 
@@ -274,9 +272,7 @@ class AlertConfig(Base):
     alert_on_rate_limit = Column(Boolean, default=True, comment="频率限制告警")
 
     created_at = Column(DateTime, default=get_beijing_now_naive, comment="创建时间")
-    updated_at = Column(
-        DateTime, default=get_beijing_now_naive, onupdate=get_beijing_now_naive, comment="更新时间"
-    )
+    updated_at = Column(DateTime, default=get_beijing_now_naive, onupdate=get_beijing_now_naive, comment="更新时间")
 
 
 class AlertHistory(Base):
