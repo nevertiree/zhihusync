@@ -89,6 +89,7 @@ class ImageGenerator:
             return
 
         self._playwright = await async_playwright().start()
+        assert self._playwright is not None  # noqa: S101
 
         browser_type = getattr(self._playwright, self.browser_type, self._playwright.chromium)
 

@@ -138,7 +138,7 @@ class StorageManager:
         question_id: str,
         question_title: str,
         html_content: str,
-        page_metadata: dict = None,
+        page_metadata: dict | None = None,
     ) -> str:
         """保存回答 HTML 内容.
 
@@ -174,7 +174,7 @@ class StorageManager:
         logger.info(f"保存 HTML: {filepath}")
         return str(filepath)
 
-    def _build_full_html(self, question_title: str, content_html: str, metadata: dict = None) -> str:
+    def _build_full_html(self, question_title: str, content_html: str, metadata: dict | None = None) -> str:
         """构建完整的 HTML 文档 - 使用知乎样式.
 
         Args:

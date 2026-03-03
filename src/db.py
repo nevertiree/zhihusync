@@ -161,7 +161,9 @@ class DatabaseManager:
         finally:
             session.close()
 
-    def update_user_info(self, user_id: str, name: str = None, avatar_url: str = None, headline: str = None) -> bool:
+    def update_user_info(
+        self, user_id: str, name: str | None = None, avatar_url: str | None = None, headline: str | None = None
+    ) -> bool:
         """更新用户信息.
 
         Args:
