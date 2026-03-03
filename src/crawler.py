@@ -7,7 +7,7 @@ from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
 
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Tag
 from db import DatabaseManager
 from loguru import logger
 from playwright.async_api import Browser, BrowserContext, Page, async_playwright
@@ -622,6 +622,220 @@ class ZhihuCrawler:
 
         return []
 
+    def _extract_question_info_from_link(self, href: str) -> tuple[str, str]:
+        """从链接提取问题ID和问题标题。
+
+        Args:
+            href: 回答链接，格式: //www.zhihu.com/question/{question_id}/answer/{answer_id}
+
+        Returns:
+            tuple: (question_id, question_title) 或 ("", "") 如果提取失败
+        """
+        question_id = ""
+        if "/question/" in href:
+            parts = href.split("/")
+            for i, part in enumerate(parts):
+                if part == "question" and i + 1 < len(parts):
+                    question_id = parts[i + 1]
+                    break
+        return question_id, ""
+
+    def _extract_author_info_from_html(self, author_info: Tag) -> dict:
+        """从 AuthorInfo HTML 元素提取作者信息。
+
+        Args:
+            author_info: BeautifulSoup Tag 对象，包含作者信息
+
+        Returns:
+            dict: 包含 author_name, author_id, author_headline 的字典
+        """
+        author_name = ""
+        author_id = ""
+        author_headline = ""
+
+        # 尝试多种选择器获取用户名
+        name_selectors = [
+            "a.UserLink-link",
+            ".AuthorInfo-name",
+            "[data-za-detail-view-element_name='UserName']",
+        ]
+        for selector in name_selectors:
+            name_elem = author_info.select_one(selector)
+            if name_elem and name_elem.get_text(strip=True):
+                author_name = name_elem.get_text(strip=True)
+                break
+
+        # 获取用户ID
+        name_elem = author_info.select_one("a.UserLink-link")
+        if name_elem:
+            href = name_elem.get("href", "")
+            # 提取用户ID，处理多种格式
+            if "/people/" in href:
+                author_id = href.split("/people/")[-1].split("?")[0].strip("/")
+            elif href.startswith("//"):
+                # 格式: //www.zhihu.com/people/xxx
+                author_id = href.split("/")[-1].split("?")[0]
+            else:
+                author_id = href.strip("/")
+
+        # 获取作者签名
+        badge = author_info.find("div", class_="AuthorInfo-badgeText")
+        if badge:
+            author_headline = badge.get_text(strip=True)
+
+        return {
+            "name": author_name,
+            "id": author_id,
+            "headline": author_headline,
+        }
+
+    def _extract_voteup_count(self, actions: Tag) -> int:
+        """从 ContentItem-actions 提取赞同数。
+
+        Args:
+            actions: BeautifulSoup Tag 对象，包含操作按钮
+
+        Returns:
+            int: 赞同数，默认为 0
+        """
+        vote_btn = actions.find("button", class_="VoteButton")
+        if vote_btn:
+            text = vote_btn.get_text(strip=True)
+            numbers = re.findall(r"\d+", text)
+            if numbers:
+                return int(numbers[0])
+        return 0
+
+    def _extract_comment_count(self, actions: Tag) -> int:
+        """从 ContentItem-actions 提取评论数。
+
+        Args:
+            actions: BeautifulSoup Tag 对象，包含操作按钮
+
+        Returns:
+            int: 评论数，默认为 0
+        """
+        comment_btn = actions.find("a", class_="ContentItem-action") or actions.find(
+            "button", class_="ContentItem-action"
+        )
+        if comment_btn:
+            text = comment_btn.get_text(strip=True)
+            numbers = re.findall(r"\d+", text)
+            if numbers:
+                return int(numbers[0])
+        return 0
+
+    def _parse_time_to_timestamp(self, time_str: str) -> int:
+        """解析时间字符串为毫秒时间戳。
+
+        Args:
+            time_str: 时间字符串，格式: %Y-%m-%d %H:%M
+
+        Returns:
+            int: 毫秒时间戳，解析失败返回 0
+        """
+        if not time_str:
+            return 0
+        try:
+            dt = datetime.strptime(time_str, "%Y-%m-%d %H:%M")
+            return int(dt.timestamp() * 1000)
+        except ValueError:
+            return 0
+
+    def _parse_single_activity(self, item: Tag) -> dict | None:
+        """解析单个活动项。
+
+        Args:
+            item: BeautifulSoup Tag 对象，包含单个活动
+
+        Returns:
+            dict | None: 解析成功返回活动字典，失败返回 None
+        """
+        try:
+            # 获取活动类型和时间
+            meta_div = item.find("div", class_="ActivityItem-meta")
+            if not meta_div:
+                return None
+
+            meta_title = meta_div.find("span", class_="ActivityItem-metaTitle")
+            time_span = meta_div.find_all("span")
+            created_time_str = time_span[-1].text if len(time_span) > 1 else ""
+
+            # 只处理点赞活动
+            if not meta_title or "赞同" not in meta_title.text:
+                return None
+
+            # 确定类型
+            is_article = "文章" in meta_title.text
+            verb = "MEMBER_VOTEUP_ARTICLE" if is_article else "MEMBER_VOTEUP_ANSWER"
+
+            # 获取内容项
+            content_item = item.find("div", class_="ContentItem")
+            if not content_item:
+                return None
+
+            # 提取 data-zop 属性
+            data_zop = content_item.get("data-zop", "{}")
+            try:
+                zop_data = json.loads(data_zop)
+            except json.JSONDecodeError:
+                zop_data = {}
+
+            answer_id = str(zop_data.get("itemId", ""))
+
+            # 从 title 中提取问题信息和链接
+            title_elem = content_item.find("h2", class_="ContentItem-title")
+            question_title = ""
+            question_id = ""
+
+            if title_elem:
+                link = title_elem.find("a")
+                if link:
+                    question_title = link.get_text(strip=True)
+                    answer_href = link.get("href", "")
+                    question_id, _ = self._extract_question_info_from_link(answer_href)
+
+            # 获取作者信息
+            author_info_elem = content_item.find("div", class_="AuthorInfo")
+            author_data = {"name": "", "id": "", "headline": ""}
+            if author_info_elem:
+                author_data = self._extract_author_info_from_html(author_info_elem)
+
+            # 获取赞同数和评论数
+            voteup_count = 0
+            comment_count = 0
+            actions = content_item.find("div", class_="ContentItem-actions")
+            if actions:
+                voteup_count = self._extract_voteup_count(actions)
+                comment_count = self._extract_comment_count(actions)
+
+            # 解析时间字符串为时间戳
+            created_time = self._parse_time_to_timestamp(created_time_str)
+
+            # 构建完整的活动数据
+            return {
+                "id": answer_id,
+                "verb": verb,
+                "created_time": created_time,
+                "target": {
+                    "id": answer_id,
+                    "type": "article" if is_article else "answer",
+                    "question": {
+                        "id": question_id,
+                        "title": question_title,
+                    },
+                    "author": author_data,
+                    "voteup_count": voteup_count,
+                    "comment_count": comment_count,
+                    "created_time": created_time,
+                    "updated_time": created_time,
+                },
+            }
+
+        except Exception as e:
+            logger.debug(f"Failed to parse activity item: {e}")
+            return None
+
     def _parse_activities_from_html(self, html: str) -> list[dict]:
         """从 HTML 页面中解析活动数据"""
         activities = []
@@ -632,166 +846,11 @@ class ZhihuCrawler:
         logger.debug(f"Found {len(activity_items)} activity items in HTML")
 
         for item in activity_items:
-            try:
-                # 获取活动类型和时间
-                meta_div = item.find("div", class_="ActivityItem-meta")
-                if not meta_div:
-                    continue
-
-                meta_title = meta_div.find("span", class_="ActivityItem-metaTitle")
-                time_span = meta_div.find_all("span")
-                created_time_str = time_span[-1].text if len(time_span) > 1 else ""
-
-                # 只处理点赞活动
-                if not meta_title or "赞同" not in meta_title.text:
-                    continue
-
-                # 确定类型
-                is_article = "文章" in meta_title.text
-                verb = "MEMBER_VOTEUP_ARTICLE" if is_article else "MEMBER_VOTEUP_ANSWER"
-
-                # 获取内容项
-                content_item = item.find("div", class_="ContentItem")
-                if not content_item:
-                    continue
-
-                # 提取 data-zop 属性
-                data_zop = content_item.get("data-zop", "{}")
-                try:
-                    zop_data = json.loads(data_zop)
-                except json.JSONDecodeError:
-                    zop_data = {}
-
-                answer_id = str(zop_data.get("itemId", ""))
-
-                # 从 title 中提取问题信息和链接
-                title_elem = content_item.find("h2", class_="ContentItem-title")
-                question_title = ""
-                question_id = ""
-                answer_href = ""
-
-                if title_elem:
-                    link = title_elem.find("a")
-                    if link:
-                        question_title = link.get_text(strip=True)
-                        answer_href = link.get("href", "")
-                        # 从 href 中提取 question_id
-                        # 格式: //www.zhihu.com/question/{question_id}/answer/{answer_id}
-                        if "/question/" in answer_href:
-                            parts = answer_href.split("/")
-                            for i, part in enumerate(parts):
-                                if part == "question" and i + 1 < len(parts):
-                                    question_id = parts[i + 1]
-                                    break
-
-                # 获取作者信息
-                author_info = content_item.find("div", class_="AuthorInfo")
-                author_name = ""
-                author_id = ""
-                author_headline = ""
-
-                if author_info:
-                    # 尝试多种选择器获取用户名
-                    name_selectors = [
-                        "a.UserLink-link",
-                        ".AuthorInfo-name",
-                        "[data-za-detail-view-element_name='UserName']",
-                    ]
-                    for selector in name_selectors:
-                        name_elem = author_info.select_one(selector)
-                        if name_elem and name_elem.get_text(strip=True):
-                            author_name = name_elem.get_text(strip=True)
-                            break
-
-                    # 获取用户ID
-                    name_elem = author_info.select_one("a.UserLink-link")
-                    if name_elem:
-                        href = name_elem.get("href", "")
-                        # 提取用户ID，处理多种格式
-                        if "/people/" in href:
-                            author_id = href.split("/people/")[-1].split("?")[0].strip("/")
-                        elif href.startswith("//"):
-                            # 格式: //www.zhihu.com/people/xxx
-                            author_id = href.split("/")[-1].split("?")[0]
-                        else:
-                            author_id = href.strip("/")
-
-                    # 获取作者签名
-                    badge = author_info.find("div", class_="AuthorInfo-badgeText")
-                    if badge:
-                        author_headline = badge.get_text(strip=True)
-
-                # 获取赞同数和评论数
-                voteup_count = 0
-                comment_count = 0
-                actions = content_item.find("div", class_="ContentItem-actions")
-                if actions:
-                    # 查找赞同按钮
-                    vote_btn = actions.find("button", class_="VoteButton")
-                    if vote_btn:
-                        text = vote_btn.get_text(strip=True)
-                        # 提取数字
-                        import re
-
-                        numbers = re.findall(r"\d+", text)
-                        if numbers:
-                            voteup_count = int(numbers[0])
-
-                    # 查找评论按钮/链接
-                    comment_btn = actions.find("a", class_="ContentItem-action") or actions.find(
-                        "button", class_="ContentItem-action"
-                    )
-                    if comment_btn:
-                        text = comment_btn.get_text(strip=True)
-                        # 提取数字，如 "10 条评论" 或 "评论"
-                        numbers = re.findall(r"\d+", text)
-                        if numbers:
-                            comment_count = int(numbers[0])
-                        elif "评论" in text:
-                            # 有评论按钮但没有数字，可能是0或有评论但数字未显示
-                            comment_count = 0
-
-                # 解析时间字符串为时间戳
-                created_time = 0
-                if created_time_str:
-                    try:
-                        from datetime import datetime
-
-                        dt = datetime.strptime(created_time_str, "%Y-%m-%d %H:%M")
-                        created_time = int(dt.timestamp() * 1000)  # 毫秒时间戳
-                    except ValueError:
-                        pass
-
-                # 构建完整的活动数据，符合 process_answer 期望的格式
-                activity = {
-                    "id": answer_id,
-                    "verb": verb,
-                    "created_time": created_time,
-                    "target": {
-                        "id": answer_id,
-                        "type": "article" if is_article else "answer",
-                        "question": {
-                            "id": question_id,
-                            "title": question_title,
-                        },
-                        "author": {
-                            "id": author_id,
-                            "name": author_name,
-                            "headline": author_headline,
-                        },
-                        "voteup_count": voteup_count,
-                        "comment_count": comment_count,
-                        "created_time": created_time,
-                        "updated_time": created_time,
-                    },
-                }
-
+            activity = self._parse_single_activity(item)
+            if activity:
                 activities.append(activity)
-                logger.debug(f"Parsed activity: {answer_id} - {question_title[:50]}")
-
-            except Exception as e:
-                logger.debug(f"Failed to parse activity item: {e}")
-                continue
+                question_title = activity["target"]["question"]["title"]
+                logger.debug(f"Parsed activity: {activity['id']} - {question_title[:50]}")
 
         return activities
 
@@ -1032,6 +1091,73 @@ class ZhihuCrawler:
 
         logger.info(f"页面滚动完成，最终高度: {last_height}")
 
+    def _extract_content_from_page(self, soup: BeautifulSoup, target: dict) -> tuple[str, str]:
+        """从页面提取回答内容。
+
+        Args:
+            soup: BeautifulSoup 对象，解析后的页面
+            target: 目标数据字典，包含 content 字段作为备选
+
+        Returns:
+            tuple: (content_html, content_text)
+        """
+        content_elem = soup.select_one(".RichContent-inner")
+        if content_elem:
+            content_html = str(content_elem)
+            content_text = content_elem.get_text(separator="\n", strip=True)
+        else:
+            content_html = target.get("content", "")
+            content_text = BeautifulSoup(content_html, "lxml").get_text(separator="\n", strip=True)
+        return content_html, content_text
+
+    def _extract_author_info_from_page(
+        self, soup: BeautifulSoup, author: dict
+    ) -> tuple[str | None, str | None, str | None]:
+        """从页面提取作者详细信息（头像、名称、签名）。
+
+        Args:
+            soup: BeautifulSoup 对象，解析后的页面
+            author: 作者数据字典，包含 headline 字段作为备选
+
+        Returns:
+            tuple: (author_avatar_url, author_name, author_headline)
+        """
+        author_avatar_url = None
+        author_headline = None
+        author_name_from_page = None
+
+        # 从页面提取作者信息
+        author_info_elem = soup.select_one(".AuthorInfo")
+        if author_info_elem:
+            # 提取头像 - 尝试多种选择器
+            avatar_selectors = [
+                ".Avatar img",
+                ".UserAvatar img",
+                "img.Avatar",
+                ".author-avatar img",
+                'img[alt*="头像"]',
+                "img",
+            ]
+            for selector in avatar_selectors:
+                avatar_img = author_info_elem.select_one(selector)
+                if avatar_img and avatar_img.get("src"):
+                    author_avatar_url = avatar_img.get("src")
+                    logger.debug(f"提取到作者头像: {author_avatar_url[:60]}...")
+                    break
+
+            # 提取作者名（如果API中没有）
+            name_elem = author_info_elem.select_one("a.UserLink-link, .AuthorInfo-name")
+            if name_elem:
+                author_name_from_page = name_elem.get_text(strip=True)
+                logger.debug(f"从页面提取到作者名: {author_name_from_page}")
+
+            # 提取签名
+            headline_elem = author_info_elem.select_one(".AuthorInfo-badgeText, .AuthorInfo-headline")
+            if headline_elem:
+                author_headline = headline_elem.get_text(strip=True)
+
+        return author_avatar_url, author_name_from_page, author_headline
+
     async def process_answer(self, activity: dict, liked_time: datetime) -> bool:
         """处理单个回答"""
         try:
@@ -1074,56 +1200,23 @@ class ZhihuCrawler:
             soup = BeautifulSoup(page_html, "lxml")
 
             # 提取回答内容
-            content_elem = soup.select_one(".RichContent-inner")
-            if content_elem:
-                content_html = str(content_elem)
-                content_text = content_elem.get_text(separator="\n", strip=True)
-            else:
-                content_html = target.get("content", "")
-                content_text = BeautifulSoup(content_html, "lxml").get_text(separator="\n", strip=True)
+            content_html, content_text = self._extract_content_from_page(soup, target)
 
             # 提取作者详细信息（头像、名称、签名）
-            author_avatar_url = None
-            author_headline = None
-            author_name_from_page = None
-
-            # 从页面提取作者信息
-            author_info_elem = soup.select_one(".AuthorInfo")
-            if author_info_elem:
-                # 提取头像 - 尝试多种选择器
-                avatar_selectors = [
-                    ".Avatar img",
-                    ".UserAvatar img",
-                    "img.Avatar",
-                    ".author-avatar img",
-                    'img[alt*="头像"]',
-                    "img",
-                ]
-                for selector in avatar_selectors:
-                    avatar_img = author_info_elem.select_one(selector)
-                    if avatar_img and avatar_img.get("src"):
-                        author_avatar_url = avatar_img.get("src")
-                        logger.debug(f"提取到作者头像: {author_avatar_url[:60]}...")
-                        break
-
-                # 提取作者名（如果API中没有）
-                if not author_name:
-                    name_elem = author_info_elem.select_one("a.UserLink-link, .AuthorInfo-name")
-                    if name_elem:
-                        author_name_from_page = name_elem.get_text(strip=True)
-                        logger.debug(f"从页面提取到作者名: {author_name_from_page}")
-
-                # 提取签名
-                headline_elem = author_info_elem.select_one(".AuthorInfo-badgeText, .AuthorInfo-headline")
-                if headline_elem:
-                    author_headline = headline_elem.get_text(strip=True)
+            (
+                author_avatar_url,
+                author_name_from_page,
+                author_headline_from_page,
+            ) = self._extract_author_info_from_page(soup, author)
 
             # 使用页面提取的作者名
             if author_name_from_page and not author_name:
                 author_name = author_name_from_page
 
             # 如果从页面没提取到签名，使用 API 数据中的
-            if not author_headline:
+            if author_headline_from_page:
+                author_headline = author_headline_from_page
+            elif not author_headline:
                 author_headline = author.get("headline", "")
 
             # 下载作者头像
@@ -1168,8 +1261,8 @@ class ZhihuCrawler:
                 "content_length": len(content_text) if content_text else 0,
                 "voteup_count": voteup_count,
                 "comment_count": comment_count,
-                "created_time": self._parse_timestamp(created_time) if created_time else None,
-                "updated_time": self._parse_timestamp(updated_time) if updated_time else None,
+                "created_time": (self._parse_timestamp(created_time) if created_time else None),
+                "updated_time": (self._parse_timestamp(updated_time) if updated_time else None),
                 "liked_time": liked_time,
                 "html_path": html_path,
                 "original_url": f"{self.ZHIHU_BASE}/question/{question_id}/answer/{answer_id}",

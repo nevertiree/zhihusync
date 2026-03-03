@@ -137,10 +137,7 @@ class ImageGenerator:
             Path: 输出文件路径.
         """
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        if suffix:
-            filename = f"zhihu_{identifier}_{suffix}_{timestamp}.png"
-        else:
-            filename = f"zhihu_{identifier}_{timestamp}.png"
+        filename = f"zhihu_{identifier}_{suffix}_{timestamp}.png" if suffix else f"zhihu_{identifier}_{timestamp}.png"
         return self.output_dir / filename
 
     def _generate_id_from_html(self, html_content: str) -> str:
