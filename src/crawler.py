@@ -505,7 +505,7 @@ class ZhihuCrawler:
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
     async def fetch_likes(self, limit: int = 20, offset: int = 0) -> list[dict]:
-        """获取用户点赞列表 - 访问用户主页并解析活动数据"""
+        """获取用户点赞列表 - 增量滚动模式，边滚动边解析避免长时间等待"""
         # 访问用户主页
         url = f"{self.ZHIHU_BASE}/people/{self.user_id}"
         logger.info(f"访问用户主页: {url}")
@@ -520,19 +520,82 @@ class ZhihuCrawler:
         except Exception:
             pass
 
-        # 滚动页面加载更多内容
-        logger.info("开始滚动页面加载更多内容...")
-        await self._scroll_page_for_activities()
+        # 增量滚动：分批滚动并解析，避免长时间等待
+        logger.info(f"开始增量滚动，目标数量: {limit}...")
+        all_activities = []
+        last_count = 0
+        no_new_content_count = 0
+        max_no_new_content = 3
+        max_scroll_rounds = 20  # 最多滚动20轮，防止无限滚动
+        scroll_round = 0
 
-        # 获取页面内容
-        content = await self.page.content()
-        logger.debug(f"页面内容长度: {len(content)}")
+        while len(all_activities) < limit + offset and scroll_round < max_scroll_rounds:
+            scroll_round += 1
+            logger.debug(f"第 {scroll_round} 轮滚动...")
 
-        # 解析活动数据
-        activities = self._parse_activities_from_html(content)
-        if activities:
-            logger.info(f"从页面解析到 {len(activities)} 条点赞记录")
-            return activities[offset : offset + limit]
+            # 每次滚动3次
+            for _ in range(3):
+                await self.page.evaluate(
+                    """() => {
+                        window.scrollBy(0, 800);
+                    }"""
+                )
+                await asyncio.sleep(0.8)
+
+            # 获取当前页面内容并解析
+            content = await self.page.content()
+            activities = self._parse_activities_from_html(content)
+
+            if not activities:
+                no_new_content_count += 1
+                if no_new_content_count >= max_no_new_content:
+                    logger.info("没有解析到活动数据，停止滚动")
+                    break
+                continue
+
+            # 检查是否有新内容
+            if len(activities) > last_count:
+                new_count = len(activities) - last_count
+                logger.info(f"第 {scroll_round} 轮滚动后: 共 {len(activities)} 条 (+{new_count})")
+                all_activities = activities
+                last_count = len(activities)
+                no_new_content_count = 0
+            else:
+                no_new_content_count += 1
+                logger.debug(f"没有新内容，连续 {no_new_content_count} 次")
+
+                # 尝试点击"查看更多"按钮
+                try:
+                    has_more = await self.page.evaluate(
+                        """() => {
+                            const btn = document.querySelector(
+                                '.ActivityItem-more, .ContentItem-more, '
+                                + '.FeedItem-more, [data-za-detail-view-element_name="ViewMore"]'
+                            );
+                            if (btn) { btn.click(); return true; }
+                            return false;
+                        }"""
+                    )
+                    if has_more:
+                        logger.debug("点击了'查看更多'按钮")
+                        await asyncio.sleep(1)
+                        continue
+                except Exception:
+                    pass
+
+            # 如果已经获取足够内容，提前退出
+            if len(all_activities) >= limit + offset:
+                logger.info(f"已获取足够内容 ({len(all_activities)} 条)，停止滚动")
+                break
+
+            # 连续多次没有新内容，停止滚动
+            if no_new_content_count >= max_no_new_content:
+                logger.info(f"连续 {max_no_new_content} 次没有新内容，停止滚动")
+                break
+
+        if all_activities:
+            logger.info(f"共解析到 {len(all_activities)} 条，返回 [{offset}:{offset + limit}]")
+            return all_activities[offset : offset + limit]
 
         # 如果页面解析失败，尝试访问 API
         logger.info("页面解析失败，尝试直接访问 API...")
@@ -1101,8 +1164,8 @@ class ZhihuCrawler:
             logger.exception(f"处理评论失败: {e}")
 
     async def scan_likes(self, max_items: int = 50, progress_callback: Callable | None = None):
-        """扫描用户点赞内容"""
-        logger.info(f"开始扫描用户 {self.user_id} 的点赞内容...")
+        """扫描用户点赞内容 - 支持断点续传"""
+        logger.info(f"开始扫描用户 {self.user_id} 的点赞内容 (max={max_items})...")
 
         # 确保用户记录在数据库中存在
         user_created = self.db.add_user(self.user_id, self.user_id)
@@ -1115,15 +1178,23 @@ class ZhihuCrawler:
         self.updated_items = 0
         scanned = 0
         offset = 0
-        limit = 20
+        limit = 10  # 减少每批数量，更频繁保存
+        processed_ids = set()  # 防止重复处理
+
+        # 获取已处理的回答ID，支持断点续传
+        existing_answers = self.db.get_user_answer_ids(self.user_id)
+        processed_ids.update(existing_answers)
+        logger.info(f"已有 {len(processed_ids)} 条回答，将跳过重复内容")
 
         while scanned < max_items:
             batch_size = min(limit, max_items - scanned)
             activities = await self.fetch_likes(limit=batch_size, offset=offset)
 
             if not activities:
+                logger.info("没有更多活动数据")
                 break
 
+            batch_new = 0
             for activity in activities:
                 # 只处理点赞回答
                 if (
@@ -1132,14 +1203,30 @@ class ZhihuCrawler:
                 ):
                     continue
 
+                # 获取回答ID用于去重
+                target = activity.get("target", {})
+                answer_id = str(target.get("id", ""))
+
+                # 如果已经处理过，跳过
+                if answer_id and answer_id in processed_ids:
+                    logger.debug(f"跳过已处理的回答: {answer_id}")
+                    scanned += 1
+                    if scanned >= max_items:
+                        break
+                    continue
+
                 # 解析点赞时间
                 created_time = activity.get("created_time", 0)
                 liked_time = (
                     self._parse_timestamp(created_time) if created_time else get_beijing_now()
                 )
 
-                # 处理回答
-                await self.process_answer(activity, liked_time)
+                # 处理回答（会立即保存到数据库和文件）
+                success = await self.process_answer(activity, liked_time)
+                if success and answer_id:
+                    processed_ids.add(answer_id)
+                    batch_new += 1
+
                 scanned += 1
 
                 if progress_callback:
@@ -1148,15 +1235,22 @@ class ZhihuCrawler:
                 if scanned >= max_items:
                     break
 
+            logger.info(f"本批处理: {len(activities)} 条，新增: {batch_new} 条，累计: {scanned}")
+
+            # 每批处理完后立即更新同步时间（断点续传）
+            if batch_new > 0:
+                self.db.update_user_sync_time(self.user_id)
+
             offset += len(activities)
 
             # 如果没有更多数据，退出
             if len(activities) < batch_size:
+                logger.info("活动数据不足，结束扫描")
                 break
 
-        logger.info(f"扫描完成: 新增 {self.new_items} 条, 更新 {self.updated_items} 条")
+        logger.info(f"扫描完成: 处理 {scanned} 条，新增 {self.new_items} 条，更新 {self.updated_items} 条")
 
-        # 更新用户同步时间和次数
+        # 最终更新用户同步时间和次数
         if self.new_items > 0 or self.updated_items > 0:
             self.db.update_user_sync_time(self.user_id)
             logger.info(f"已更新用户同步时间: {self.user_id}")
