@@ -15,6 +15,7 @@ import asyncio
 import hashlib
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 from loguru import logger
 from playwright.async_api import Browser, BrowserContext, async_playwright
@@ -181,14 +182,14 @@ class ImageGenerator:
         # 生成输出路径
         if not output_path:
             answer_id = html_file.stem.split("_")[-1] if "_" in html_file.stem else "unknown"
-            output_path = self._get_output_path(answer_id)
+            output_file = self._get_output_path(answer_id)
         else:
-            output_path = Path(output_path)
+            output_file = Path(output_path)
 
         # 生成图片
         return await self.generate_from_html(
             html_content=html_content,
-            output_path=str(output_path),
+            output_path=str(output_file),
             full_page=full_page,
             add_watermark=add_watermark,
             clip_to_content=clip_to_content,
@@ -217,6 +218,7 @@ class ImageGenerator:
         if not self._browser:
             await self._init_browser()
 
+        assert self._context is not None  # noqa: S101
         page = await self._context.new_page()
 
         try:
@@ -293,7 +295,7 @@ class ImageGenerator:
             logger.debug(f"页面尺寸: {dimensions}")
 
             # 设置截图选项
-            screenshot_options = {
+            screenshot_options: dict[str, Any] = {
                 "path": output_path,
                 "type": "png",
             }
@@ -347,6 +349,7 @@ class ImageGenerator:
         if not self._browser:
             await self._init_browser()
 
+        assert self._context is not None  # noqa: S101
         page = await self._context.new_page()
 
         try:
@@ -366,17 +369,19 @@ class ImageGenerator:
             # 生成输出路径
             if not output_path:
                 url_hash = hashlib.md5(url.encode()).hexdigest()[:12]
-                output_path = self._get_output_path(url_hash)
+                output_file = self._get_output_path(url_hash)
+            else:
+                output_file = Path(output_path)
 
             # 截图
             await page.screenshot(
-                path=output_path,
+                path=str(output_file),
                 full_page=full_page,
                 type="png",
             )
 
-            logger.info(f"图片生成完成: {output_path}")
-            return output_path
+            logger.info(f"图片生成完成: {output_file}")
+            return str(output_file)
 
         finally:
             await page.close()
