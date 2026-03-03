@@ -15,7 +15,7 @@ from typing import Any
 
 from loguru import logger
 from models import AlertConfig, Answer, Base, Comment, SyncLog, User
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import Session, sessionmaker
 from timezone_utils import get_beijing_now
 
@@ -48,14 +48,30 @@ class DatabaseManager:
         self.db_path = db_path
         Path(db_path).parent.mkdir(parents=True, exist_ok=True)
 
+        # 配置SQLite引擎，优化并发性能
         self.engine = create_engine(
-            f"sqlite:///{db_path}", connect_args={"check_same_thread": False}, echo=False
+            f"sqlite:///{db_path}",
+            connect_args={
+                "check_same_thread": False,
+                "timeout": 30,  # 等待锁的超时时间(秒)
+            },
+            echo=False,
+            pool_pre_ping=True,  # 连接前检查连接是否有效
+            pool_recycle=3600,  # 连接回收时间
         )
+
+        # 启用 WAL 模式提高并发写入性能
+        with self.engine.connect() as conn:
+            conn.execute(text("PRAGMA journal_mode=WAL"))
+            conn.execute(text("PRAGMA synchronous=NORMAL"))
+            conn.execute(text("PRAGMA cache_size=10000"))
+            conn.execute(text("PRAGMA temp_store=MEMORY"))
+
         self.SessionLocal = sessionmaker(bind=self.engine)
 
         # 创建表
         Base.metadata.create_all(self.engine)
-        logger.info(f"数据库初始化完成: {db_path}")
+        logger.info(f"数据库初始化完成: {db_path} (WAL模式)")
 
     def get_session(self) -> Session:
         """获取数据库会话.
