@@ -1,0 +1,733 @@
+/**
+ * 知乎主题样式 - 完整模拟知乎界面
+ * 参考知乎 2024 年最新界面设计
+ */
+
+/* ============================================
+   基础变量
+   ============================================ */
+:root {
+    --zhihu-blue: #0066ff;
+    --zhihu-blue-hover: #005ce6;
+    --zhihu-red: #f1403c;
+    --zhihu-green: #12b928;
+
+    --text-primary: #121212;
+    --text-secondary: #444;
+    --text-tertiary: #8590a6;
+    --text-link: #175199;
+
+    --bg-primary: #ffffff;
+    --bg-secondary: #f6f6f6;
+    --bg-tertiary: #f9f9f9;
+
+    --border-color: #ebebeb;
+    --border-light: #f0f0f0;
+
+    --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+    --font-mono: "SF Mono", Monaco, "Cascadia Code", "Roboto Mono", Consolas, "Courier New", monospace;
+
+    --radius-small: 4px;
+    --radius-medium: 6px;
+    --radius-large: 8px;
+
+    --shadow-card: 0 1px 3px rgba(18, 18, 18, 0.1);
+    --shadow-hover: 0 4px 12px rgba(18, 18, 18, 0.15);
+}
+
+/* ============================================
+   基础重置
+   ============================================ */
+*, *::before, *::after {
+    box-sizing: border-box;
+}
+
+html {
+    font-size: 15px;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+    font-family: var(--font-family);
+    font-size: 15px;
+    line-height: 1.6;
+    color: var(--text-primary);
+    background: var(--bg-secondary);
+    margin: 0;
+    padding: 0;
+    min-height: 100vh;
+}
+
+/* ============================================
+   页面布局
+   ============================================ */
+.zhihu-page {
+    max-width: 694px;
+    margin: 0 auto;
+    padding: 10px 16px 100px;
+    background: var(--bg-secondary);
+}
+
+.zhihu-card {
+    background: var(--bg-primary);
+    border-radius: var(--radius-medium);
+    box-shadow: var(--shadow-card);
+    margin-bottom: 10px;
+    overflow: hidden;
+}
+
+.zhihu-card-inner {
+    padding: 20px;
+}
+
+/* ============================================
+   头部导航（截图用）
+   ============================================ */
+.zhihu-header {
+    background: var(--bg-primary);
+    border-bottom: 1px solid var(--border-color);
+    padding: 12px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.zhihu-logo {
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--zhihu-blue);
+    letter-spacing: -1px;
+}
+
+.zhihu-nav {
+    display: flex;
+    gap: 24px;
+    color: var(--text-secondary);
+    font-size: 15px;
+}
+
+.zhihu-nav-item {
+    cursor: pointer;
+    transition: color 0.2s;
+}
+
+.zhihu-nav-item:hover {
+    color: var(--text-primary);
+}
+
+.zhihu-nav-item.active {
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+/* ============================================
+   问题标题区域
+   ============================================ */
+.question-header {
+    padding: 20px 20px 12px;
+    border-bottom: 1px solid var(--border-light);
+}
+
+.question-topics {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.topic-tag {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 10px;
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+    font-size: 13px;
+    border-radius: var(--radius-small);
+    transition: all 0.2s;
+}
+
+.topic-tag:hover {
+    background: #e6f0ff;
+    color: var(--zhihu-blue);
+}
+
+.question-title {
+    font-size: 22px;
+    font-weight: 600;
+    line-height: 1.4;
+    color: var(--text-primary);
+    margin: 0 0 12px 0;
+    word-break: break-word;
+}
+
+.question-meta {
+    font-size: 14px;
+    color: var(--text-tertiary);
+    line-height: 1.5;
+}
+
+.question-meta .highlight {
+    color: var(--zhihu-blue);
+    font-weight: 500;
+}
+
+/* ============================================
+   回答头部 - 作者信息
+   ============================================ */
+.answer-header {
+    padding: 16px 20px;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+}
+
+.author-avatar-wrapper {
+    flex-shrink: 0;
+}
+
+.author-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: var(--radius-small);
+    object-fit: cover;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: 600;
+    font-size: 16px;
+}
+
+.author-avatar img {
+    width: 100%;
+    height: 100%;
+    border-radius: var(--radius-small);
+    object-fit: cover;
+}
+
+.author-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.author-name-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.author-name {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-decoration: none;
+}
+
+.author-name:hover {
+    color: var(--text-primary);
+}
+
+.author-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    background: var(--zhihu-blue);
+    color: white;
+    font-size: 12px;
+    font-weight: 500;
+    border-radius: 4px;
+}
+
+.author-headline {
+    font-size: 14px;
+    color: var(--text-tertiary);
+    margin-top: 4px;
+    line-height: 1.4;
+}
+
+.author-meta-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 6px;
+    font-size: 13px;
+    color: var(--text-tertiary);
+}
+
+/* ============================================
+   富文本内容区域 - RichContent
+   ============================================ */
+.RichContent {
+    padding: 0 20px 16px;
+    font-size: 15px;
+    line-height: 1.8;
+    color: var(--text-primary);
+}
+
+.RichContent-inner {
+    word-break: break-word;
+}
+
+/* 段落 */
+.RichContent p {
+    margin: 0 0 1em 0;
+    line-height: 1.8;
+}
+
+.RichContent p:last-child {
+    margin-bottom: 0;
+}
+
+/* 标题 */
+.RichContent h1,
+.RichContent h2,
+.RichContent h3,
+.RichContent h4 {
+    font-weight: 600;
+    margin: 1.5em 0 0.8em;
+    line-height: 1.4;
+    color: var(--text-primary);
+}
+
+.RichContent h1 { font-size: 20px; }
+.RichContent h2 { font-size: 18px; }
+.RichContent h3 { font-size: 16px; }
+.RichContent h4 { font-size: 15px; }
+
+/* 链接 */
+.RichContent a {
+    color: var(--text-link);
+    text-decoration: none;
+    border-bottom: 1px solid transparent;
+    transition: border-color 0.2s;
+}
+
+.RichContent a:hover {
+    border-bottom-color: var(--text-link);
+}
+
+/* 加粗 */
+.RichContent strong,
+.RichContent b {
+    font-weight: 600;
+}
+
+/* 斜体 */
+.RichContent em,
+.RichContent i {
+    font-style: italic;
+}
+
+/* 删除线 */
+.RichContent s,
+.RichContent strike,
+.RichContent del {
+    text-decoration: line-through;
+}
+
+/* 引用块 */
+.RichContent blockquote {
+    margin: 1em 0;
+    padding: 0 1em;
+    color: var(--text-secondary);
+    border-left: 3px solid #d3d3d3;
+    background: none;
+}
+
+.RichContent blockquote p {
+    margin: 0.5em 0;
+}
+
+.RichContent blockquote p:first-child {
+    margin-top: 0;
+}
+
+.RichContent blockquote p:last-child {
+    margin-bottom: 0;
+}
+
+/* 分割线 */
+.RichContent hr {
+    margin: 1.5em 0;
+    border: none;
+    border-top: 1px solid var(--border-color);
+}
+
+/* 列表 */
+.RichContent ul,
+.RichContent ol {
+    margin: 1em 0;
+    padding-left: 2em;
+}
+
+.RichContent li {
+    margin: 0.4em 0;
+    line-height: 1.8;
+}
+
+.RichContent li > p {
+    margin: 0.3em 0;
+}
+
+/* 代码块 */
+.RichContent pre {
+    margin: 1em 0;
+    padding: 16px;
+    background: #f6f6f6;
+    border-radius: var(--radius-small);
+    overflow-x: auto;
+    font-family: var(--font-mono);
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+.RichContent pre code {
+    background: none;
+    padding: 0;
+    font-size: inherit;
+    color: inherit;
+    border-radius: 0;
+}
+
+/* 行内代码 */
+.RichContent code {
+    background: rgba(0, 102, 255, 0.08);
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-family: var(--font-mono);
+    font-size: 0.9em;
+    color: var(--text-primary);
+}
+
+/* 图片 */
+.RichContent img {
+    max-width: 100%;
+    height: auto;
+    margin: 1em 0;
+    border-radius: var(--radius-small);
+    display: block;
+}
+
+/* 图片说明 */
+.RichContent figcaption {
+    text-align: center;
+    font-size: 13px;
+    color: var(--text-tertiary);
+    margin-top: -0.5em;
+    margin-bottom: 1em;
+}
+
+/* 表格 */
+.RichContent table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1em 0;
+    font-size: 14px;
+}
+
+.RichContent th,
+.RichContent td {
+    padding: 8px 12px;
+    border: 1px solid var(--border-color);
+    text-align: left;
+}
+
+.RichContent th {
+    background: var(--bg-secondary);
+    font-weight: 600;
+}
+
+.RichContent tr:nth-child(even) {
+    background: var(--bg-tertiary);
+}
+
+/* 视频卡片 */
+.RichContent .video-box {
+    margin: 1em 0;
+    border-radius: var(--radius-medium);
+    overflow: hidden;
+    background: #000;
+    position: relative;
+}
+
+.RichContent .video-box img {
+    width: 100%;
+    margin: 0;
+    border-radius: 0;
+}
+
+.RichContent .video-play-btn {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 60px;
+    height: 60px;
+    background: rgba(0, 0, 0, 0.7);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* 卡片链接 */
+.RichContent .link-card {
+    display: flex;
+    margin: 1em 0;
+    padding: 12px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-medium);
+    text-decoration: none;
+    transition: all 0.2s;
+}
+
+.RichContent .link-card:hover {
+    background: var(--bg-secondary);
+    border-color: var(--zhihu-blue);
+}
+
+.RichContent .link-card-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.RichContent .link-card-title {
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.RichContent .link-card-desc {
+    font-size: 13px;
+    color: var(--text-tertiary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.RichContent .link-card-img {
+    width: 80px;
+    height: 80px;
+    margin-left: 12px;
+    border-radius: var(--radius-small);
+    object-fit: cover;
+}
+
+/* ============================================
+   回答底部操作栏
+   ============================================ */
+.answer-actions {
+    display: flex;
+    align-items: center;
+    padding: 12px 20px;
+    border-top: 1px solid var(--border-light);
+    gap: 16px;
+}
+
+.vote-button {
+    display: inline-flex;
+    align-items: center;
+    padding: 8px 16px;
+    background: var(--zhihu-blue);
+    color: white;
+    border: none;
+    border-radius: var(--radius-small);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.vote-button:hover {
+    background: var(--zhihu-blue-hover);
+}
+
+.vote-button .icon {
+    margin-right: 4px;
+}
+
+.vote-count {
+    font-weight: 600;
+    margin-left: 4px;
+}
+
+.action-button {
+    display: inline-flex;
+    align-items: center;
+    padding: 8px 12px;
+    background: transparent;
+    color: var(--text-tertiary);
+    border: none;
+    font-size: 14px;
+    cursor: pointer;
+    transition: color 0.2s;
+}
+
+.action-button:hover {
+    color: var(--text-secondary);
+}
+
+.action-button .icon {
+    margin-right: 4px;
+}
+
+/* ============================================
+   评论区样式
+   ============================================ */
+.comments-section {
+    margin-top: 16px;
+    padding: 16px 20px;
+    border-top: 1px solid var(--border-light);
+    background: var(--bg-tertiary);
+}
+
+.comments-header {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 16px;
+}
+
+.comment-item {
+    display: flex;
+    gap: 12px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border-light);
+}
+
+.comment-item:last-child {
+    border-bottom: none;
+}
+
+.comment-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: var(--radius-small);
+    flex-shrink: 0;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.comment-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.comment-author {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: 4px;
+}
+
+.comment-text {
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--text-primary);
+    word-break: break-word;
+}
+
+.comment-meta {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 8px;
+    font-size: 13px;
+    color: var(--text-tertiary);
+}
+
+/* ============================================
+   底部信息
+   ============================================ */
+.backup-info {
+    padding: 16px 20px;
+    background: var(--bg-secondary);
+    border-top: 1px solid var(--border-light);
+    font-size: 13px;
+    color: var(--text-tertiary);
+    text-align: center;
+}
+
+.backup-info a {
+    color: var(--zhihu-blue);
+    text-decoration: none;
+}
+
+/* ============================================
+   截图专用样式
+   ============================================ */
+.screenshot-mode {
+    background: var(--bg-primary) !important;
+    padding: 0 !important;
+}
+
+.screenshot-mode .zhihu-card {
+    box-shadow: none;
+    margin-bottom: 0;
+}
+
+.screenshot-watermark {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    padding: 8px 16px;
+    background: rgba(0, 0, 0, 0.6);
+    color: white;
+    font-size: 12px;
+    border-radius: var(--radius-small);
+    backdrop-filter: blur(4px);
+}
+
+/* ============================================
+   响应式适配
+   ============================================ */
+@media (max-width: 640px) {
+    .zhihu-page {
+        padding: 0;
+    }
+
+    .zhihu-card {
+        border-radius: 0;
+    }
+
+    .question-title {
+        font-size: 18px;
+    }
+
+    .RichContent {
+        font-size: 14px;
+    }
+
+    .answer-actions {
+        flex-wrap: wrap;
+    }
+}
+
+/* ============================================
+   打印样式
+   ============================================ */
+@media print {
+    body {
+        background: white;
+    }
+
+    .zhihu-card {
+        box-shadow: none;
+    }
+
+    .answer-actions,
+    .comments-section {
+        display: none;
+    }
+}

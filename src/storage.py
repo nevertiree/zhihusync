@@ -182,7 +182,7 @@ class StorageManager:
     def _build_full_html(
         self, question_title: str, content_html: str, metadata: dict = None
     ) -> str:
-        """构建完整的 HTML 文档.
+        """构建完整的 HTML 文档 - 使用知乎样式.
 
         Args:
             question_title: 问题标题.
@@ -196,13 +196,24 @@ class StorageManager:
         author_name = ""
         author_headline = ""
         voteup_count = ""
+        comment_count = ""
+        backup_time = ""
+        original_url = ""
 
         if metadata:
             for key, value in metadata.items():
-                meta_str += f'<meta name="{key}" content="{value}">\n'
+                if isinstance(value, str):
+                    meta_str += f'<meta name="{key}" content="{value}">\n'
             author_name = metadata.get("author_name", "")
             author_headline = metadata.get("author_headline", "")
-            voteup_count = str(metadata.get("voteup_count", ""))
+            voteup_count = str(metadata.get("voteup_count", "0"))
+            comment_count = str(metadata.get("comment_count", "0"))
+            backup_time = metadata.get("backup_time", "")
+            original_url = metadata.get("original_url", "")
+
+        # 处理内容 HTML - 确保使用 RichContent 类
+        if 'class="RichContent' not in content_html and "class='RichContent" not in content_html:
+            content_html = f'<div class="RichContent-inner">{content_html}</div>'
 
         return f"""<!DOCTYPE html>
 <html lang="zh-CN">
@@ -212,175 +223,457 @@ class StorageManager:
     <title>{question_title} - 知乎备份</title>
     {meta_str}
     <style>
-        /* 基础样式 */
-        body {{
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-                "Helvetica Neue", Arial, sans-serif;
-            font-size: 15px;
-            line-height: 1.6;
-            color: #121212;
-            background: #f6f6f6;
-            margin: 0;
-            padding: 20px;
-        }}
-        .container {{
-            max-width: 800px;
-            margin: 0 auto;
-            background: #fff;
-            border-radius: 4px;
-            box-shadow: 0 1px 3px rgba(18, 18, 18, 0.1);
-            padding: 24px;
-        }}
+/* ============================================
+   知乎主题样式 - 完整模拟知乎界面
+   ============================================ */
+:root {{
+    --zhihu-blue: #0066ff;
+    --zhihu-blue-hover: #005ce6;
+    --text-primary: #121212;
+    --text-secondary: #444;
+    --text-tertiary: #8590a6;
+    --text-link: #175199;
+    --bg-primary: #ffffff;
+    --bg-secondary: #f6f6f6;
+    --bg-tertiary: #f9f9f9;
+    --border-color: #ebebeb;
+    --border-light: #f0f0f0;
+    --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+        "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+    --font-mono: "SF Mono", Monaco, "Cascadia Code",
+        "Roboto Mono", Consolas, "Courier New", monospace;
+    --radius-small: 4px;
+    --radius-medium: 6px;
+    --shadow-card: 0 1px 3px rgba(18, 18, 18, 0.1);
+}}
 
-        /* 标题样式 */
-        .question-title {{
-            font-size: 22px;
-            font-weight: 600;
-            color: #121212;
-            margin-bottom: 16px;
-            line-height: 1.4;
-        }}
+*, *::before, *::after {{ box-sizing: border-box; }}
 
-        /* 作者信息样式 */
-        .author-info {{
-            display: flex;
-            align-items: center;
-            margin-bottom: 16px;
-            padding-bottom: 16px;
-            border-bottom: 1px solid #ebebeb;
-        }}
-        .author-avatar {{
-            width: 40px;
-            height: 40px;
-            border-radius: 4px;
-            background: #0066ff;
-            color: white;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 600;
-            margin-right: 12px;
-            font-size: 16px;
-        }}
-        .author-meta {{
-            flex: 1;
-        }}
-        .author-name {{
-            font-size: 15px;
-            font-weight: 600;
-            color: #444;
-        }}
-        .author-headline {{
-            font-size: 14px;
-            color: #8590a6;
-            margin-top: 2px;
-        }}
+html {{
+    font-size: 15px;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}}
 
-        /* 内容样式 - 模拟知乎 RichContent */
-        .content {{
-            font-size: 15px;
-            line-height: 1.8;
-            color: #121212;
-        }}
-        .content p {{
-            margin: 1em 0;
-        }}
-        .content img {{
-            max-width: 100%;
-            height: auto;
-            border-radius: 4px;
-            margin: 1em 0;
-        }}
-        .content a {{
-            color: #175199;
-            text-decoration: none;
-        }}
-        .content a:hover {{
-            border-bottom: 1px solid #175199;
-        }}
-        .content blockquote {{
-            margin: 1em 0;
-            padding: 0 1em;
-            color: #646464;
-            border-left: 3px solid #d3d3d3;
-        }}
-        .content pre {{
-            background: #f6f6f6;
-            padding: 16px;
-            overflow-x: auto;
-            border-radius: 4px;
-            font-family: "Monaco", "Menlo", monospace;
-            font-size: 14px;
-        }}
-        .content code {{
-            background: rgba(0, 102, 255, 0.1);
-            padding: 2px 6px;
-            border-radius: 3px;
-            font-family: "Monaco", "Menlo", monospace;
-            font-size: 14px;
-        }}
-        .content ul, .content ol {{
-            padding-left: 2em;
-            margin: 1em 0;
-        }}
-        .content li {{
-            margin: 0.5em 0;
-        }}
-        .content h1, .content h2, .content h3 {{
-            font-weight: 600;
-            margin: 1.5em 0 0.8em;
-        }}
-        .content h1 {{ font-size: 20px; }}
-        .content h2 {{ font-size: 18px; }}
-        .content h3 {{ font-size: 16px; }}
+body {{
+    font-family: var(--font-family);
+    font-size: 15px;
+    line-height: 1.6;
+    color: var(--text-primary);
+    background: var(--bg-secondary);
+    margin: 0;
+    padding: 0;
+    min-height: 100vh;
+}}
 
-        /* 底部信息 */
-        .footer {{
-            margin-top: 32px;
-            padding-top: 16px;
-            border-top: 1px solid #ebebeb;
-            font-size: 13px;
-            color: #8590a6;
-        }}
-        .vote-count {{
-            color: #0066ff;
-            font-weight: 600;
-        }}
+.zhihu-page {{
+    max-width: 694px;
+    margin: 0 auto;
+    padding: 10px 16px 50px;
+    background: var(--bg-secondary);
+}}
 
-        /* 移动端适配 */
-        @media (max-width: 640px) {{
-            body {{
-                padding: 10px;
-                font-size: 14px;
-            }}
-            .container {{
-                padding: 16px;
-            }}
-            .question-title {{
-                font-size: 18px;
-            }}
-        }}
+.zhihu-card {{
+    background: var(--bg-primary);
+    border-radius: var(--radius-medium);
+    box-shadow: var(--shadow-card);
+    overflow: hidden;
+}}
+
+/* 问题标题 */
+.question-header {{
+    padding: 20px 20px 12px;
+    border-bottom: 1px solid var(--border-light);
+}}
+
+.question-title {{
+    font-size: 22px;
+    font-weight: 600;
+    line-height: 1.4;
+    color: var(--text-primary);
+    margin: 0 0 12px 0;
+    word-break: break-word;
+}}
+
+.question-meta {{
+    font-size: 14px;
+    color: var(--text-tertiary);
+    line-height: 1.5;
+}}
+
+/* 作者信息 */
+.answer-header {{
+    padding: 16px 20px;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+}}
+
+.author-avatar {{
+    width: 40px;
+    height: 40px;
+    border-radius: var(--radius-small);
+    flex-shrink: 0;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: 600;
+    font-size: 16px;
+    overflow: hidden;
+}}
+
+.author-avatar img {{
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}}
+
+.author-info {{
+    flex: 1;
+    min-width: 0;
+}}
+
+.author-name-row {{
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}}
+
+.author-name {{
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-decoration: none;
+}}
+
+.author-headline {{
+    font-size: 14px;
+    color: var(--text-tertiary);
+    margin-top: 4px;
+    line-height: 1.4;
+}}
+
+/* 富文本内容 */
+.RichContent {{
+    padding: 0 20px 16px;
+    font-size: 15px;
+    line-height: 1.8;
+    color: var(--text-primary);
+}}
+
+.RichContent-inner {{
+    word-break: break-word;
+}}
+
+.RichContent p {{
+    margin: 0 0 1em 0;
+    line-height: 1.8;
+}}
+
+.RichContent p:last-child {{
+    margin-bottom: 0;
+}}
+
+.RichContent h1, .RichContent h2, .RichContent h3, .RichContent h4 {{
+    font-weight: 600;
+    margin: 1.5em 0 0.8em;
+    line-height: 1.4;
+    color: var(--text-primary);
+}}
+
+.RichContent h1 {{ font-size: 20px; }}
+.RichContent h2 {{ font-size: 18px; }}
+.RichContent h3 {{ font-size: 16px; }}
+.RichContent h4 {{ font-size: 15px; }}
+
+.RichContent a {{
+    color: var(--text-link);
+    text-decoration: none;
+    border-bottom: 1px solid transparent;
+    transition: border-color 0.2s;
+}}
+
+.RichContent a:hover {{
+    border-bottom-color: var(--text-link);
+}}
+
+.RichContent strong, .RichContent b {{
+    font-weight: 600;
+}}
+
+.RichContent blockquote {{
+    margin: 1em 0;
+    padding: 0 1em;
+    color: var(--text-secondary);
+    border-left: 3px solid #d3d3d3;
+}}
+
+.RichContent hr {{
+    margin: 1.5em 0;
+    border: none;
+    border-top: 1px solid var(--border-color);
+}}
+
+.RichContent ul, .RichContent ol {{
+    margin: 1em 0;
+    padding-left: 2em;
+}}
+
+.RichContent li {{
+    margin: 0.4em 0;
+    line-height: 1.8;
+}}
+
+.RichContent pre {{
+    margin: 1em 0;
+    padding: 16px;
+    background: #f6f6f6;
+    border-radius: var(--radius-small);
+    overflow-x: auto;
+    font-family: var(--font-mono);
+    font-size: 14px;
+    line-height: 1.6;
+}}
+
+.RichContent pre code {{
+    background: none;
+    padding: 0;
+    font-size: inherit;
+    color: inherit;
+    border-radius: 0;
+}}
+
+.RichContent code {{
+    background: rgba(0, 102, 255, 0.08);
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-family: var(--font-mono);
+    font-size: 0.9em;
+    color: var(--text-primary);
+}}
+
+.RichContent img {{
+    max-width: 100%;
+    height: auto;
+    margin: 1em 0;
+    border-radius: var(--radius-small);
+    display: block;
+}}
+
+.RichContent table {{
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1em 0;
+    font-size: 14px;
+}}
+
+.RichContent th, .RichContent td {{
+    padding: 8px 12px;
+    border: 1px solid var(--border-color);
+    text-align: left;
+}}
+
+.RichContent th {{
+    background: var(--bg-secondary);
+    font-weight: 600;
+}}
+
+.RichContent tr:nth-child(even) {{
+    background: var(--bg-tertiary);
+}}
+
+/* 操作栏 */
+.answer-actions {{
+    display: flex;
+    align-items: center;
+    padding: 12px 20px;
+    border-top: 1px solid var(--border-light);
+    gap: 16px;
+}}
+
+.vote-button {{
+    display: inline-flex;
+    align-items: center;
+    padding: 8px 16px;
+    background: var(--zhihu-blue);
+    color: white;
+    border: none;
+    border-radius: var(--radius-small);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+}}
+
+.vote-count {{
+    font-weight: 600;
+    margin-left: 4px;
+}}
+
+.action-button {{
+    display: inline-flex;
+    align-items: center;
+    padding: 8px 12px;
+    background: transparent;
+    color: var(--text-tertiary);
+    border: none;
+    font-size: 14px;
+    cursor: pointer;
+}}
+
+/* 评论区 */
+.comments-section {{
+    margin-top: 16px;
+    padding: 16px 20px;
+    border-top: 1px solid var(--border-light);
+    background: var(--bg-tertiary);
+}}
+
+.comments-header {{
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 16px;
+}}
+
+.comment-item {{
+    display: flex;
+    gap: 12px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border-light);
+}}
+
+.comment-item:last-child {{
+    border-bottom: none;
+}}
+
+.comment-avatar {{
+    width: 32px;
+    height: 32px;
+    border-radius: var(--radius-small);
+    flex-shrink: 0;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 12px;
+    font-weight: 600;
+}}
+
+.comment-content {{
+    flex: 1;
+    min-width: 0;
+}}
+
+.comment-author {{
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: 4px;
+}}
+
+.comment-text {{
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--text-primary);
+    word-break: break-word;
+}}
+
+.comment-meta {{
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 8px;
+    font-size: 13px;
+    color: var(--text-tertiary);
+}}
+
+/* 底部信息 */
+.backup-info {{
+    padding: 16px 20px;
+    background: var(--bg-secondary);
+    border-top: 1px solid var(--border-light);
+    font-size: 13px;
+    color: var(--text-tertiary);
+    text-align: center;
+}}
+
+.backup-info a {{
+    color: var(--zhihu-blue);
+    text-decoration: none;
+}}
+
+/* 移动端适配 */
+@media (max-width: 640px) {{
+    .zhihu-page {{
+        padding: 0;
+    }}
+    .zhihu-card {{
+        border-radius: 0;
+    }}
+    .question-title {{
+        font-size: 18px;
+    }}
+    .RichContent {{
+        font-size: 14px;
+    }}
+}}
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1 class="question-title">{question_title}</h1>
-
-        <div class="author-info">
-            <div class="author-avatar">{(author_name[0] if author_name else "?").upper()}</div>
-            <div class="author-meta">
-                <div class="author-name">{author_name or "匿名用户"}</div>
-                <div class="author-headline">{author_headline or "知乎用户"}</div>
+    <div class="zhihu-page">
+        <div class="zhihu-card">
+            <!-- 问题标题 -->
+            <div class="question-header">
+                <h1 class="question-title">{question_title}</h1>
+                <div class="question-meta">
+                    知乎备份 ·
+                    <span style="color: var(--zhihu-blue); font-weight: 500;">
+                        {voteup_count}
+                    </span> 人赞同
+                </div>
             </div>
-        </div>
 
-        <div class="content">
-            {content_html}
-        </div>
+            <!-- 作者信息 -->
+            <div class="answer-header">
+                <div class="author-avatar">{(author_name[0] if author_name else "?").upper()}</div>
+                <div class="author-info">
+                    <div class="author-name-row">
+                        <span class="author-name">{author_name or "匿名用户"}</span>
+                    </div>
+                    <div class="author-headline">{author_headline or "知乎用户"}</div>
+                </div>
+            </div>
 
-        <div class="footer">
-            <span class="vote-count">{voteup_count}</span> 人赞同了该回答
-            | 备份于 {metadata.get('backup_time', '') if metadata else ''}
+            <!-- 回答内容 -->
+            <div class="RichContent">
+                {content_html}
+            </div>
+
+            <!-- 操作栏 -->
+            <div class="answer-actions">
+                <button class="vote-button">
+                    ▲ 赞同 <span class="vote-count">{voteup_count}</span>
+                </button>
+                <button class="action-button">
+                    ▼
+                </button>
+                <button class="action-button">
+                    💬 {comment_count} 条评论
+                </button>
+                <button class="action-button">
+                    ⭐ 收藏
+                </button>
+            </div>
+
+            <!-- 底部信息 -->
+            <div class="backup-info">
+                备份于 {backup_time or "未知时间"} ·
+                <a href="{original_url}" target="_blank">查看原文</a>
+            </div>
         </div>
     </div>
 </body>

@@ -21,12 +21,12 @@
             <table class="data-table content-table">
                 <thead>
                     <tr>
-                        <th style="width: 40%;">问题</th>
+                        <th style="width: 35%;">问题</th>
                         <th>作者</th>
                         <th>点赞</th>
                         <th>评论</th>
                         <th>备份时间</th>
-                        <th>操作</th>
+                        <th style="width: 180px;">操作</th>
                     </tr>
                 </thead>
                 <tbody id="answers-body">
@@ -44,29 +44,170 @@
     </div>
 </div>
 
-<!-- 详情模态框 -->
-<div class="modal" id="detail-modal">
-    <div class="modal-overlay" onclick="closeModal()"></div>
-    <div class="modal-content">
+<!-- 生成长图模态框 -->
+<div class="modal" id="image-modal">
+    <div class="modal-overlay" onclick="closeImageModal()"></div>
+    <div class="modal-content modal-lg">
         <div class="modal-header">
-            <h3 id="modal-title">回答详情</h3>
-            <button class="btn btn-icon" onclick="closeModal()">✕</button>
+            <h3>📷 生成长图</h3>
+            <button class="btn btn-icon" onclick="closeImageModal()">✕</button>
         </div>
-        <div class="modal-body" id="modal-body">
-            <!-- 动态内容 -->
+        <div class="modal-body">
+            <div id="image-generate-form">
+                <p class="text-muted" id="image-modal-title">正在准备生成...</p>
+                <div class="form-group">
+                    <label>卡片样式</label>
+                    <select id="card-style" class="form-control">
+                        <option value="default">默认样式 (完整)</option>
+                        <option value="compact">紧凑样式 (适合手机)</option>
+                        <option value="minimal">极简样式 (仅内容)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="include-comments"> 包含评论区
+                    </label>
+                </div>
+            </div>
+            <div id="image-generating" class="text-center hidden">
+                <div class="loading-spinner"></div>
+                <p class="text-muted mt-3">正在生成图片，请稍候...</p>
+                <p class="text-muted small">首次生成可能需要下载浏览器组件</p>
+            </div>
+            <div id="image-result" class="hidden">
+                <div class="image-preview-container">
+                    <img id="generated-image" src="" alt="生成的长图" class="image-preview">
+                </div>
+                <div class="image-info mt-3">
+                    <p class="text-muted small" id="image-info-text"></p>
+                </div>
+            </div>
+            <div id="image-error" class="alert alert-danger hidden"></div>
         </div>
-        <div class="modal-footer">
-            <a id="modal-open-link" href="#" target="_blank" class="btn btn-primary">在知乎打开</a>
-            <button class="btn btn-secondary" onclick="closeModal()">关闭</button>
+        <div class="modal-footer" id="image-modal-footer">
+            <button class="btn btn-secondary" onclick="closeImageModal()">关闭</button>
+            <button class="btn btn-primary" id="btn-generate" onclick="generateImage()">开始生成</button>
+            <a id="btn-download" href="#" download class="btn btn-success hidden" target="_blank">下载图片</a>
         </div>
     </div>
 </div>
+
+<style>
+/* 图片生成模态框样式 */
+.modal-lg {
+    max-width: 800px;
+    width: 90%;
+}
+
+.image-preview-container {
+    max-height: 500px;
+    overflow-y: auto;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 10px;
+    background: #f5f5f5;
+}
+
+.image-preview {
+    max-width: 100%;
+    height: auto;
+    display: block;
+    margin: 0 auto;
+    border-radius: 4px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.loading-spinner {
+    width: 50px;
+    height: 50px;
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid #0066ff;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 0 auto;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.hidden {
+    display: none !important;
+}
+
+.form-group {
+    margin-bottom: 15px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 500;
+}
+
+.form-control {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #d9d9d9;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+.checkbox-label {
+    display: flex !important;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+}
+
+.checkbox-label input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+}
+
+.mt-3 {
+    margin-top: 15px;
+}
+
+.btn-generate-img {
+    background: #0066ff;
+    color: white;
+    border: none;
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-generate-img:hover {
+    background: #005ce6;
+}
+
+.actions-cell {
+    white-space: nowrap;
+}
+
+.actions-cell .btn {
+    margin-right: 4px;
+    padding: 4px 8px;
+    font-size: 12px;
+}
+
+.actions-cell .btn:last-child {
+    margin-right: 0;
+}
+</style>
 {% endblock %}
 
 {% block scripts %}
 <script>
 let currentPage = 1;
 let totalPages = 1;
+let currentAnswerId = null;
+let currentAnswerTitle = '';
 
 // 加载回答列表
 async function loadAnswers(page = 1) {
@@ -95,6 +236,7 @@ async function loadAnswers(page = 1) {
             const synced = item.synced_at
                 ? new Date(item.synced_at).toLocaleString()
                 : '-';
+            const htmlFileName = item.html_path ? item.html_path.split('/').pop() : '';
 
             return `
                 <tr>
@@ -107,8 +249,11 @@ async function loadAnswers(page = 1) {
                     <td>${synced}</td>
                     <td class="actions-cell">
                         ${item.html_path ? `
-                            <a href="/data/html/${encodeURIComponent(item.html_path.split('/html/')[1] || '')}"
+                            <a href="/data/html/${encodeURIComponent(htmlFileName)}"
                                target="_blank" class="btn btn-sm btn-secondary">查看</a>
+                            <button class="btn btn-generate-img"
+                                    onclick="openImageModal('${item.id}', '${escapeHtml(title)}')"
+                                    title="生成长图">📷 截图</button>
                         ` : '<span class="text-muted">无文件</span>'}
                         <button class="btn btn-sm btn-danger" onclick="deleteAnswer('${item.id}', '${escapeHtml(title)}')">删除</button>
                     </td>
@@ -168,6 +313,79 @@ function renderPagination() {
         ${currentPage === totalPages ? '' : `onclick="loadAnswers(${currentPage + 1})"`}>下一页</button>`;
 
     container.innerHTML = html;
+}
+
+// 打开生成长图模态框
+function openImageModal(answerId, title) {
+    currentAnswerId = answerId;
+    currentAnswerTitle = title;
+
+    // 重置状态
+    document.getElementById('image-modal-title').textContent = `为回答生成长图: ${title.substring(0, 50)}${title.length > 50 ? '...' : ''}`;
+    document.getElementById('image-generate-form').classList.remove('hidden');
+    document.getElementById('image-generating').classList.add('hidden');
+    document.getElementById('image-result').classList.add('hidden');
+    document.getElementById('image-error').classList.add('hidden');
+    document.getElementById('btn-generate').classList.remove('hidden');
+    document.getElementById('btn-download').classList.add('hidden');
+
+    // 显示模态框
+    document.getElementById('image-modal').classList.add('active');
+}
+
+// 关闭生成长图模态框
+function closeImageModal() {
+    document.getElementById('image-modal').classList.remove('active');
+    currentAnswerId = null;
+    currentAnswerTitle = '';
+}
+
+// 生成图片
+async function generateImage() {
+    if (!currentAnswerId) return;
+
+    const cardStyle = document.getElementById('card-style').value;
+    const includeComments = document.getElementById('include-comments').checked;
+
+    // 显示生成中状态
+    document.getElementById('image-generate-form').classList.add('hidden');
+    document.getElementById('image-generating').classList.remove('hidden');
+    document.getElementById('btn-generate').classList.add('hidden');
+    document.getElementById('image-error').classList.add('hidden');
+
+    try {
+        const url = `/api/answers/${currentAnswerId}/generate-image?card_style=${cardStyle}&include_comments=${includeComments}`;
+        const res = await fetch(url, {method: 'POST'});
+        const data = await res.json();
+
+        if (res.ok && data.status === 'success') {
+            // 显示结果
+            document.getElementById('image-generating').classList.add('hidden');
+            document.getElementById('image-result').classList.remove('hidden');
+
+            const imageUrl = data.data.image_url;
+            document.getElementById('generated-image').src = imageUrl;
+            document.getElementById('btn-download').href = imageUrl;
+            document.getElementById('btn-download').classList.remove('hidden');
+            document.getElementById('image-info-text').textContent =
+                `图片路径: ${data.data.image_path}`;
+
+            showToast('图片生成成功！', 'success');
+        } else {
+            throw new Error(data.detail || '生成失败');
+        }
+    } catch (e) {
+        console.error('生成图片失败:', e);
+        document.getElementById('image-generating').classList.add('hidden');
+        document.getElementById('image-generate-form').classList.remove('hidden');
+        document.getElementById('btn-generate').classList.remove('hidden');
+
+        const errorDiv = document.getElementById('image-error');
+        errorDiv.textContent = '生成失败: ' + e.message;
+        errorDiv.classList.remove('hidden');
+
+        showToast('图片生成失败: ' + e.message, 'error');
+    }
 }
 
 // 删除回答
