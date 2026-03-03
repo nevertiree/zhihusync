@@ -30,3 +30,8 @@ tenacity>=8.2.0
 
 # Image processing
 pillow>=10.1.0
+
+# Testing (optional)
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+httpx>=0.25.0  # For FastAPI TestClient
