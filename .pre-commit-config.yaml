@@ -40,6 +40,7 @@ repos:
           - sqlalchemy>=2.0.0
           - types-beautifulsoup4
           - types-lxml
+          - types-aiofiles
         args:
           - --ignore-missing-imports
           - --show-error-codes
