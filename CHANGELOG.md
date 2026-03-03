@@ -27,6 +27,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Vote count display
   - Metadata footer
 
+## [0.3.0] - 2026-03-03
+
+### Added
+- **Long image generation**: Convert HTML backups to screenshot-style long images
+  - New `image_generator.py` module using Playwright for rendering
+  - API endpoint `POST /api/answers/{id}/generate-image`
+  - Support for 3 card styles: default, compact, minimal
+  - 2x high-resolution screenshots (694px width, Zhihu standard)
+  - Frontend UI with preview and download options
+- **Ruff linter**: Introduced Ruff as the primary Python linter
+  - Added `pyproject.toml` with Ruff, Black, and isort configurations
+  - Updated `.pre-commit-config.yaml` with Ruff hooks
+  - Replaced flake8, pydocstyle, and isort with Ruff
+
+### Changed
+- **Major UI style overhaul**: Completely redesigned HTML template to match Zhihu's appearance
+  - Card-based layout with gray background and white content cards
+  - Added question header section with vote count display
+  - Enhanced author information section with avatar gradient
+  - RichContent styling for better typography and readability
+  - Added action bar (vote, comment, favorite buttons)
+  - Improved responsive design for mobile devices
+
+### Fixed
+- **Fixed image access 404**: Added missing `/data/static` static file mount in `web.py`
+  - Generated images can now be accessed at `/data/static/images/xxx.png`
+- **Fixed viewport_height error**: Corrected undefined variable in `image_generator.py`
+- **Fixed font-family line too long**: Split long CSS font declarations in HTML template
+
 ## [0.2.0] - 2026-03-03
 
 ### Added
