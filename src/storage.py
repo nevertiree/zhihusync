@@ -779,6 +779,14 @@ body {{
         if not self.download_images:
             return None
 
+        # 跳过本地路径
+        if url.startswith("/data/") or url.startswith("../") or url.startswith("./"):
+            return url
+
+        # 跳过非 HTTP URL
+        if not url.startswith("http://") and not url.startswith("https://"):
+            return url
+
         if url in self._downloaded_images:
             return self._get_local_image_path(url)
 
