@@ -909,12 +909,51 @@ class ZhihuCrawler:
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
     async def fetch_answer_page(self, question_id: str, answer_id: str) -> str | None:
-        """获取回答页面 HTML，包含完整内容和样式"""
+        """获取回答页面 HTML，包含完整内容和样式
+
+        Returns:
+            页面HTML内容，如果页面404返回 "__DELETED__"，其他错误返回 None
+        """
         url = f"{self.ZHIHU_BASE}/question/{question_id}/answer/{answer_id}"
 
         await self._delay()
         assert self.page is not None  # noqa: S101
-        await self.page.goto(url, wait_until="networkidle")
+        response = await self.page.goto(url, wait_until="networkidle")
+
+        # 检测404状态
+        if response:
+            status = response.status
+            if status == 404:
+                logger.warning(f"页面404(可能已被删除): {url}")
+                return "__DELETED__"
+            elif status >= 400:
+                logger.warning(f"页面返回错误状态码 {status}: {url}")
+
+        # 检查页面内容是否包含404提示
+        page_title = await self.page.title()
+        if "404" in page_title or "不存在" in page_title:
+            logger.warning(f"页面标题表明404: {page_title}")
+            return "__DELETED__"
+
+        # 检查是否有内容区域
+        content_exists = await self.page.query_selector(".RichContent, .QuestionAnswer-content")
+        if not content_exists:
+            # 检查是否显示"内容不存在"等提示
+            error_selectors = [
+                "text=/内容不存在/",
+                "text=/页面不存在/",
+                "text=/404/",
+                ".ErrorPage",
+                ".NotFoundPage",
+            ]
+            for selector in error_selectors:
+                try:
+                    error_el = await self.page.query_selector(selector)
+                    if error_el:
+                        logger.warning(f"页面显示不存在提示: {url}")
+                        return "__DELETED__"
+                except Exception:
+                    continue
 
         # 等待内容加载
         try:
@@ -1227,17 +1266,70 @@ class ZhihuCrawler:
             # 检查是否已存在
             existing = self.db.get_answer_by_id(answer_id)
 
-            # 如果是已存在的记录且没有更新，跳过
-            if existing:
-                logger.debug(f"回答已存在，跳过: {question_title[:50]}...")
-                return False
-
             # 获取完整页面内容
             logger.info(f"获取回答: {question_title[:60]}...")
             page_html = await self.fetch_answer_page(question_id, answer_id)
 
+            # 处理404被删除的内容
+            if page_html == "__DELETED__":
+                logger.warning(f"回答已被删除: {question_title[:60]}...")
+
+                if existing:
+                    # 更新现有记录为删除状态
+                    if not existing.is_deleted:
+                        self.db.save_answer(
+                            {
+                                "id": answer_id,
+                                "is_deleted": True,
+                                "content_text": "[此回答已被删除或不存在]",
+                            }
+                        )
+                        self.updated_items += 1
+                        logger.info(f"已标记为删除状态: {question_title[:60]}...")
+                    return True
+
+                # 保存删除状态的新记录
+                answer_data = {
+                    "id": answer_id,
+                    "user_id": self.user_id,
+                    "question_id": question_id,
+                    "question_title": question_title,
+                    "author_id": author_id,
+                    "author_name": author_name,
+                    "author_avatar_url": None,
+                    "author_headline": author_headline,
+                    "author_url": author_url,
+                    "content_text": "[此回答已被删除或不存在]",
+                    "content_length": 0,
+                    "voteup_count": voteup_count,
+                    "comment_count": comment_count,
+                    "created_time": (self._parse_timestamp(created_time) if created_time else None),
+                    "updated_time": (self._parse_timestamp(updated_time) if updated_time else None),
+                    "liked_time": liked_time,
+                    "html_path": None,
+                    "original_url": f"{self.ZHIHU_BASE}/question/{question_id}/answer/{answer_id}",
+                    "has_comments": False,
+                    "is_deleted": True,  # 标记为已删除
+                    "extra_meta": {
+                        "deleted": True,
+                        "author_headline": author_headline,
+                    },
+                }
+
+                is_new = self.db.save_answer(answer_data)
+                if is_new:
+                    self.new_items += 1
+                    logger.info(f"已保存删除状态回答: {question_title[:60]}...")
+                return True
+
+            # 其他获取失败的情况
             if not page_html:
                 logger.warning(f"无法获取页面内容: {answer_id}")
+                return False
+
+            # 如果是已存在的记录且没有更新，跳过
+            if existing:
+                logger.debug(f"回答已存在，跳过: {question_title[:50]}...")
                 return False
 
             # 解析页面获取内容
