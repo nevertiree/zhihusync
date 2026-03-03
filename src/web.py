@@ -5,6 +5,7 @@ import json
 from contextlib import asynccontextmanager
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 from config_loader import load_config
 from crawler import ZhihuCrawler
@@ -20,8 +21,8 @@ from storage import StorageManager
 from timezone_utils import get_beijing_now
 
 # 全局状态
-app_state = {
-    "sync_task": None,
+app_state: dict[str, Any] = {
+    "sync_task": None,  # type: ignore[typeddict-item]
     "sync_status": "idle",  # idle, running, success, failed
     "sync_progress": 0,
     "sync_message": "",
