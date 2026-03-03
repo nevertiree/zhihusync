@@ -1,3 +1,4 @@
+# type: ignore
 """数据模型定义.
 
 该模块定义了知乎同步工具使用的所有数据库模型，使用 SQLAlchemy ORM。

@@ -156,6 +156,7 @@ class AlertManager:
                 "source": "zhihusync",
             }
 
+            assert self._config is not None  # noqa: S101
             headers = {"Content-Type": "application/json", **(self._config.webhook_headers or {})}
 
             timeout = aiohttp.ClientTimeout(total=30)

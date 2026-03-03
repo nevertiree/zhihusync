@@ -1203,6 +1203,9 @@ class ZhihuCrawler:
             content_html, content_text = self._extract_content_from_page(soup, target)
 
             # 提取作者详细信息（头像、名称、签名）
+            author_avatar_url: str | None
+            author_name_from_page: str | None
+            author_headline_from_page: str | None
             (
                 author_avatar_url,
                 author_name_from_page,

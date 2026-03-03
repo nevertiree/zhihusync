@@ -20,7 +20,6 @@ repos:
         args:
           - --fix
           - --exit-non-zero-on-fix
-          - --ignore=SIM,C901
         files: ^(src|backend)/.*\.py$
   - repo: https://github.com/psf/black
     rev: 24.2.0
@@ -30,23 +29,22 @@ repos:
         args:
           - --line-length=120
         files: ^(src|backend)/.*\.py$
-  # MyPy disabled for now - project needs type annotations cleanup
-  # - repo: https://github.com/pre-commit/mirrors-mypy
-  #   rev: v1.9.0
-  #   hooks:
-  #     - id: mypy
-  #       additional_dependencies:
-  #         - types-PyYAML
-  #         - types-requests
-  #         - pydantic>=2.5.0
-  #         - sqlalchemy>=2.0.0
-  #         - types-beautifulsoup4
-  #         - types-lxml
-  #       args:
-  #         - --ignore-missing-imports
-  #         - --show-error-codes
-  #       files: ^(src|backend)/.*\.py$
-  #       exclude: ^(src|backend)/.*_test\.py$
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.9.0
+    hooks:
+      - id: mypy
+        additional_dependencies:
+          - types-PyYAML
+          - types-requests
+          - pydantic>=2.5.0
+          - sqlalchemy>=2.0.0
+          - types-beautifulsoup4
+          - types-lxml
+        args:
+          - --ignore-missing-imports
+          - --show-error-codes
+        files: ^(src|backend)/.*\.py$
+        exclude: ^(src|backend)/.*_test\.py$
   - repo: https://github.com/pre-commit/mirrors-prettier
     rev: v3.1.0
     hooks:
