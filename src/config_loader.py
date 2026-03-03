@@ -10,7 +10,6 @@ Examples:
 """
 
 from pathlib import Path
-from typing import Optional
 
 import yaml
 from pydantic import BaseModel, Field
@@ -83,7 +82,8 @@ class LoggingConfig(BaseModel):
     """
 
     level: str = "INFO"
-    format: str = "{time:YYYY-MM-DD HH:mm:ss} | {level} | {name} | {message}"
+    # 使用北京时间 (UTC+8)，loguru 的 time 字段支持 tz 参数
+    format: str = "<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level}</level> | <cyan>{name}</cyan> | <level>{message}</level>"
     file: str = "/app/data/meta/zhihusync.log"
     rotation: str = "10 MB"
     retention: str = "30 days"
@@ -118,7 +118,7 @@ class AppConfig(BaseSettings):
         env_prefix = "ZHIHUSYNC_"
 
 
-def load_config(config_path: Optional[str] = None) -> AppConfig:
+def load_config(config_path: str | None = None) -> AppConfig:
     """加载配置文件.
 
     按优先级从以下位置加载配置:
@@ -153,7 +153,7 @@ def load_config(config_path: Optional[str] = None) -> AppConfig:
 
     # 如果存在配置文件，从文件加载
     if config_path and Path(config_path).exists():
-        with open(config_path, "r", encoding="utf-8") as f:
+        with open(config_path, encoding="utf-8") as f:
             config_data = yaml.safe_load(f)
         return AppConfig(**config_data)
 

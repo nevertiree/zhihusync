@@ -624,6 +624,22 @@ async function stopSync() {
     }
 }
 
+// 格式化为北京时间字符串
+function formatBeijingTime(isoString) {
+    if (!isoString) return '-';
+    const date = new Date(isoString);
+    // 使用北京时间 (UTC+8) 显示
+    return date.toLocaleString('zh-CN', {
+        timeZone: 'Asia/Shanghai',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+    });
+}
+
 // 加载同步历史
 async function loadSyncHistory() {
     try {
@@ -658,7 +674,7 @@ async function loadSyncHistory() {
 
             return `
                 <tr>
-                    <td>${started.toLocaleString()}</td>
+                    <td>${formatBeijingTime(log.started_at)}</td>
                     <td><span class="badge ${statusClass}">${statusText}</span></td>
                     <td>${log.items_scanned || 0}</td>
                     <td>${log.items_new || 0}</td>

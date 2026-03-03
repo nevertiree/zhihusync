@@ -279,7 +279,7 @@ async function loadAnswers(page = 1) {
             const title = escapeHtml(item.question_title || '无标题');
             const author = escapeHtml(item.author_name || '匿名用户');
             const synced = item.synced_at
-                ? new Date(item.synced_at).toLocaleString()
+                ? new Date(item.synced_at).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })
                 : '-';
             const htmlFileName = item.html_path ? item.html_path.split('/').pop() : '';
 

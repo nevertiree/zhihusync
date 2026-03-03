@@ -13,6 +13,7 @@ from loguru import logger
 from playwright.async_api import Browser, BrowserContext, Page, async_playwright
 from storage import StorageManager
 from tenacity import retry, stop_after_attempt, wait_exponential
+from timezone_utils import get_beijing_now
 
 
 class ZhihuCrawler:
@@ -1008,7 +1009,7 @@ class ZhihuCrawler:
                 "updated_time": (
                     self._parse_timestamp(updated_time).isoformat() if updated_time else ""
                 ),
-                "backup_time": datetime.now().isoformat(),
+                "backup_time": get_beijing_now().isoformat(),
             }
 
             html_path = await self.storage.save_answer(
@@ -1133,7 +1134,9 @@ class ZhihuCrawler:
 
                 # 解析点赞时间
                 created_time = activity.get("created_time", 0)
-                liked_time = self._parse_timestamp(created_time) if created_time else datetime.now()
+                liked_time = (
+                    self._parse_timestamp(created_time) if created_time else get_beijing_now()
+                )
 
                 # 处理回答
                 await self.process_answer(activity, liked_time)

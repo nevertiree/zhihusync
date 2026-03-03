@@ -17,6 +17,7 @@ from image_generator import ImageGenerator
 from loguru import logger
 from pydantic import BaseModel
 from storage import StorageManager
+from timezone_utils import get_beijing_now
 
 # 全局状态
 app_state = {
@@ -434,7 +435,7 @@ async def do_sync():
 
             app_state["sync_status"] = "success"
             app_state["sync_message"] = f"同步完成! 新增 {new_items} 条, 更新 {updated_items} 条"
-            app_state["last_sync"] = datetime.now().isoformat()
+            app_state["last_sync"] = get_beijing_now().isoformat()
 
     except Exception as e:
         app_state["sync_status"] = "failed"

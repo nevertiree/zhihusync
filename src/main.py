@@ -12,6 +12,9 @@ Examples:
 """
 
 import asyncio
+
+# 设置北京时区环境变量
+import os
 import signal
 import sys
 from pathlib import Path
@@ -19,6 +22,14 @@ from pathlib import Path
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 from loguru import logger
+
+os.environ["TZ"] = "Asia/Shanghai"
+try:
+    import time
+
+    time.tzset()
+except Exception:
+    pass  # Windows 不支持 tzset
 
 # 添加 src 到路径
 sys.path.insert(0, str(Path(__file__).parent))
@@ -82,15 +93,25 @@ class ZhihuSyncService:
         """配置日志.
 
         设置控制台和文件日志输出，根据配置文件调整级别和格式。
+        使用北京时间 (UTC+8)。
         """
         # 移除默认处理器
         logger.remove()
+
+        # 自定义时间格式化函数 - 返回北京时间
+        def beijing_time_formatter(record):
+            from datetime import datetime, timedelta, timezone
+
+            beijing_tz = timezone(timedelta(hours=8))
+            beijing_time = datetime.now(beijing_tz)
+            record["extra"]["beijing_time"] = beijing_time.strftime("%Y-%m-%d %H:%M:%S")
+            return "{extra[beijing_time]} | {level} | {name} | {message}\n"
 
         # 添加控制台输出
         logger.add(
             sys.stdout,
             level=self.config.logging.level,
-            format=self.config.logging.format,
+            format=beijing_time_formatter,
             colorize=True,
         )
 
@@ -98,7 +119,7 @@ class ZhihuSyncService:
         logger.add(
             self.config.logging.file,
             level=self.config.logging.level,
-            format=self.config.logging.format,
+            format=beijing_time_formatter,
             rotation=self.config.logging.rotation,
             retention=self.config.logging.retention,
             encoding="utf-8",
