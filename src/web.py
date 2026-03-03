@@ -571,6 +571,57 @@ async def stop_sync():
     return {"status": "stopped", "message": "同步任务已停止"}
 
 
+@app.post("/api/sync/init")
+async def start_init_sync():
+    """开始初始化同步（全量爬取历史数据）"""
+    if app_state["sync_task"] and not app_state["sync_task"].done():
+        return {"status": "error", "message": "已有同步任务在运行"}
+
+    async def do_init_sync():
+        """执行初始化同步"""
+        try:
+            app_state["sync_status"] = "running"
+            app_state["sync_message"] = "初始化采集中..."
+            app_state["sync_progress"] = 0
+
+            def progress_callback(current: int, total: int):
+                if total > 0:
+                    app_state["sync_progress"] = int(current / total * 100)
+                else:
+                    # 无限制模式，显示已处理数量
+                    app_state["sync_progress"] = current
+                app_state["sync_message"] = f"已处理 {current} 条点赞..."
+
+            async with ZhihuCrawler(
+                user_id=config.zhihu.user_id,
+                db_manager=db,
+                storage_manager=storage,
+                headless=True,
+                request_delay=config.zhihu.request_delay,
+                max_comments=config.zhihu.max_comments_per_answer,
+            ) as crawler:
+                # 使用 init_mode=True 进行全量采集
+                await crawler.scan_likes(
+                    max_items=-1,  # 无限制
+                    progress_callback=progress_callback,
+                    init_mode=True,
+                )
+
+            app_state["sync_status"] = "success"
+            app_state["sync_message"] = "初始化采集完成"
+            app_state["last_sync"] = get_beijing_now().isoformat()
+
+        except Exception as e:
+            logger.exception(f"初始化同步失败: {e}")
+            app_state["sync_status"] = "failed"
+            app_state["sync_message"] = f"初始化失败: {e}"
+
+    # 创建异步任务
+    app_state["sync_task"] = asyncio.create_task(do_init_sync())
+
+    return {"status": "started", "message": "初始化采集已启动（将爬取全部历史数据）"}
+
+
 from sqlalchemy import or_
 
 

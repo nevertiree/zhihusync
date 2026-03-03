@@ -1347,3 +1347,54 @@ body {
   font-size: 14px;
   margin-top: 4px;
 }
+
+/* ==================== 初始化采集样式 ==================== */
+
+.card-warning {
+  border-left: 4px solid var(--warning);
+}
+
+.card-warning .card-header {
+  background: rgba(250, 173, 20, 0.1);
+}
+
+.init-sync-info {
+  padding: 8px 0;
+}
+
+.init-sync-info p {
+  margin-bottom: 12px;
+  color: var(--text-primary);
+}
+
+.init-sync-info .feature-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 16px 0;
+}
+
+.init-sync-info .feature-list li {
+  padding: 4px 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.init-sync-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.btn-warning {
+  background: var(--warning);
+  color: white;
+}
+
+.btn-warning:hover:not(:disabled) {
+  background: #d48806;
+}
+
+.btn-warning:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

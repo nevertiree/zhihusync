@@ -191,6 +191,30 @@
         </div>
     </div>
 
+    <!-- 初始化采集 -->
+    <div class="card card-warning">
+        <div class="card-header">
+            <h3>🚀 初始化采集（全量）</h3>
+        </div>
+        <div class="card-body compact">
+            <div class="init-sync-info">
+                <p>⚠️ <strong>首次使用或需要重新爬取全部历史数据时使用</strong></p>
+                <ul class="feature-list">
+                    <li>✅ 无视已存在的数据，强制重新爬取</li>
+                    <li>✅ 爬取全部历史点赞（直到知乎页面底部）</li>
+                    <li>✅ 不受到"最大扫描条目"限制</li>
+                    <li>⏱️ 根据点赞数量，可能需要较长时间</li>
+                </ul>
+                <div class="init-sync-actions">
+                    <button class="btn btn-warning" onclick="startInitSync()" id="init-sync-btn">
+                        🚀 开始初始化采集
+                    </button>
+                    <span class="text-muted" id="init-sync-status"></span>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="card">
         <div class="card-header">
             <h3>🌐 浏览器设置</h3>
