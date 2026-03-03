@@ -7,7 +7,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from fastapi import BackgroundTasks, FastAPI, HTTPException, Request
+from fastapi import BackgroundTasks, FastAPI, HTTPException, Query, Request
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from loguru import logger
@@ -16,6 +17,7 @@ from pydantic import BaseModel
 from config_loader import load_config
 from crawler import ZhihuCrawler
 from db import Answer, DatabaseManager, SyncLog
+from image_generator import ImageGenerator
 from storage import StorageManager
 
 # 全局状态
@@ -589,6 +591,179 @@ async def delete_answer(answer_id: str):
             session.close()
 
         return {"status": "success", "message": "已删除"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============ 图片生成 API ============
+
+
+@app.post("/api/answers/{answer_id}/generate-image")
+async def generate_answer_image_api(
+    answer_id: str,
+    card_style: str = Query("default", description="卡片样式: default/compact/minimal"),
+    include_comments: bool = Query(False, description="是否包含评论区"),
+):
+    """为指定回答生成截图/长图.
+
+    Args:
+        answer_id: 回答ID.
+        card_style: 卡片样式 (default-默认, compact-紧凑, minimal-极简).
+        include_comments: 是否包含评论区.
+
+    Returns:
+        包含生成图片路径的响应.
+    """
+    try:
+        # 获取回答信息
+        answer = db.get_answer_by_id(answer_id)
+        if not answer:
+            raise HTTPException(status_code=404, detail="回答不存在")
+
+        if not answer.html_path:
+            raise HTTPException(status_code=400, detail="回答没有 HTML 文件")
+
+        html_path = Path(answer.html_path)
+        if not html_path.exists():
+            raise HTTPException(status_code=404, detail="HTML 文件不存在")
+
+        # 确保图片目录存在
+        images_dir = Path(config.storage.static_path) / "images"
+        images_dir.mkdir(parents=True, exist_ok=True)
+
+        # 生成图片
+        async with ImageGenerator(output_dir=str(images_dir)) as generator:
+            image_path = await generator.generate_answer_card(
+                html_path=str(html_path),
+                include_comments=include_comments,
+                card_style=card_style,
+            )
+
+        # 计算相对路径用于访问
+        relative_path = Path(image_path).relative_to(config.storage.static_path)
+
+        return {
+            "status": "success",
+            "message": "图片生成成功",
+            "data": {
+                "image_path": image_path,
+                "relative_path": str(relative_path),
+                "image_url": f"/data/static/images/{Path(image_path).name}",
+                "answer_id": answer_id,
+                "question_title": answer.question_title,
+            },
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"生成图片失败: {e}")
+        raise HTTPException(status_code=500, detail=f"生成图片失败: {str(e)}")
+
+
+@app.get("/api/images")
+async def list_generated_images(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+):
+    """获取已生成的图片列表.
+
+    Args:
+        page: 页码.
+        page_size: 每页数量.
+
+    Returns:
+        图片列表.
+    """
+    try:
+        images_dir = Path(config.storage.static_path) / "images"
+        if not images_dir.exists():
+            return {"items": [], "total": 0, "page": page, "page_size": page_size}
+
+        # 获取所有图片文件
+        image_files = sorted(
+            images_dir.glob("*.png"),
+            key=lambda x: x.stat().st_mtime,
+            reverse=True,
+        )
+
+        total = len(image_files)
+        start = (page - 1) * page_size
+        end = start + page_size
+        page_files = image_files[start:end]
+
+        items = []
+        for f in page_files:
+            stat = f.stat()
+            items.append(
+                {
+                    "filename": f.name,
+                    "url": f"/data/static/images/{f.name}",
+                    "size": stat.st_size,
+                    "created_at": datetime.fromtimestamp(stat.st_mtime).isoformat(),
+                }
+            )
+
+        return {
+            "items": items,
+            "total": total,
+            "page": page,
+            "page_size": page_size,
+            "total_pages": (total + page_size - 1) // page_size,
+        }
+
+    except Exception as e:
+        logger.exception(f"获取图片列表失败: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/images/{filename}")
+async def get_image(filename: str):
+    """获取生成的图片文件.
+
+    Args:
+        filename: 图片文件名.
+
+    Returns:
+        图片文件.
+    """
+    try:
+        image_path = Path(config.storage.static_path) / "images" / filename
+        if not image_path.exists():
+            raise HTTPException(status_code=404, detail="图片不存在")
+
+        return FileResponse(
+            path=image_path,
+            media_type="image/png",
+            filename=filename,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.delete("/api/images/{filename}")
+async def delete_image(filename: str):
+    """删除生成的图片.
+
+    Args:
+        filename: 图片文件名.
+
+    Returns:
+        删除结果.
+    """
+    try:
+        image_path = Path(config.storage.static_path) / "images" / filename
+        if not image_path.exists():
+            raise HTTPException(status_code=404, detail="图片不存在")
+
+        image_path.unlink()
+        return {"status": "success", "message": "图片已删除"}
+
     except HTTPException:
         raise
     except Exception as e:
