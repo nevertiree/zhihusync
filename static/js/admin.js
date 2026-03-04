@@ -101,8 +101,8 @@ function debounce(func, wait) {
     };
 }
 
-// 确认对话框
-function confirm(message) {
+// 确认对话框 - 使用原生 confirm，避免命名冲突
+function showConfirm(message) {
     return window.confirm(message);
 }
 
@@ -171,7 +171,7 @@ async function startInitSync() {
     const status = document.getElementById('init-sync-status');
 
     // 确认对话框
-    if (!confirm('确定要开始初始化采集吗？\n\n这将：\n- 重新爬取全部历史点赞数据\n- 可能需要较长时间（取决于点赞数量）\n- 可以中途停止')) {
+    if (!showConfirm('确定要开始初始化采集吗？\n\n这将：\n- 重新爬取全部历史点赞数据\n- 可能需要较长时间（取决于点赞数量）\n- 可以中途停止')) {
         return;
     }
 
@@ -190,7 +190,7 @@ async function startInitSync() {
         const data = await res.json();
 
         if (data.status === 'started') {
-            showToast('success', data.message);
+            showToast(data.message, 'success');
             status.textContent = '采集中，请查看日志页面了解进度';
 
             // 3秒后跳转到日志页面
@@ -198,13 +198,13 @@ async function startInitSync() {
                 window.location.href = '/logs';
             }, 3000);
         } else if (data.status === 'error') {
-            showToast('error', data.message);
+            showToast(data.message, 'error');
             btn.disabled = false;
             btn.textContent = '🚀 开始初始化采集';
             status.textContent = '';
         }
     } catch (err) {
-        showToast('error', '启动失败: ' + err.message);
+        showToast('启动失败: ' + err.message, 'error');
         btn.disabled = false;
         btn.textContent = '🚀 开始初始化采集';
         status.textContent = '';
