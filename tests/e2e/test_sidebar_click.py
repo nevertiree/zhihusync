@@ -2,16 +2,17 @@
 侧边栏点击展开/关闭功能 E2E 测试
 """
 
-import pytest
 import time
+
+import pytest
 
 selenium = pytest.importorskip("selenium", reason="selenium not installed")
 
 from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.common.action_chains import ActionChains
+from selenium.webdriver.common.by import By
 
 
 class TestSidebarClickMode:
@@ -27,6 +28,7 @@ class TestSidebarClickMode:
 
         try:
             from webdriver_manager.chrome import ChromeDriverManager
+
             service = Service(ChromeDriverManager().install())
             driver = webdriver.Chrome(service=service, options=chrome_options)
         except Exception:
@@ -46,7 +48,7 @@ class TestSidebarClickMode:
         """
         print("\n=== 测试点击侧边栏展开 ===")
         driver.get(f"{base_url}/content")
-        driver.execute_cdp_cmd('Network.clearBrowserCache', {})
+        driver.execute_cdp_cmd("Network.clearBrowserCache", {})
         time.sleep(3)
 
         driver.save_screenshot("tests/e2e/screenshots/sidebar_click_before.png")
@@ -54,7 +56,7 @@ class TestSidebarClickMode:
         sidebar = driver.find_element(By.ID, "sidebar")
 
         # 确认初始状态是收缩的
-        width_before = sidebar.size['width']
+        width_before = sidebar.size["width"]
         print(f"初始宽度: {width_before}px")
 
         # 点击侧边栏
@@ -64,7 +66,7 @@ class TestSidebarClickMode:
         driver.save_screenshot("tests/e2e/screenshots/sidebar_click_after.png")
 
         # 检查是否展开
-        width_after = sidebar.size['width']
+        width_after = sidebar.size["width"]
         print(f"点击后宽度: {width_after}px")
 
         # 检查是否有 expanded 类
@@ -84,7 +86,7 @@ class TestSidebarClickMode:
         """
         print("\n=== 测试点击主内容区关闭侧边栏 ===")
         driver.get(f"{base_url}/content")
-        driver.execute_cdp_cmd('Network.clearBrowserCache', {})
+        driver.execute_cdp_cmd("Network.clearBrowserCache", {})
         time.sleep(3)
 
         sidebar = driver.find_element(By.ID, "sidebar")
@@ -94,7 +96,7 @@ class TestSidebarClickMode:
         sidebar.click()
         time.sleep(0.5)
 
-        width_expanded = sidebar.size['width']
+        width_expanded = sidebar.size["width"]
         print(f"展开后宽度: {width_expanded}px")
 
         # 点击主内容区
@@ -104,7 +106,7 @@ class TestSidebarClickMode:
         driver.save_screenshot("tests/e2e/screenshots/sidebar_click_close.png")
 
         # 检查是否关闭
-        width_after = sidebar.size['width']
+        width_after = sidebar.size["width"]
         print(f"点击主内容区后宽度: {width_after}px")
 
         has_expanded = driver.execute_script(
@@ -123,7 +125,7 @@ class TestSidebarClickMode:
         """
         print("\n=== 测试点击导航项保持展开 ===")
         driver.get(f"{base_url}/content")
-        driver.execute_cdp_cmd('Network.clearBrowserCache', {})
+        driver.execute_cdp_cmd("Network.clearBrowserCache", {})
         time.sleep(3)
 
         sidebar = driver.find_element(By.ID, "sidebar")
@@ -144,12 +146,12 @@ class TestSidebarClickMode:
 
         # 检查侧边栏是否仍然展开（在新页面上）
         sidebar = driver.find_element(By.ID, "sidebar")
-        width_after_nav = sidebar.size['width']
+        width_after_nav = sidebar.size["width"]
         print(f"点击导航后宽度: {width_after_nav}px")
 
         # 注意：页面跳转后会重新加载，侧边栏会重置为收缩状态
         # 这是预期行为，我们主要验证导航能正常工作
-        if '/config' in driver.current_url:
+        if "/config" in driver.current_url:
             print("✅ 点击导航项成功跳转")
         else:
             print("❌ 点击导航项没有跳转")
@@ -160,7 +162,7 @@ class TestSidebarClickMode:
         """
         print("\n=== 测试鼠标离开后保持展开 ===")
         driver.get(f"{base_url}/content")
-        driver.execute_cdp_cmd('Network.clearBrowserCache', {})
+        driver.execute_cdp_cmd("Network.clearBrowserCache", {})
         time.sleep(3)
 
         sidebar = driver.find_element(By.ID, "sidebar")
@@ -170,7 +172,7 @@ class TestSidebarClickMode:
         sidebar.click()
         time.sleep(0.5)
 
-        width_expanded = sidebar.size['width']
+        width_expanded = sidebar.size["width"]
         print(f"展开后宽度: {width_expanded}px")
 
         # 鼠标移动到主内容区（离开侧边栏）
@@ -181,7 +183,7 @@ class TestSidebarClickMode:
         driver.save_screenshot("tests/e2e/screenshots/sidebar_mouse_leave.png")
 
         # 检查侧边栏是否仍然展开
-        width_after_leave = sidebar.size['width']
+        width_after_leave = sidebar.size["width"]
         print(f"鼠标离开后宽度: {width_after_leave}px")
 
         has_expanded = driver.execute_script(

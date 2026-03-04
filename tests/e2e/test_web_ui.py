@@ -3,20 +3,19 @@ End-to-End Tests using Selenium - 模拟真实用户操作
 需要安装: pip install selenium webdriver-manager
 """
 
-import pytest
 import time
-import json
-from pathlib import Path
+
+import pytest
 
 # Skip all tests if selenium is not installed
 selenium = pytest.importorskip("selenium", reason="selenium not installed")
 
 from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support.ui import WebDriverWait
 
 
 class TestWebInterface:
@@ -33,6 +32,7 @@ class TestWebInterface:
 
         try:
             from webdriver_manager.chrome import ChromeDriverManager
+
             service = Service(ChromeDriverManager().install())
             driver = webdriver.Chrome(service=service, options=chrome_options)
         except Exception:
@@ -52,9 +52,7 @@ class TestWebInterface:
         assert "zhihusync" in driver.title or "知乎" in driver.title
 
         wait = WebDriverWait(driver, 10)
-        stats_card = wait.until(
-            EC.presence_of_element_located((By.CSS_SELECTOR, "body"))
-        )
+        stats_card = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "body")))
         assert stats_card is not None
 
     def test_config_page_interactions(self, driver, base_url):

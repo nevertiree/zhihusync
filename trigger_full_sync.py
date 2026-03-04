@@ -1,7 +1,9 @@
 #!/usr/bin/env python
 """触发全量同步"""
 import time
+
 import requests
+
 
 def wait_for_service(max_retries=30):
     """等待服务启动"""
@@ -16,6 +18,7 @@ def wait_for_service(max_retries=30):
         print(f"⏳ 等待服务启动... ({i+1}/{max_retries})")
         time.sleep(1)
     return False
+
 
 def trigger_full_sync():
     """触发全量同步"""
@@ -33,6 +36,7 @@ def trigger_full_sync():
         print(f"❌ 请求失败: {e}")
         return False
 
+
 def check_status():
     """检查同步状态"""
     print("\n📊 同步状态检查 (每5秒刷新，按Ctrl+C停止)")
@@ -43,35 +47,31 @@ def check_status():
                 response = requests.get("http://localhost:6067/api/sync/status", timeout=2)
                 if response.status_code == 200:
                     data = response.json()
-                    status = data.get('status', 'unknown')
-                    message = data.get('message', '')
-                    progress = data.get('progress', 0)
+                    status = data.get("status", "unknown")
+                    message = data.get("message", "")
+                    progress = data.get("progress", 0)
 
-                    status_emoji = {
-                        'idle': '⏸️',
-                        'running': '🔄',
-                        'success': '✅',
-                        'failed': '❌'
-                    }.get(status, '❓')
+                    status_emoji = {"idle": "⏸️", "running": "🔄", "success": "✅", "failed": "❌"}.get(status, "❓")
 
-                    print(f"\r{status_emoji} [{status.upper()}] {message} ({progress}%)", end='', flush=True)
+                    print(f"\r{status_emoji} [{status.upper()}] {message} ({progress}%)", end="", flush=True)
 
-                    if status in ['success', 'failed']:
+                    if status in ["success", "failed"]:
                         print(f"\n\n{'='*60}")
                         print(f"同步结束: {message}")
                         break
 
             except Exception as e:
-                print(f"\r⚠️ 获取状态失败: {e}", end='', flush=True)
+                print(f"\r⚠️ 获取状态失败: {e}", end="", flush=True)
 
             time.sleep(5)
     except KeyboardInterrupt:
         print("\n\n⏹️ 用户停止监控")
 
+
 if __name__ == "__main__":
-    print("="*60)
+    print("=" * 60)
     print("🚀 zhihusync 全量采集工具")
-    print("="*60)
+    print("=" * 60)
 
     if wait_for_service():
         if trigger_full_sync():

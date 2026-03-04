@@ -6,10 +6,10 @@ from pathlib import Path
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-import pytest
-import tempfile
 import os
+import tempfile
 
+import pytest
 from storage import StorageManager
 
 
@@ -174,20 +174,14 @@ class TestImagePathGeneration:
 
     def test_get_local_image_path(self, temp_storage):
         """Test local image path generation."""
-        result = temp_storage._get_local_image_path(
-            "https://pic1.zhimg.com/test.jpg"
-        )
+        result = temp_storage._get_local_image_path("https://pic1.zhimg.com/test.jpg")
         assert result.startswith("../static/images/")
         assert result.endswith(".jpg")
 
     def test_get_local_image_path_with_hash(self, temp_storage):
         """Test image path contains hash."""
-        result1 = temp_storage._get_local_image_path(
-            "https://pic1.zhimg.com/test1.jpg"
-        )
-        result2 = temp_storage._get_local_image_path(
-            "https://pic1.zhimg.com/test2.jpg"
-        )
+        result1 = temp_storage._get_local_image_path("https://pic1.zhimg.com/test1.jpg")
+        result2 = temp_storage._get_local_image_path("https://pic1.zhimg.com/test2.jpg")
         # Different URLs should produce different hashes
         assert result1 != result2
 

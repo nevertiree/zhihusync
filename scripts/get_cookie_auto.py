@@ -33,23 +33,24 @@ def get_zhihu_cookies():
         # 启动浏览器（使用用户数据目录，保持登录状态）
         print("\n启动浏览器...")
         browser = p.chromium.launch(
-            headless=False,  # 显示浏览器窗口
-            args=["--disable-blink-features=AutomationControlled"]
+            headless=False, args=["--disable-blink-features=AutomationControlled"]  # 显示浏览器窗口
         )
 
         context = browser.new_context(
             viewport={"width": 1280, "height": 800},
-            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
         )
 
         page = context.new_page()
 
         # 隐藏 webdriver 标志
-        page.add_init_script("""
+        page.add_init_script(
+            """
             Object.defineProperty(navigator, 'webdriver', {
                 get: () => undefined
             });
-        """)
+        """
+        )
 
         try:
             # 访问知乎
@@ -61,8 +62,8 @@ def get_zhihu_cookies():
             page.wait_for_timeout(2000)
 
             # 查找登录按钮或用户头像
-            login_button = page.locator('text=登录').first
-            user_menu = page.locator('.AppHeader-profile').first
+            login_button = page.locator("text=登录").first
+            user_menu = page.locator(".AppHeader-profile").first
 
             if login_button.is_visible() and not user_menu.is_visible():
                 print("\n⚠️ 检测到未登录")
@@ -86,19 +87,16 @@ def get_zhihu_cookies():
             print(f"✅ 获取到 {len(cookies)} 个 Cookie")
 
             # 检查关键 cookie
-            cookie_names = [c['name'] for c in cookies]
+            cookie_names = [c["name"] for c in cookies]
             print(f"   Cookie 列表: {cookie_names}")
 
-            if 'z_c0' not in cookie_names:
+            if "z_c0" not in cookie_names:
                 print("\n❌ 未找到关键 Cookie (z_c0)")
                 print("   请确保已成功登录知乎")
                 return None
 
             # 转换为 storage_state 格式
-            storage_state = {
-                "cookies": cookies,
-                "origins": []
-            }
+            storage_state = {"cookies": cookies, "origins": []}
 
             return storage_state
 
@@ -126,11 +124,8 @@ def save_and_send(storage_state):
 
         response = requests.post(
             "http://localhost:6067/api/cookies",
-            json={
-                "cookies": json.dumps(storage_state),
-                "format": "json"
-            },
-            timeout=10
+            json={"cookies": json.dumps(storage_state), "format": "json"},
+            timeout=10,
         )
 
         if response.status_code == 200:

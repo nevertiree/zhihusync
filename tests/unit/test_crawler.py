@@ -2,11 +2,11 @@
 爬虫模块单元测试
 """
 
-import pytest
 import sys
-from pathlib import Path
 from datetime import datetime
-from unittest.mock import Mock, patch, AsyncMock
+from pathlib import Path
+
+import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
@@ -70,9 +70,9 @@ class TestStorageUtils:
         # 测试清理非法字符
         filename = 'test<>:"/\\|?*file.txt'
         result = storage._sanitize_filename(filename)
-        assert '<' not in result
-        assert '>' not in result
-        assert ':' not in result
+        assert "<" not in result
+        assert ">" not in result
+        assert ":" not in result
 
         # 测试截断长文件名
         long_name = "a" * 200
@@ -198,7 +198,7 @@ class TestConfigLoader:
 
     def test_default_config(self):
         """测试默认配置"""
-        from config_loader import ZhihuConfig, StorageConfig, BrowserConfig
+        from config_loader import BrowserConfig, StorageConfig, ZhihuConfig
 
         zhihu = ZhihuConfig()
         assert zhihu.user_id == ""

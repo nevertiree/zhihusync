@@ -5,25 +5,22 @@ Test Extraction Errors UI - 测试内容提取错误功能的按钮交互
 运行测试: pytest tests/e2e/test_extraction_errors.py -v --tb=short
 """
 
-import pytest
 import time
-import json
-from pathlib import Path
+
+import pytest
 
 # Skip all tests if selenium is not installed
 selenium = pytest.importorskip("selenium", reason="selenium not installed")
 
 from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import (
+    NoSuchElementException,
+)
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
-from selenium.common.exceptions import (
-    TimeoutException,
-    NoSuchElementException,
-    ElementClickInterceptedException,
-)
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support.ui import WebDriverWait
 
 
 class TestExtractionErrorsUI:
@@ -44,6 +41,7 @@ class TestExtractionErrorsUI:
 
         try:
             from webdriver_manager.chrome import ChromeDriverManager
+
             service = Service(ChromeDriverManager().install())
             driver = webdriver.Chrome(service=service, options=chrome_options)
         except Exception as e:
@@ -90,7 +88,7 @@ class TestExtractionErrorsUI:
 
     def test_error_buttons_exist(self, driver, base_url, wait):
         """测试错误操作按钮存在且可见"""
-        print(f"\n[TEST] 检查错误操作按钮")
+        print("\n[TEST] 检查错误操作按钮")
         driver.get(f"{base_url}/logs")
         time.sleep(2)
 
@@ -114,7 +112,7 @@ class TestExtractionErrorsUI:
 
     def test_show_resolved_button_toggle(self, driver, base_url, wait):
         """测试'查看已解决'按钮切换功能"""
-        print(f"\n[TEST] 测试'查看已解决'按钮切换")
+        print("\n[TEST] 测试'查看已解决'按钮切换")
         driver.get(f"{base_url}/logs")
         time.sleep(2)
 
@@ -134,7 +132,9 @@ class TestExtractionErrorsUI:
 
             # 文本应该变化
             assert new_text != original_text, "按钮文本应该切换"
-            assert "未解决" in new_text or "已解决" in new_text, f"按钮文本应该是'查看未解决'或'查看已解决'，实际是'{new_text}'"
+            assert (
+                "未解决" in new_text or "已解决" in new_text
+            ), f"按钮文本应该是'查看未解决'或'查看已解决'，实际是'{new_text}'"
 
             print("[PASS] 按钮切换功能正常")
 
@@ -148,7 +148,7 @@ class TestExtractionErrorsUI:
 
     def test_resolve_all_button_click(self, driver, base_url, wait):
         """测试'全部标为已解决'按钮点击"""
-        print(f"\n[TEST] 测试'全部标为已解决'按钮点击")
+        print("\n[TEST] 测试'全部标为已解决'按钮点击")
         driver.get(f"{base_url}/logs")
         time.sleep(2)
 
@@ -206,7 +206,7 @@ class TestExtractionErrorsUI:
 
     def test_delete_all_button_click(self, driver, base_url, wait):
         """测试'全部删除'按钮点击（取消操作）"""
-        print(f"\n[TEST] 测试'全部删除'按钮点击（取消操作）")
+        print("\n[TEST] 测试'全部删除'按钮点击（取消操作）")
         driver.get(f"{base_url}/logs")
         time.sleep(2)
 
@@ -245,7 +245,7 @@ class TestExtractionErrorsUI:
 
     def test_individual_error_buttons(self, driver, base_url, wait):
         """测试单个错误的操作按钮"""
-        print(f"\n[TEST] 测试单个错误的操作按钮")
+        print("\n[TEST] 测试单个错误的操作按钮")
         driver.get(f"{base_url}/logs")
         time.sleep(2)
 
@@ -292,6 +292,7 @@ class TestHomepageErrorBanner:
 
         try:
             from webdriver_manager.chrome import ChromeDriverManager
+
             service = Service(ChromeDriverManager().install())
             driver = webdriver.Chrome(service=service, options=chrome_options)
         except Exception:
@@ -307,7 +308,7 @@ class TestHomepageErrorBanner:
 
     def test_error_banner_exists(self, driver, base_url):
         """测试错误提示横幅元素存在"""
-        print(f"\n[TEST] 检查首页错误提示横幅")
+        print("\n[TEST] 检查首页错误提示横幅")
         driver.get(base_url)
         time.sleep(2)
 
@@ -330,7 +331,7 @@ class TestHomepageErrorBanner:
 @pytest.mark.e2e
 def test_js_console_errors(driver, base_url):
     """检查页面加载时的 JavaScript 错误"""
-    print(f"\n[TEST] 检查 JavaScript 控制台错误")
+    print("\n[TEST] 检查 JavaScript 控制台错误")
     driver.get(f"{base_url}/logs")
     time.sleep(3)
 
@@ -353,10 +354,7 @@ def test_js_console_errors(driver, base_url):
             print(f"    [WARN] {warn['message']}")
 
     # 检查是否有关键错误（排除网络错误）
-    critical_errors = [
-        e for e in errors
-        if "resolveAllErrors" in e["message"] or "deleteError" in e["message"]
-    ]
+    critical_errors = [e for e in errors if "resolveAllErrors" in e["message"] or "deleteError" in e["message"]]
 
     if critical_errors:
         print("  [FAIL] 发现关键 JavaScript 错误!")

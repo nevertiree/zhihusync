@@ -2,21 +2,20 @@
 批量操作功能的 E2E 测试 - 验证多选后批量导出和删除是否有效
 """
 
-import pytest
 import time
-import json
-from pathlib import Path
+
+import pytest
 
 # Skip all tests if selenium is not installed
 selenium = pytest.importorskip("selenium", reason="selenium not installed")
 
 from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
-from selenium.common.exceptions import TimeoutException, NoSuchElementException
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support.ui import WebDriverWait
 
 
 class TestBatchOperations:
@@ -37,6 +36,7 @@ class TestBatchOperations:
 
         try:
             from webdriver_manager.chrome import ChromeDriverManager
+
             service = Service(ChromeDriverManager().install())
             driver = webdriver.Chrome(service=service, options=chrome_options)
         except Exception:
@@ -64,7 +64,7 @@ class TestBatchOperations:
         print("\n=== 开始测试批量删除按钮 ===")
         # 清除缓存并重新加载
         driver.get(f"{base_url}/content")
-        driver.execute_cdp_cmd('Network.clearBrowserCache', {})
+        driver.execute_cdp_cmd("Network.clearBrowserCache", {})
         driver.refresh()
 
         # 等待页面加载
@@ -313,9 +313,7 @@ class TestBatchOperations:
             wait = WebDriverWait(driver, 10)
 
             # 等待至少一行数据
-            wait.until(
-                EC.presence_of_element_located((By.CSS_SELECTOR, "#answers-body tr[data-answer-id]"))
-            )
+            wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "#answers-body tr[data-answer-id]")))
 
             # 通过 JavaScript 获取第一个 answer ID
             first_answer_id = driver.execute_script(
@@ -328,14 +326,16 @@ class TestBatchOperations:
                 return
 
             # 使用 JavaScript 模拟选择
-            driver.execute_script(f"""
+            driver.execute_script(
+                f"""
                 // 模拟选择
                 selectedAnswers.add('{first_answer_id}');
                 updateBatchToolbar();
                 updateRowStyle('{first_answer_id}', true);
                 updateSelectAllCheckbox();
                 console.log('通过 JS 模拟选择完成，selectedAnswers:', Array.from(selectedAnswers));
-            """)
+            """
+            )
 
             time.sleep(1)
             driver.save_screenshot("tests/e2e/screenshots/batch_delete_js_select.png")
