@@ -14,7 +14,7 @@
     </div>
 </div>
 
-<!-- 筛选栏 -->
+<!-- 筛选栏 - 仅删除状态 -->
 <div class="card filter-card">
     <div class="card-body">
         <div class="filter-row">
@@ -24,39 +24,6 @@
                     <option value="">全部</option>
                     <option value="false">正常</option>
                     <option value="true">已删除</option>
-                </select>
-            </div>
-            <div class="filter-group">
-                <label>点赞数</label>
-                <div class="range-inputs">
-                    <input type="number" id="filter-vote-min" placeholder="最小" min="0" onchange="loadAnswers(1)">
-                    <span>-</span>
-                    <input type="number" id="filter-vote-max" placeholder="最大" min="0" onchange="loadAnswers(1)">
-                </div>
-            </div>
-            <div class="filter-group">
-                <label>评论数</label>
-                <div class="range-inputs">
-                    <input type="number" id="filter-comment-min" placeholder="最小" min="0" onchange="loadAnswers(1)">
-                    <span>-</span>
-                    <input type="number" id="filter-comment-max" placeholder="最大" min="0" onchange="loadAnswers(1)">
-                </div>
-            </div>
-            <div class="filter-group">
-                <label>排序</label>
-                <select id="filter-sort" onchange="loadAnswers(1)">
-                    <option value="liked_time">点赞时间</option>
-                    <option value="voteup_count">点赞数</option>
-                    <option value="comment_count">评论数</option>
-                    <option value="created_time">回答时间</option>
-                    <option value="synced_at">备份时间</option>
-                </select>
-            </div>
-            <div class="filter-group">
-                <label>顺序</label>
-                <select id="filter-order" onchange="loadAnswers(1)">
-                    <option value="desc">降序</option>
-                    <option value="asc">升序</option>
                 </select>
             </div>
             <button class="btn btn-secondary btn-sm" onclick="resetFilters()">重置筛选</button>
@@ -74,12 +41,39 @@
                         <th style="width: 80px;">用户</th>
                         <th style="width: 120px;">回答作者</th>
                         <th style="min-width: 200px;">问题标题</th>
-                        <th style="width: 60px;">点赞</th>
-                        <th style="width: 60px;">评论</th>
-                        <th style="width: 90px;">点赞时间</th>
-                        <th style="width: 90px;">回答时间</th>
+                        <th class="sortable-header" style="width: 70px;" data-sort="voteup_count">
+                            <div class="header-content">
+                                <span>点赞</span>
+                                <span class="sort-icon" id="sort-voteup_count">↕️</span>
+                            </div>
+                            <button class="filter-btn" onclick="openFilterModal('voteup')">🔍</button>
+                        </th>
+                        <th class="sortable-header" style="width: 70px;" data-sort="comment_count">
+                            <div class="header-content">
+                                <span>评论</span>
+                                <span class="sort-icon" id="sort-comment_count">↕️</span>
+                            </div>
+                            <button class="filter-btn" onclick="openFilterModal('comment')">🔍</button>
+                        </th>
+                        <th class="sortable-header" style="width: 100px;" data-sort="liked_time">
+                            <div class="header-content">
+                                <span>点赞时间</span>
+                                <span class="sort-icon" id="sort-liked_time">↓️</span>
+                            </div>
+                        </th>
+                        <th class="sortable-header" style="width: 100px;" data-sort="created_time">
+                            <div class="header-content">
+                                <span>回答时间</span>
+                                <span class="sort-icon" id="sort-created_time">↕️</span>
+                            </div>
+                        </th>
                         <th style="width: 90px;">修改时间</th>
-                        <th style="width: 90px;">备份时间</th>
+                        <th class="sortable-header" style="width: 100px;" data-sort="synced_at">
+                            <div class="header-content">
+                                <span>备份时间</span>
+                                <span class="sort-icon" id="sort-synced_at">↕️</span>
+                            </div>
+                        </th>
                         <th style="width: 140px;">操作</th>
                     </tr>
                 </thead>
@@ -114,6 +108,32 @@
                 <input type="number" id="page-input" min="1" placeholder="页码" onkeypress="if(event.key==='Enter')jumpToPage()">
                 <button class="btn btn-sm" onclick="jumpToPage()">确定</button>
             </div>
+        </div>
+    </div>
+</div>
+
+<!-- 列筛选模态框 -->
+<div class="modal" id="filter-modal">
+    <div class="modal-overlay" onclick="closeFilterModal()"></div>
+    <div class="modal-content modal-sm">
+        <div class="modal-header">
+            <h3 id="filter-modal-title">筛选</h3>
+            <button class="btn btn-icon" onclick="closeFilterModal()">✕</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label id="filter-min-label">最小值</label>
+                <input type="number" id="filter-modal-min" class="form-control" placeholder="不限" min="0">
+            </div>
+            <div class="form-group">
+                <label id="filter-max-label">最大值</label>
+                <input type="number" id="filter-modal-max" class="form-control" placeholder="不限" min="0">
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeFilterModal()">取消</button>
+            <button class="btn btn-danger" onclick="clearColumnFilter()">清除</button>
+            <button class="btn btn-primary" onclick="applyColumnFilter()">应用</button>
         </div>
     </div>
 </div>
@@ -183,6 +203,73 @@
     color: var(--text-secondary);
     padding: 10px 6px;
     white-space: nowrap;
+    position: relative;
+}
+
+/* 可排序表头 */
+.sortable-header {
+    cursor: pointer;
+    user-select: none;
+    background: var(--bg-secondary);
+    transition: background 0.2s;
+}
+
+.sortable-header:hover {
+    background: var(--border-color);
+}
+
+.sortable-header .header-content {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 4px;
+}
+
+.sortable-header .sort-icon {
+    font-size: 10px;
+    opacity: 0.5;
+    transition: opacity 0.2s;
+}
+
+.sortable-header.active-sort .sort-icon {
+    opacity: 1;
+    color: var(--primary);
+}
+
+/* 列筛选按钮 */
+.filter-btn {
+    position: absolute;
+    right: 2px;
+    top: 50%;
+    transform: translateY(-50%);
+    padding: 2px 4px;
+    font-size: 10px;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.sortable-header:hover .filter-btn {
+    opacity: 0.6;
+}
+
+.sortable-header:hover .filter-btn:hover {
+    opacity: 1;
+    background: var(--bg-primary);
+    border-radius: 4px;
+}
+
+.sortable-header.has-filter .filter-btn {
+    opacity: 1;
+    background: var(--primary);
+    border-radius: 4px;
+}
+
+/* 模态框小号 */
+.modal-sm {
+    max-width: 320px;
 }
 
 .detail-table td {
@@ -368,13 +455,13 @@
     background: #cf1322;
 }
 
-/* 筛选卡片 */
+/* 筛选卡片 - 简化版 */
 .filter-card {
     margin-bottom: 16px;
 }
 
 .filter-card .card-body {
-    padding: 16px 20px;
+    padding: 12px 20px;
 }
 
 .filter-row {
@@ -387,7 +474,7 @@
 .filter-group {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 4px;
 }
 
 .filter-group label {
@@ -396,34 +483,15 @@
     font-weight: 500;
 }
 
-.filter-group select,
-.filter-group input {
-    padding: 6px 10px;
+.filter-group select {
+    padding: 6px 12px;
     border: 1px solid var(--border-color);
     border-radius: 6px;
     font-size: 13px;
     background: var(--bg-primary);
     color: var(--text-primary);
-}
-
-.filter-group select {
-    min-width: 100px;
+    min-width: 120px;
     cursor: pointer;
-}
-
-.range-inputs {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-}
-
-.range-inputs input {
-    width: 70px;
-    text-align: center;
-}
-
-.range-inputs span {
-    color: var(--text-muted);
 }
 
 /* 分页容器 */
@@ -498,20 +566,9 @@
 
 @media (max-width: 768px) {
     .filter-row {
-        flex-direction: column;
-        align-items: stretch;
-    }
-    
-    .filter-group {
         flex-direction: row;
         align-items: center;
         justify-content: space-between;
-    }
-    
-    .filter-group select,
-    .filter-group .range-inputs {
-        flex: 1;
-        max-width: 200px;
     }
     
     .pagination-container {
@@ -523,6 +580,10 @@
     .pagination-jump {
         justify-content: center;
     }
+    
+    .sortable-header .filter-btn {
+        opacity: 0.6;
+    }
 }
 </style>
 {% endblock %}
@@ -533,6 +594,13 @@ let currentPage = 1;
 let totalPages = 1;
 let currentAnswerId = null;
 let currentAnswerTitle = '';
+
+// 排序和筛选状态
+let currentSort = 'liked_time';
+let currentOrder = 'desc';
+let voteupFilter = { min: null, max: null };
+let commentFilter = { min: null, max: null };
+let currentFilterColumn = null;
 
 // 格式化时间
 function formatTime(isoString) {
@@ -565,14 +633,8 @@ async function loadAnswers(page = 1) {
     const search = document.getElementById('search-input').value.trim();
     const pageSize = document.getElementById('page-size').value;
     
-    // 获取筛选参数
+    // 获取删除状态筛选
     const deleted = document.getElementById('filter-deleted').value;
-    const voteMin = document.getElementById('filter-vote-min').value;
-    const voteMax = document.getElementById('filter-vote-max').value;
-    const commentMin = document.getElementById('filter-comment-min').value;
-    const commentMax = document.getElementById('filter-comment-max').value;
-    const sort = document.getElementById('filter-sort').value;
-    const order = document.getElementById('filter-order').value;
 
     try {
         const tbody = document.getElementById('answers-body');
@@ -581,18 +643,26 @@ async function loadAnswers(page = 1) {
         let url = `/api/answers?page=${page}&page_size=${pageSize}`;
         if (search) url += `&search=${encodeURIComponent(search)}`;
         if (deleted) url += `&is_deleted=${deleted}`;
-        if (voteMin) url += `&voteup_min=${voteMin}`;
-        if (voteMax) url += `&voteup_max=${voteMax}`;
-        if (commentMin) url += `&comment_min=${commentMin}`;
-        if (commentMax) url += `&comment_max=${commentMax}`;
-        if (sort) url += `&sort=${sort}`;
-        if (order) url += `&order=${order}`;
+        
+        // 点赞数筛选
+        if (voteupFilter.min !== null) url += `&voteup_min=${voteupFilter.min}`;
+        if (voteupFilter.max !== null) url += `&voteup_max=${voteupFilter.max}`;
+        
+        // 评论数筛选
+        if (commentFilter.min !== null) url += `&comment_min=${commentFilter.min}`;
+        if (commentFilter.max !== null) url += `&comment_max=${commentFilter.max}`;
+        
+        // 排序
+        url += `&sort=${currentSort}&order=${currentOrder}`;
         
         const res = await fetch(url);
         const data = await res.json();
 
         totalPages = data.total_pages;
         document.getElementById('total-count').textContent = data.total.toLocaleString();
+        
+        // 更新排序图标
+        updateSortIcons();
 
         if (data.items.length === 0) {
             tbody.innerHTML = '<tr><td colspan="10" class="text-center text-muted">暂无数据</td></tr>';
@@ -701,6 +771,128 @@ function renderPagination() {
         ${currentPage === totalPages ? '' : `onclick="loadAnswers(${currentPage + 1})"`}>下一页</button>`;
 
     container.innerHTML = html;
+}
+
+// 更新排序图标显示
+function updateSortIcons() {
+    // 重置所有表头状态
+    document.querySelectorAll('.sortable-header').forEach(th => {
+        th.classList.remove('active-sort');
+        const sortField = th.getAttribute('data-sort');
+        const icon = document.getElementById(`sort-${sortField}`);
+        if (icon) {
+            if (sortField === currentSort) {
+                th.classList.add('active-sort');
+                icon.textContent = currentOrder === 'desc' ? '↓️' : '↑️';
+            } else {
+                icon.textContent = '↕️';
+            }
+        }
+    });
+    
+    // 更新筛选按钮状态
+    document.querySelectorAll('.sortable-header').forEach(th => {
+        th.classList.remove('has-filter');
+    });
+    
+    // 点赞数筛选按钮
+    if (voteupFilter.min !== null || voteupFilter.max !== null) {
+        const voteHeader = document.querySelector('[data-sort="voteup_count"]');
+        if (voteHeader) voteHeader.classList.add('has-filter');
+    }
+    
+    // 评论数筛选按钮
+    if (commentFilter.min !== null || commentFilter.max !== null) {
+        const commentHeader = document.querySelector('[data-sort="comment_count"]');
+        if (commentHeader) commentHeader.classList.add('has-filter');
+    }
+}
+
+// 列表头点击排序
+document.addEventListener('click', function(e) {
+    const th = e.target.closest('.sortable-header');
+    if (!th) return;
+    
+    // 如果点击的是筛选按钮，不触发排序
+    if (e.target.closest('.filter-btn')) return;
+    
+    const sortField = th.getAttribute('data-sort');
+    if (!sortField) return;
+    
+    if (currentSort === sortField) {
+        // 切换顺序
+        currentOrder = currentOrder === 'desc' ? 'asc' : 'desc';
+    } else {
+        // 新排序字段，默认降序
+        currentSort = sortField;
+        currentOrder = 'desc';
+    }
+    
+    loadAnswers(1);
+});
+
+// 打开列筛选模态框
+function openFilterModal(column) {
+    currentFilterColumn = column;
+    const modal = document.getElementById('filter-modal');
+    const title = document.getElementById('filter-modal-title');
+    const minLabel = document.getElementById('filter-min-label');
+    const maxLabel = document.getElementById('filter-max-label');
+    const minInput = document.getElementById('filter-modal-min');
+    const maxInput = document.getElementById('filter-modal-max');
+    
+    if (column === 'voteup') {
+        title.textContent = '筛选点赞数';
+        minLabel.textContent = '最小点赞数';
+        maxLabel.textContent = '最大点赞数';
+        minInput.value = voteupFilter.min ?? '';
+        maxInput.value = voteupFilter.max ?? '';
+    } else if (column === 'comment') {
+        title.textContent = '筛选评论数';
+        minLabel.textContent = '最小评论数';
+        maxLabel.textContent = '最大评论数';
+        minInput.value = commentFilter.min ?? '';
+        maxInput.value = commentFilter.max ?? '';
+    }
+    
+    modal.classList.add('active');
+}
+
+// 关闭列筛选模态框
+function closeFilterModal() {
+    document.getElementById('filter-modal').classList.remove('active');
+    currentFilterColumn = null;
+}
+
+// 应用列筛选
+function applyColumnFilter() {
+    const minVal = document.getElementById('filter-modal-min').value;
+    const maxVal = document.getElementById('filter-modal-max').value;
+    
+    if (currentFilterColumn === 'voteup') {
+        voteupFilter.min = minVal ? parseInt(minVal) : null;
+        voteupFilter.max = maxVal ? parseInt(maxVal) : null;
+    } else if (currentFilterColumn === 'comment') {
+        commentFilter.min = minVal ? parseInt(minVal) : null;
+        commentFilter.max = maxVal ? parseInt(maxVal) : null;
+    }
+    
+    closeFilterModal();
+    loadAnswers(1);
+}
+
+// 清除列筛选
+function clearColumnFilter() {
+    if (currentFilterColumn === 'voteup') {
+        voteupFilter.min = null;
+        voteupFilter.max = null;
+    } else if (currentFilterColumn === 'comment') {
+        commentFilter.min = null;
+        commentFilter.max = null;
+    }
+    
+    closeFilterModal();
+    loadAnswers(1);
 }
 
 // 删除回答
@@ -812,13 +1004,16 @@ function jumpToPage() {
 // 重置筛选器
 function resetFilters() {
     document.getElementById('filter-deleted').value = '';
-    document.getElementById('filter-vote-min').value = '';
-    document.getElementById('filter-vote-max').value = '';
-    document.getElementById('filter-comment-min').value = '';
-    document.getElementById('filter-comment-max').value = '';
-    document.getElementById('filter-sort').value = 'liked_time';
-    document.getElementById('filter-order').value = 'desc';
     document.getElementById('search-input').value = '';
+    
+    // 重置排序
+    currentSort = 'liked_time';
+    currentOrder = 'desc';
+    
+    // 重置列筛选
+    voteupFilter = { min: null, max: null };
+    commentFilter = { min: null, max: null };
+    
     loadAnswers(1);
 }
 
@@ -831,7 +1026,17 @@ function parseUrlParams() {
     if (filter === 'deleted') {
         document.getElementById('filter-deleted').value = 'true';
     }
-}
+    
+    // 处理排序参数
+    const sort = params.get('sort');
+    if (sort && ['liked_time', 'voteup_count', 'comment_count', 'created_time', 'synced_at'].includes(sort)) {
+        currentSort = sort;
+    }
+    const order = params.get('order');
+    if (order && ['asc', 'desc'].includes(order)) {
+        currentOrder = order;
+    }
+}}
 
 // 初始化
 document.addEventListener('DOMContentLoaded', function() {
