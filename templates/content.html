@@ -31,6 +31,18 @@
     </div>
 </div>
 
+<!-- 批量操作工具栏 -->
+<div class="batch-toolbar" id="batch-toolbar" style="display: none;">
+    <div class="batch-info">
+        <span>已选择 <strong id="selected-count">0</strong> 项</span>
+    </div>
+    <div class="batch-actions">
+        <button class="btn btn-primary" onclick="batchGenerateImages()">📸 批量导出图片</button>
+        <button class="btn btn-danger" onclick="batchDelete()">🗑️ 批量删除</button>
+        <button class="btn btn-secondary" onclick="clearSelection()">取消选择</button>
+    </div>
+</div>
+
 <!-- 内容列表 -->
 <div class="card">
     <div class="card-body">
@@ -38,6 +50,9 @@
             <table class="data-table detail-table">
                 <thead>
                     <tr>
+                        <th style="width: 40px;">
+                            <input type="checkbox" id="select-all" onclick="toggleSelectAll()" title="全选">
+                        </th>
                         <th style="width: 80px;">用户</th>
                         <th style="width: 120px;">回答作者</th>
                         <th style="min-width: 200px;">问题标题</th>
@@ -79,7 +94,7 @@
                 </thead>
                 <tbody id="answers-body">
                     <tr>
-                        <td colspan="10" class="text-center text-muted">加载中...</td>
+                        <td colspan="11" class="text-center text-muted">加载中...</td>
                     </tr>
                 </tbody>
             </table>
@@ -134,6 +149,52 @@
             <button class="btn btn-secondary" onclick="closeFilterModal()">取消</button>
             <button class="btn btn-danger" onclick="clearColumnFilter()">清除</button>
             <button class="btn btn-primary" onclick="applyColumnFilter()">应用</button>
+        </div>
+    </div>
+</div>
+
+<!-- 批量操作确认模态框 -->
+<div class="modal" id="batch-confirm-modal">
+    <div class="modal-overlay" onclick="closeBatchConfirmModal()"></div>
+    <div class="modal-content modal-sm">
+        <div class="modal-header">
+            <h3 id="batch-confirm-title">确认操作</h3>
+            <button class="btn btn-icon" onclick="closeBatchConfirmModal()">✕</button>
+        </div>
+        <div class="modal-body">
+            <p id="batch-confirm-message">确认要执行此操作吗？</p>
+            <div class="form-group" style="margin-top: 16px;">
+                <label class="checkbox-label" style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                    <input type="checkbox" id="batch-confirm-checkbox" style="width: 18px; height: 18px;">
+                    <span id="batch-confirm-checkbox-label">我已了解此操作的后果并确认执行</span>
+                </label>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeBatchConfirmModal()">取消</button>
+            <button class="btn btn-primary" id="batch-confirm-btn" onclick="executeBatchAction()" disabled>确认执行</button>
+        </div>
+    </div>
+</div>
+
+<!-- 批量导出进度模态框 -->
+<div class="modal" id="batch-export-modal">
+    <div class="modal-overlay"></div>
+    <div class="modal-content modal-md">
+        <div class="modal-header">
+            <h3>📸 批量导出图片中</h3>
+        </div>
+        <div class="modal-body">
+            <div class="progress-container" style="margin: 20px 0;">
+                <div class="progress-bar-container" style="background: var(--bg-secondary); border-radius: 8px; overflow: hidden; height: 24px;">
+                    <div class="progress-bar" id="batch-export-progress" style="width: 0%; height: 100%; background: linear-gradient(90deg, #667eea 0%, #764ba2 100%); transition: width 0.3s ease;"></div>
+                </div>
+                <p class="progress-text" id="batch-export-status" style="text-align: center; margin-top: 12px; color: var(--text-secondary);">准备中...</p>
+            </div>
+            <div id="batch-export-results" style="max-height: 200px; overflow-y: auto; margin-top: 16px;"></div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" id="batch-export-close-btn" onclick="closeBatchExportModal()" style="display: none;">关闭</button>
         </div>
     </div>
 </div>
@@ -455,6 +516,58 @@
     background: #cf1322;
 }
 
+/* 批量操作工具栏 */
+.batch-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 20px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 8px;
+    margin-bottom: 16px;
+    color: white;
+    animation: slideDown 0.3s ease;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.batch-info strong {
+    font-size: 18px;
+    margin: 0 4px;
+}
+
+.batch-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.batch-actions .btn {
+    font-size: 13px;
+    padding: 6px 12px;
+}
+
+/* 表格复选框 */
+.detail-table th input[type="checkbox"],
+.detail-table td input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+    accent-color: var(--primary);
+}
+
+.detail-table tr.selected-row {
+    background: rgba(102, 126, 234, 0.08);
+}
+
 /* 筛选卡片 - 简化版 */
 .filter-card {
     margin-bottom: 16px;
@@ -602,6 +715,10 @@ let voteupFilter = { min: null, max: null };
 let commentFilter = { min: null, max: null };
 let currentFilterColumn = null;
 
+// 批量操作状态
+let selectedAnswers = new Set();
+let currentBatchAction = null; // 'delete' 或 'export'
+
 // 格式化时间
 function formatTime(isoString) {
     if (!isoString) return '-';
@@ -638,7 +755,7 @@ async function loadAnswers(page = 1) {
 
     try {
         const tbody = document.getElementById('answers-body');
-        tbody.innerHTML = '<tr><td colspan="10" class="text-center">加载中...</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="11" class="text-center">加载中...</td></tr>';
 
         let url = `/api/answers?page=${page}&page_size=${pageSize}`;
         if (search) url += `&search=${encodeURIComponent(search)}`;
@@ -665,7 +782,7 @@ async function loadAnswers(page = 1) {
         updateSortIcons();
 
         if (data.items.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="10" class="text-center text-muted">暂无数据</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="11" class="text-center text-muted">暂无数据</td></tr>';
             renderPagination();
             return;
         }
@@ -1036,6 +1153,292 @@ function parseUrlParams() {
     if (order && ['asc', 'desc'].includes(order)) {
         currentOrder = order;
     }
+}
+
+// ==================== 批量操作功能 ====================
+
+// 切换选择单个回答
+function toggleSelectAnswer(answerId, checked) {
+    if (checked) {
+        selectedAnswers.add(answerId);
+    } else {
+        selectedAnswers.delete(answerId);
+    }
+    updateBatchToolbar();
+    updateRowStyle(answerId, checked);
+}
+
+// 全选/取消全选
+function toggleSelectAll() {
+    const selectAllCheckbox = document.getElementById('select-all');
+    const checkboxes = document.querySelectorAll('#answers-body input[type="checkbox"]');
+    
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = selectAllCheckbox.checked;
+        const row = checkbox.closest('tr');
+        const answerId = row.getAttribute('data-answer-id');
+        if (answerId) {
+            if (selectAllCheckbox.checked) {
+                selectedAnswers.add(answerId);
+            } else {
+                selectedAnswers.delete(answerId);
+            }
+            updateRowStyle(answerId, selectAllCheckbox.checked);
+        }
+    });
+    
+    updateBatchToolbar();
+}
+
+// 更新行样式
+function updateRowStyle(answerId, selected) {
+    const row = document.querySelector(`tr[data-answer-id="${answerId}"]`);
+    if (row) {
+        if (selected) {
+            row.classList.add('selected-row');
+        } else {
+            row.classList.remove('selected-row');
+        }
+    }
+}
+
+// 更新全选复选框状态
+function updateSelectAllCheckbox() {
+    const selectAllCheckbox = document.getElementById('select-all');
+    const checkboxes = document.querySelectorAll('#answers-body input[type="checkbox"]');
+    
+    if (checkboxes.length === 0) {
+        selectAllCheckbox.checked = false;
+        selectAllCheckbox.indeterminate = false;
+        return;
+    }
+    
+    const checkedCount = document.querySelectorAll('#answers-body input[type="checkbox"]:checked').length;
+    
+    if (checkedCount === 0) {
+        selectAllCheckbox.checked = false;
+        selectAllCheckbox.indeterminate = false;
+    } else if (checkedCount === checkboxes.length) {
+        selectAllCheckbox.checked = true;
+        selectAllCheckbox.indeterminate = false;
+    } else {
+        selectAllCheckbox.checked = false;
+        selectAllCheckbox.indeterminate = true;
+    }
+}
+
+// 更新批量操作工具栏
+function updateBatchToolbar() {
+    const toolbar = document.getElementById('batch-toolbar');
+    const selectedCount = document.getElementById('selected-count');
+    
+    selectedCount.textContent = selectedAnswers.size;
+    
+    if (selectedAnswers.size > 0) {
+        toolbar.style.display = 'flex';
+    } else {
+        toolbar.style.display = 'none';
+    }
+}
+
+// 清空选择
+function clearSelection() {
+    selectedAnswers.clear();
+    document.getElementById('select-all').checked = false;
+    document.getElementById('select-all').indeterminate = false;
+    
+    document.querySelectorAll('#answers-body input[type="checkbox"]').forEach(checkbox => {
+        checkbox.checked = false;
+    });
+    
+    document.querySelectorAll('#answers-body tr').forEach(row => {
+        row.classList.remove('selected-row');
+    });
+    
+    updateBatchToolbar();
+}
+
+// ==================== 批量删除 ====================
+
+function batchDelete() {
+    if (selectedAnswers.size === 0) {
+        showToast('请先选择要删除的项目', 'warning');
+        return;
+    }
+    
+    currentBatchAction = 'delete';
+    openBatchConfirmModal(
+        '确认批量删除',
+        `您确定要删除 <strong>${selectedAnswers.size}</strong> 条回答吗？<br><br>此操作<strong style="color: var(--danger);">不可恢复</strong>，请谨慎操作！`,
+        '我已了解删除后果并确认删除'
+    );
+}
+
+// ==================== 批量导出图片 ====================
+
+function batchGenerateImages() {
+    if (selectedAnswers.size === 0) {
+        showToast('请先选择要导出的项目', 'warning');
+        return;
+    }
+    
+    currentBatchAction = 'export';
+    openBatchConfirmModal(
+        '确认批量导出图片',
+        `您确定要导出 <strong>${selectedAnswers.size}</strong> 条回答的图片吗？<br><br>批量导出可能需要较长时间，请耐心等待。`,
+        '我已了解并确认导出'
+    );
+}
+
+// ==================== 双重确认模态框 ====================
+
+function openBatchConfirmModal(title, message, checkboxLabel) {
+    document.getElementById('batch-confirm-title').textContent = title;
+    document.getElementById('batch-confirm-message').innerHTML = message;
+    document.getElementById('batch-confirm-checkbox-label').textContent = checkboxLabel;
+    document.getElementById('batch-confirm-checkbox').checked = false;
+    document.getElementById('batch-confirm-btn').disabled = true;
+    
+    document.getElementById('batch-confirm-modal').classList.add('active');
+}
+
+function closeBatchConfirmModal() {
+    document.getElementById('batch-confirm-modal').classList.remove('active');
+    currentBatchAction = null;
+}
+
+// 监听确认复选框
+document.addEventListener('change', function(e) {
+    if (e.target.id === 'batch-confirm-checkbox') {
+        document.getElementById('batch-confirm-btn').disabled = !e.target.checked;
+    }
+});
+
+// 执行批量操作
+async function executeBatchAction() {
+    closeBatchConfirmModal();
+    
+    if (currentBatchAction === 'delete') {
+        await executeBatchDelete();
+    } else if (currentBatchAction === 'export') {
+        await executeBatchExport();
+    }
+}
+
+// 执行批量删除
+async function executeBatchDelete() {
+    const ids = Array.from(selectedAnswers);
+    let successCount = 0;
+    let failCount = 0;
+    
+    showToast(`开始删除 ${ids.length} 条回答...`, 'info');
+    
+    for (const answerId of ids) {
+        try {
+            const res = await fetch(`/api/answers/${answerId}`, { method: 'DELETE' });
+            if (res.ok) {
+                successCount++;
+                selectedAnswers.delete(answerId);
+            } else {
+                failCount++;
+            }
+        } catch (e) {
+            failCount++;
+        }
+    }
+    
+    if (successCount > 0) {
+        showToast(`成功删除 ${successCount} 条回答`, 'success');
+        loadAnswers(currentPage);
+    }
+    if (failCount > 0) {
+        showToast(`${failCount} 条删除失败`, 'error');
+    }
+    
+    clearSelection();
+}
+
+// 执行批量导出
+async function executeBatchExport() {
+    const ids = Array.from(selectedAnswers);
+    const modal = document.getElementById('batch-export-modal');
+    const progressBar = document.getElementById('batch-export-progress');
+    const statusText = document.getElementById('batch-export-status');
+    const resultsDiv = document.getElementById('batch-export-results');
+    const closeBtn = document.getElementById('batch-export-close-btn');
+    
+    modal.classList.add('active');
+    closeBtn.style.display = 'none';
+    resultsDiv.innerHTML = '';
+    
+    let successCount = 0;
+    let failCount = 0;
+    const results = [];
+    
+    for (let i = 0; i < ids.length; i++) {
+        const answerId = ids[i];
+        const progress = ((i + 1) / ids.length) * 100;
+        progressBar.style.width = `${progress}%`;
+        statusText.textContent = `正在导出 ${i + 1}/${ids.length}...`;
+        
+        try {
+            const res = await fetch(`/api/answers/${answerId}/generate-image?card_style=default&include_comments=false`, {
+                method: 'POST'
+            });
+            const data = await res.json();
+            
+            if (res.ok && data.status === 'success') {
+                successCount++;
+                results.push({
+                    answerId,
+                    success: true,
+                    imageUrl: data.image_url,
+                    title: data.title || answerId
+                });
+            } else {
+                failCount++;
+                results.push({
+                    answerId,
+                    success: false,
+                    error: data.detail || '生成失败'
+                });
+            }
+        } catch (e) {
+            failCount++;
+            results.push({
+                answerId,
+                success: false,
+                error: e.message
+            });
+        }
+        
+        // 添加小延迟避免请求过快
+        if (i < ids.length - 1) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+        }
+    }
+    
+    progressBar.style.width = '100%';
+    statusText.innerHTML = `完成！成功: <strong>${successCount}</strong>, 失败: <strong>${failCount}</strong>`;
+    
+    // 显示结果列表
+    resultsDiv.innerHTML = results.map(r => `
+        <div style="padding: 8px; margin: 4px 0; border-radius: 4px; background: ${r.success ? 'rgba(82, 196, 26, 0.1)' : 'rgba(255, 77, 79, 0.1)'}; display: flex; align-items: center; gap: 8px;">
+            <span>${r.success ? '✅' : '❌'}</span>
+            <span style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${r.title || r.answerId}</span>
+            ${r.success ? `<a href="${r.imageUrl}" target="_blank" class="btn btn-sm btn-primary" style="padding: 2px 8px; font-size: 12px;">查看</a>` : '<span style="color: var(--danger); font-size: 12px;">' + r.error + '</span>'}
+        </div>
+    `).join('');
+    
+    closeBtn.style.display = 'block';
+    
+    if (successCount > 0) {
+        showToast(`成功导出 ${successCount} 条回答图片`, 'success');
+    }
+}
+
+function closeBatchExportModal() {
+    document.getElementById('batch-export-modal').classList.remove('active');
 }
 
 // 初始化
