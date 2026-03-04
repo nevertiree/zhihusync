@@ -37,9 +37,9 @@
         <span>已选择 <strong id="selected-count">0</strong> 项</span>
     </div>
     <div class="batch-actions">
-        <button class="btn btn-primary" onclick="batchGenerateImages()">📸 批量导出图片</button>
-        <button class="btn btn-danger" onclick="batchDelete()">🗑️ 批量删除</button>
-        <button class="btn btn-secondary" onclick="clearSelection()">取消选择</button>
+        <button class="btn btn-primary" id="btn-batch-export" onclick="batchGenerateImages(); return false;">📸 批量导出图片</button>
+        <button class="btn btn-danger" id="btn-batch-delete" onclick="batchDelete(); return false;">🗑️ 批量删除</button>
+        <button class="btn btn-secondary" id="btn-clear-selection" onclick="clearSelection(); return false;">取消选择</button>
     </div>
 </div>
 
@@ -1279,12 +1279,16 @@ function batchDelete() {
         return;
     }
     
-    currentBatchAction = 'delete';
-    openBatchConfirmModal(
-        '确认批量删除',
-        `您确定要删除 <strong style="color: var(--danger); font-size: 18px;">${selectedAnswers.size}</strong> 条回答吗？<br><br>此操作<strong style="color: var(--danger);">不可恢复</strong>，请谨慎操作！`,
-        '我已了解删除后果并确认删除'
-    );
+    // 第一次确认
+    const firstConfirm = confirm(`确认删除 ${selectedAnswers.size} 条回答？\n\n此操作不可恢复！`);
+    if (!firstConfirm) return;
+    
+    // 第二次确认
+    const secondConfirm = confirm(`再次确认：你真的要删除这 ${selectedAnswers.size} 条回答吗？\n\n删除后无法恢复！`);
+    if (!secondConfirm) return;
+    
+    // 执行删除
+    executeBatchDelete();
 }
 
 // ==================== 批量导出图片 ====================
@@ -1295,12 +1299,16 @@ function batchGenerateImages() {
         return;
     }
     
-    currentBatchAction = 'export';
-    openBatchConfirmModal(
-        '确认批量导出图片',
-        `您确定要导出 <strong>${selectedAnswers.size}</strong> 条回答的图片吗？<br><br>批量导出可能需要较长时间，请耐心等待。`,
-        '我已了解并确认导出'
-    );
+    // 第一次确认
+    const firstConfirm = confirm(`确认导出 ${selectedAnswers.size} 条回答的图片？\n\n批量导出可能需要较长时间。`);
+    if (!firstConfirm) return;
+    
+    // 第二次确认
+    const secondConfirm = confirm(`再次确认：开始导出 ${selectedAnswers.size} 条回答的图片？`);
+    if (!secondConfirm) return;
+    
+    // 执行导出
+    executeBatchExport();
 }
 
 // ==================== 双重确认模态框 ====================
