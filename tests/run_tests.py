@@ -7,6 +7,7 @@
     python run_tests.py unit         # 只运行单元测试
     python run_tests.py api          # 只运行API测试
     python run_tests.py e2e          # 只运行E2E测试
+    python run_tests.py errors       # 只运行提取错误功能测试
     python run_tests.py full         # 运行包括全量同步在内的完整测试
 """
 
@@ -99,6 +100,29 @@ def run_sync_tests():
     )
 
 
+def run_extraction_error_tests():
+    """运行提取错误功能测试"""
+    if not check_service_running():
+        print("❌ 服务未运行，请先启动Docker服务")
+        return False
+
+    results = []
+
+    # API 测试
+    results.append(run_command(
+        [sys.executable, "-m", "pytest", "integration/test_extraction_errors_api.py", "-v", "-m", "integration"],
+        "运行提取错误 API 测试"
+    ))
+
+    # E2E 测试
+    results.append(run_command(
+        [sys.executable, "-m", "pytest", "e2e/test_extraction_errors.py", "-v", "-m", "e2e"],
+        "运行提取错误 E2E 测试"
+    ))
+
+    return all(results)
+
+
 def run_all_tests():
     """运行所有测试"""
     results = []
@@ -148,7 +172,7 @@ def main():
         "type",
         nargs="?",
         default="all",
-        choices=["all", "unit", "api", "e2e", "sync", "full"],
+        choices=["all", "unit", "api", "e2e", "sync", "full", "errors"],
         help="测试类型"
     )
     parser.add_argument(
@@ -171,6 +195,8 @@ def main():
         success = run_e2e_tests()
     elif args.type == "sync":
         success = run_sync_tests()
+    elif args.type == "errors":
+        success = run_extraction_error_tests()
     elif args.type == "full":
         sys.argv.append("--with-sync")
         success = run_all_tests() == 0

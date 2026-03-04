@@ -101,3 +101,59 @@ dev:
 install:
 	pip install -r requirements.txt
 	playwright install chromium
+
+# ========== 测试命令 ==========
+
+# 运行所有测试
+test:
+	pytest tests/ -v --tb=short
+
+# 运行单元测试
+test-unit:
+	pytest tests/unit/ -v --tb=short -m unit
+
+# 运行集成测试（需要服务运行）
+test-integration:
+	pytest tests/integration/ -v --tb=short -m integration
+
+# 运行 E2E 测试（需要浏览器和服务）
+test-e2e:
+	pytest tests/e2e/ -v --tb=short -m e2e --headed
+
+# 运行 E2E 测试（无头模式，适合 CI）
+test-e2e-ci:
+	pytest tests/e2e/ -v --tb=short -m e2e
+
+# 测试提取错误功能（特定测试）
+test-errors:
+	pytest tests/e2e/test_extraction_errors.py -v --tb=short --headed -s
+
+# 生成测试报告
+test-report:
+	pytest tests/ -v --html=tests/report.html --self-contained-html
+
+# 启动测试服务器（后台运行，用于测试）
+test-server:
+	@echo "启动测试服务器..."
+	@cd src && python -c "
+import threading
+import time
+from app import app
+import uvicorn
+
+def run_server():
+    uvicorn.run(app, host='127.0.0.1', port=6067, log_level='error')
+
+server_thread = threading.Thread(target=run_server, daemon=True)
+server_thread.start()
+time.sleep(2)
+print('测试服务器已启动于 http://127.0.0.1:6067')
+while True:
+    time.sleep(1)
+" &
+	@echo "服务器 PID: $$!"
+
+# 停止测试服务器
+stop-test-server:
+	@pkill -f "python -c" 2>/dev/null || true
+	@echo "测试服务器已停止"

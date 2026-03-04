@@ -11,6 +11,7 @@ from config_loader import load_config
 from crawler import ZhihuCrawler
 from db import Answer, DatabaseManager, SyncLog
 from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -23,10 +24,11 @@ from timezone_utils import get_beijing_now
 # 全局状态
 app_state: dict[str, Any] = {
     "sync_task": None,
-    "sync_status": "idle",  # idle, running, success, failed
+    "sync_status": "idle",  # idle, running, success, failed, stopping
     "sync_progress": 0,
     "sync_message": "",
     "last_sync": None,
+    "stop_requested": False,  # 停止请求标志
 }
 
 # 加载配置
@@ -62,6 +64,15 @@ app = FastAPI(
     description="知乎点赞内容备份工具的管理界面",
     version="0.1.0",
     lifespan=lifespan,
+)
+
+# 配置 CORS - 允许浏览器扩展访问
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # 允许所有来源（浏览器扩展）
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # 静态文件和模板
@@ -127,7 +138,8 @@ class ConfigUpdate(BaseModel):
 class CookieUpdate(BaseModel):
     """Cookie 更新请求模型."""
 
-    cookies: str  # JSON 格式的 cookies
+    cookies: str  # Cookie 数据
+    format: str = "auto"  # 格式: auto, json, netscape, header, keyvalue
 
 
 class SyncResponse(BaseModel):
@@ -144,7 +156,13 @@ class StatsResponse(BaseModel):
     total_answers: int
     total_comments: int
     with_comments: int
+    comment_anomaly: int  # 评论采集异常数
+    comment_errors: int  # 评论错误数
     deleted_answers: int
+    extraction_errors: int
+    failed_downloads: int
+    pending_downloads: int
+    unresolved_failures: int
     last_sync: str | None
     sync_status: str
 
@@ -211,11 +229,20 @@ async def get_stats():
     finally:
         session.close()
 
+    # 获取提取错误数量
+    error_count = db.get_extraction_error_count(resolved=False)
+
     return StatsResponse(
         total_answers=stats["total_answers"],
         total_comments=stats["total_comments"],
         with_comments=stats["with_comments"],
+        comment_anomaly=stats.get("comment_anomaly", 0),
+        comment_errors=stats.get("comment_errors", 0),
         deleted_answers=stats["deleted_answers"],
+        extraction_errors=error_count,
+        failed_downloads=stats.get("failed_downloads", 0),
+        pending_downloads=stats.get("pending_downloads", 0),
+        unresolved_failures=stats.get("unresolved_failures", 0),
         last_sync=last_sync,
         sync_status=app_state["sync_status"],
     )
@@ -488,27 +515,15 @@ async def update_config(config_update: ConfigUpdate):
 
 @app.post("/api/cookies")
 async def update_cookies(cookie_update: CookieUpdate):
-    """更新 Cookie - 支持多种格式（EditThisCookie 数组 或 Playwright storage_state）"""
+    """更新 Cookie - 支持多种格式（JSON/TXT/Header/KeyValue）"""
     try:
-        # 解析 cookies
-        cookies_data = json.loads(cookie_update.cookies)
+        from cookie_parser import parse_cookies, validate_zhihu_cookies
 
-        # 处理 EditThisCookie 格式（数组）转换为 Playwright storage_state 格式
-        if isinstance(cookies_data, list):
-            # EditThisCookie 格式 - 转换为 Playwright format
-            storage_state = {"cookies": cookies_data, "origins": []}
-        elif isinstance(cookies_data, dict):
-            # 已经是 storage_state 格式或类似格式
-            if "cookies" in cookies_data:
-                storage_state = cookies_data
-            else:
-                # 可能是其他格式，包装成 storage_state
-                storage_state = {
-                    "cookies": ([cookies_data] if not isinstance(cookies_data.get("name"), list) else []),
-                    "origins": [],
-                }
-        else:
-            raise ValueError("不支持的 Cookie 格式")
+        # 解析 cookies（支持多种格式）
+        storage_state = parse_cookies(cookie_update.cookies, cookie_update.format)
+
+        # 验证关键 cookie
+        is_valid, msg, missing = validate_zhihu_cookies(storage_state)
 
         # 保存到文件
         cookie_file = get_cookie_file_path()
@@ -518,10 +533,27 @@ async def update_cookies(cookie_update: CookieUpdate):
             json.dump(storage_state, f, indent=2, ensure_ascii=False)
 
         cookie_count = len(storage_state.get("cookies", []))
-        return {"status": "success", "message": f"Cookie 已保存 ({cookie_count} 条)"}
-    except json.JSONDecodeError as e:
-        raise HTTPException(status_code=400, detail=f"无效的 JSON 格式: {str(e)}")
+
+        # 构建响应消息
+        if is_valid:
+            if missing:
+                message = f"Cookie 已保存 ({cookie_count} 条) - {msg}"
+            else:
+                message = f"Cookie 已保存 ({cookie_count} 条)"
+        else:
+            message = f"Cookie 已保存 ({cookie_count} 条) - ⚠️ {msg}"
+
+        return {
+            "status": "success",
+            "message": message,
+            "cookie_count": cookie_count,
+            "valid": is_valid,
+            "missing": missing,
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=f"格式解析失败: {str(e)}")
     except Exception as e:
+        logger.exception("保存 Cookie 失败")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -615,6 +647,10 @@ async def do_sync(sync_type: str = "manual"):
     log_id = db.create_sync_log(user_id=config.zhihu.user_id, sync_type=sync_type)
 
     try:
+        # 停止检查回调
+        def stop_check():
+            return app_state.get("stop_requested", False)
+
         async with ZhihuCrawler(
             user_id=config.zhihu.user_id,
             db_manager=db,
@@ -622,6 +658,7 @@ async def do_sync(sync_type: str = "manual"):
             headless=True,
             request_delay=config.browser.request_delay,
             max_comments=config.zhihu.max_comments,
+            stop_check_callback=stop_check,
         ) as crawler:
 
             def progress_callback(current, total):
@@ -655,6 +692,15 @@ async def do_sync(sync_type: str = "manual"):
             app_state["sync_status"] = "success"
             app_state["sync_message"] = f"同步完成! 新增 {new_items} 条, 更新 {updated_items} 条"
             app_state["last_sync"] = get_beijing_now().isoformat()
+
+    except RuntimeError as e:
+        # 预检查失败等已知错误
+        error_msg = str(e)
+        db.update_sync_log(log_id=log_id, status="failed", error_message=error_msg)
+        app_state["sync_status"] = "failed"
+        app_state["sync_message"] = error_msg
+        logger.error(f"同步任务失败: {error_msg}")
+        # 不抛出异常，让前端能看到错误状态
 
     except Exception as e:
         db.update_sync_log(log_id=log_id, status="failed", error_message=str(e))
@@ -692,10 +738,29 @@ async def get_sync_status():
 @app.post("/api/sync/stop")
 async def stop_sync():
     """停止同步"""
+    if app_state["sync_status"] != "running":
+        return {"status": "idle", "message": "没有正在运行的同步任务"}
+
+    # 设置停止标志，通知爬虫优雅停止
+    app_state["stop_requested"] = True
+    app_state["sync_status"] = "stopping"
+    app_state["sync_message"] = "正在停止同步..."
+
+    # 如果任务还在运行，等待一段时间后再取消
     if app_state["sync_task"] and not app_state["sync_task"].done():
-        app_state["sync_task"].cancel()
-        app_state["sync_status"] = "idle"
-        app_state["sync_message"] = "同步已取消"
+        try:
+            # 等待 5 秒让爬虫优雅停止
+            await asyncio.wait_for(app_state["sync_task"], timeout=5.0)
+        except asyncio.TimeoutError:
+            # 超时后强制取消
+            app_state["sync_task"].cancel()
+        except asyncio.CancelledError:
+            pass
+
+    # 重置状态
+    app_state["sync_status"] = "idle"
+    app_state["stop_requested"] = False
+    app_state["sync_message"] = "同步已手动停止"
 
     return {"status": "stopped", "message": "同步任务已停止"}
 
@@ -730,6 +795,10 @@ async def start_init_sync():
                     app_state["sync_progress"] = current
                 app_state["sync_message"] = f"已处理 {current} 条点赞..."
 
+            # 停止检查回调
+            def stop_check():
+                return app_state.get("stop_requested", False)
+
             async with ZhihuCrawler(
                 user_id=config.zhihu.user_id,
                 db_manager=db,
@@ -737,6 +806,7 @@ async def start_init_sync():
                 headless=True,
                 request_delay=config.browser.request_delay,
                 max_comments=config.zhihu.max_comments,
+                stop_check_callback=stop_check,
             ) as crawler:
                 # 【全量采集模式】
                 # - 穷尽所有点赞记录（max_items=-1 无限制）
@@ -761,6 +831,14 @@ async def start_init_sync():
             app_state["sync_message"] = f"全量同步完成! 新增 {new_items} 条, 更新 {updated_items} 条"
             app_state["last_sync"] = get_beijing_now().isoformat()
 
+        except RuntimeError as e:
+            # 预检查失败等已知错误
+            error_msg = str(e)
+            logger.error(f"全量同步失败: {error_msg}")
+            db.update_sync_log(log_id=log_id, status="failed", error_message=error_msg)
+            app_state["sync_status"] = "failed"
+            app_state["sync_message"] = error_msg
+
         except Exception as e:
             logger.exception(f"全量同步失败: {e}")
             db.update_sync_log(log_id=log_id, status="failed", error_message=str(e))
@@ -782,6 +860,8 @@ async def get_answers(
     page_size: int = 20,
     search: str = "",
     is_deleted: bool | None = None,
+    download_status: str | None = None,
+    comment_anomaly: bool | None = None,
     voteup_min: int | None = None,
     voteup_max: int | None = None,
     comment_min: int | None = None,
@@ -801,6 +881,14 @@ async def get_answers(
         # 删除状态筛选
         if is_deleted is not None:
             query = query.filter(Answer.is_deleted == is_deleted)
+
+        # 下载状态筛选
+        if download_status:
+            query = query.filter(Answer.download_status == download_status)
+
+        # 评论异常筛选（预期有评论但实际未获取的）
+        if comment_anomaly:
+            query = query.filter(Answer.comment_count > 0, Answer.has_comments == False)
 
         # 点赞数范围筛选
         if voteup_min is not None:
@@ -1106,6 +1194,397 @@ async def delete_image(filename: str):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============ 提取错误管理 API ============
+
+
+@app.get("/api/extraction-errors")
+async def get_extraction_errors(page: int = 1, page_size: int = 20, resolved: bool = False):
+    """获取内容提取错误列表.
+
+    Args:
+        page: 页码.
+        page_size: 每页数量.
+        resolved: 是否包含已解决的错误.
+
+    Returns:
+        错误列表和总数.
+    """
+    from models import ExtractionError
+
+    session = db.get_session()
+    try:
+        query = session.query(ExtractionError)
+        if not resolved:
+            query = query.filter_by(resolved=False)
+
+        total = query.count()
+        errors = query.order_by(ExtractionError.created_at.desc()).offset((page - 1) * page_size).limit(page_size).all()
+
+        return {
+            "items": [
+                {
+                    "id": e.id,
+                    "answer_id": e.answer_id,
+                    "question_title": e.question_title,
+                    "error_type": e.error_type,
+                    "error_message": e.error_message,
+                    "created_at": e.created_at.isoformat() if e.created_at else None,
+                    "resolved": e.resolved,
+                }
+                for e in errors
+            ],
+            "total": total,
+            "page": page,
+            "page_size": page_size,
+        }
+    finally:
+        session.close()
+
+
+@app.post("/api/extraction-errors/{error_id}/resolve")
+async def resolve_extraction_error(error_id: int):
+    """标讹提取错误为已解决.
+
+    Args:
+        error_id: 错误记录ID.
+
+    Returns:
+        操作结果.
+    """
+    success = db.resolve_extraction_error(error_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="错误记录不存在")
+    return {"status": "success", "message": "已标记为已解决"}
+
+
+@app.post("/api/extraction-errors/resolve-all")
+async def resolve_all_extraction_errors():
+    """标讹所有提取错误为已解决.
+
+    Returns:
+        操作结果.
+    """
+    count = db.resolve_all_extraction_errors()
+    if count == 0:
+        return {"status": "success", "message": "没有未解决的错误记录"}
+    return {"status": "success", "message": f"已标记 {count} 条错误为已解决"}
+
+
+@app.delete("/api/extraction-errors/{error_id}")
+async def delete_extraction_error(error_id: int):
+    """删除提取错误记录.
+
+    Args:
+        error_id: 错误记录ID.
+
+    Returns:
+        操作结果.
+    """
+    success = db.delete_extraction_error(error_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="错误记录不存在")
+    return {"status": "success", "message": "错误记录已删除"}
+
+
+# ============ 下载失败管理 API ============
+
+
+@app.get("/api/download-failures")
+async def get_download_failures(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    resolved: bool = Query(False),
+    user_id: str | None = None,
+):
+    """获取下载失败列表.
+
+    Args:
+        page: 页码.
+        page_size: 每页数量.
+        resolved: 是否包含已解决的.
+        user_id: 过滤用户ID.
+
+    Returns:
+        下载失败列表.
+    """
+    from models import DownloadFailure
+
+    session = db.get_session()
+    try:
+        query = session.query(DownloadFailure)
+        if not resolved:
+            query = query.filter_by(resolved=False)
+        if user_id:
+            query = query.filter_by(user_id=user_id)
+
+        total = query.count()
+        failures = (
+            query.order_by(DownloadFailure.created_at.desc()).offset((page - 1) * page_size).limit(page_size).all()
+        )
+
+        return {
+            "items": [
+                {
+                    "id": f.id,
+                    "answer_id": f.answer_id,
+                    "question_title": f.question_title,
+                    "user_id": f.user_id,
+                    "question_id": f.question_id,
+                    "error_type": f.error_type,
+                    "error_message": f.error_message,
+                    "http_status": f.http_status,
+                    "retry_count": f.retry_count,
+                    "max_retries": f.max_retries,
+                    "last_retry_at": f.last_retry_at.isoformat() if f.last_retry_at else None,
+                    "resolved": f.resolved,
+                    "resolved_at": f.resolved_at.isoformat() if f.resolved_at else None,
+                    "created_at": f.created_at.isoformat() if f.created_at else None,
+                }
+                for f in failures
+            ],
+            "total": total,
+            "page": page,
+            "page_size": page_size,
+            "total_pages": (total + page_size - 1) // page_size,
+        }
+    finally:
+        session.close()
+
+
+@app.get("/api/download-failures/stats")
+async def get_download_failure_stats():
+    """获取下载失败统计.
+
+    Returns:
+        下载失败统计信息.
+    """
+    return db.get_download_failure_stats()
+
+
+@app.post("/api/download-failures/{failure_id}/retry")
+async def retry_download_failure(failure_id: int):
+    """重试单个下载失败.
+
+    Args:
+        failure_id: 失败记录ID.
+
+    Returns:
+        重试结果.
+    """
+    from models import DownloadFailure
+
+    session = db.get_session()
+    try:
+        failure = session.query(DownloadFailure).filter_by(id=failure_id).first()
+        if not failure:
+            raise HTTPException(status_code=404, detail="失败记录不存在")
+
+        if failure.resolved:
+            return {"status": "skipped", "message": "该记录已解决"}
+
+        answer_id = failure.answer_id
+    finally:
+        session.close()
+
+    # 启动重试任务
+    async def do_retry():
+        try:
+            async with ZhihuCrawler(
+                user_id=config.zhihu.user_id,
+                db_manager=db,
+                storage_manager=storage,
+                headless=True,
+                request_delay=config.browser.request_delay,
+            ) as crawler:
+                result = await crawler.retry_specific_answer(answer_id)
+                return result
+        except Exception as e:
+            logger.exception(f"重试下载失败: {e}")
+            return {"success": False, "message": str(e)}
+
+    result = await do_retry()
+    return {"status": "success" if result.get("success") else "failed", "data": result}
+
+
+@app.post("/api/download-failures/retry-all")
+async def retry_all_download_failures(max_items: int = Query(50, ge=1, le=100)):
+    """批量重试所有失败的下载.
+
+    Args:
+        max_items: 最大重试数量.
+
+    Returns:
+        重试结果.
+    """
+    if app_state["sync_status"] == "running":
+        return {"status": "error", "message": "已有同步任务在运行"}
+
+    async def do_batch_retry():
+        try:
+            app_state["sync_status"] = "running"
+            app_state["sync_message"] = "正在重试失败的下载..."
+
+            async with ZhihuCrawler(
+                user_id=config.zhihu.user_id,
+                db_manager=db,
+                storage_manager=storage,
+                headless=True,
+                request_delay=config.browser.request_delay,
+            ) as crawler:
+                stats = await crawler.retry_failed_downloads(max_items=max_items)
+
+            app_state["sync_status"] = "success"
+            app_state["sync_message"] = f"重试完成: 成功 {stats['success']} 条"
+            return stats
+        except Exception as e:
+            logger.exception(f"批量重试失败: {e}")
+            app_state["sync_status"] = "failed"
+            app_state["sync_message"] = f"重试失败: {e}"
+            raise
+        finally:
+            if app_state["sync_status"] == "running":
+                app_state["sync_status"] = "idle"
+
+    # 创建异步任务
+    asyncio.create_task(do_batch_retry())
+    return {"status": "started", "message": f"开始批量重试，最多处理 {max_items} 条"}
+
+
+@app.post("/api/download-failures/{failure_id}/resolve")
+async def resolve_download_failure_api(failure_id: int):
+    """标记下载失败为已解决.
+
+    Args:
+        failure_id: 失败记录ID.
+
+    Returns:
+        操作结果.
+    """
+    success = db.resolve_download_failure(failure_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="失败记录不存在")
+    return {"status": "success", "message": "已标记为已解决"}
+
+
+@app.post("/api/answers/{answer_id}/retry")
+async def retry_answer_download(answer_id: str):
+    """重试特定回答的下载.
+
+    Args:
+        answer_id: 回答ID.
+
+    Returns:
+        重试结果.
+    """
+    answer = db.get_answer_by_id(answer_id)
+    if not answer:
+        raise HTTPException(status_code=404, detail="回答不存在")
+
+    async def do_retry():
+        try:
+            async with ZhihuCrawler(
+                user_id=answer.user_id or config.zhihu.user_id,
+                db_manager=db,
+                storage_manager=storage,
+                headless=True,
+                request_delay=config.browser.request_delay,
+            ) as crawler:
+                result = await crawler.retry_specific_answer(answer_id)
+                return result
+        except Exception as e:
+            logger.exception(f"重试下载失败: {e}")
+            return {"success": False, "message": str(e)}
+
+    result = await do_retry()
+    if result.get("success"):
+        return {"status": "success", "message": "下载成功", "data": result}
+    else:
+        raise HTTPException(status_code=400, detail=result.get("message", "下载失败"))
+
+
+@app.post("/api/comments/retry-anomaly")
+async def retry_comment_anomaly():
+    """重新采集评论异常的回答.
+
+    获取所有 comment_count > 0 但 has_comments = False 的回答，
+    重新尝试采集它们的评论。
+
+    Returns:
+        重试结果.
+    """
+    if app_state["sync_status"] == "running":
+        return {"status": "error", "message": "已有同步任务在运行"}
+
+    async def do_retry():
+        try:
+            app_state["sync_status"] = "running"
+            app_state["sync_message"] = "正在重新采集评论异常项..."
+
+            # 获取评论异常的回答列表
+            from models import Answer
+
+            session = db.get_session()
+            try:
+                anomaly_answers = (
+                    session.query(Answer).filter(Answer.comment_count > 0, Answer.has_comments == False).all()
+                )
+            finally:
+                session.close()
+
+            if not anomaly_answers:
+                return {"status": "success", "message": "没有评论异常项需要处理"}
+
+            total = len(anomaly_answers)
+            success_count = 0
+            fail_count = 0
+
+            async with ZhihuCrawler(
+                user_id=config.zhihu.user_id,
+                db_manager=db,
+                storage_manager=storage,
+                headless=True,
+                request_delay=config.browser.request_delay,
+            ) as crawler:
+                for i, answer in enumerate(anomaly_answers):
+                    app_state["sync_message"] = f"正在采集评论 ({i+1}/{total}): {answer.question_title[:30]}..."
+
+                    try:
+                        result = await crawler.process_comments(answer.id)
+                        if result.get("success"):
+                            success_count += 1
+                        else:
+                            fail_count += 1
+
+                        # 间隔延迟避免请求过快
+                        await asyncio.sleep(2)
+                    except Exception as e:
+                        logger.warning(f"采集评论失败 [{answer.id}]: {e}")
+                        fail_count += 1
+
+            app_state["sync_status"] = "success"
+            app_state["sync_message"] = f"评论重采完成: 成功 {success_count}, 失败 {fail_count}"
+
+            return {
+                "status": "success",
+                "message": f"处理完成: 成功 {success_count} 条, 失败 {fail_count} 条",
+                "total": total,
+                "success": success_count,
+                "failed": fail_count,
+            }
+        except Exception as e:
+            logger.exception(f"评论重采失败: {e}")
+            app_state["sync_status"] = "failed"
+            app_state["sync_message"] = f"评论重采失败: {e}"
+            raise
+        finally:
+            if app_state["sync_status"] == "running":
+                app_state["sync_status"] = "idle"
+
+    # 创建异步任务
+    asyncio.create_task(do_retry())
+    return {"status": "started", "message": "开始重新采集评论异常项"}
 
 
 # 启动函数

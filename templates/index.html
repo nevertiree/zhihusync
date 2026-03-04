@@ -53,32 +53,46 @@
 <div class="page-header">
     <h2>📊 仪表盘</h2>
     <div class="sync-actions">
-        <div class="sync-btn-group">
+        <div class="sync-btn-group" id="normal-sync-group">
             <button class="btn btn-primary" id="sync-btn" onclick="startSync()" title="增量同步：只同步新增的点赞">
                 <span class="icon">🔄</span>
                 <span id="sync-btn-text">立即同步</span>
             </button>
             <div class="sync-btn-desc">只同步新增点赞，适合日常使用</div>
         </div>
-        <div class="sync-btn-group">
+        <div class="sync-btn-group" id="full-sync-group">
             <button class="btn btn-warning" id="full-sync-btn" onclick="startFullSyncWithFeedback(this)" title="全量同步：重新爬取全部历史点赞">
                 <span class="icon">🚀</span>
                 <span id="full-sync-btn-text">全量同步</span>
             </button>
             <div class="sync-btn-desc" style="color: #d48806;">穷尽所有点赞，适合首次使用</div>
         </div>
+        <!-- 停止按钮：同步进行时显示 -->
+        <div class="sync-btn-group" id="stop-sync-group" style="display: none;">
+            <button class="btn btn-danger" id="stop-sync-btn" onclick="stopSync()" title="停止本次采集">
+                <span class="icon">⏹️</span>
+                <span>停止采集</span>
+            </button>
+            <div class="sync-btn-desc" style="color: #dc4446;">优雅停止当前采集任务</div>
+        </div>
     </div>
 </div>
 
-<!-- 统计卡片 -->
-<div class="stats-grid">
-    <div class="stat-card clickable" onclick="location.href='/content'" title="点击查看明细">
-        <div class="stat-icon">📄</div>
-        <div class="stat-content">
-            <div class="stat-value" id="stat-answers">-</div>
-            <div class="stat-label">已备份回答</div>
+<!-- 采集错误提示 -->
+<div class="error-alert-banner" id="error-alert-banner" style="display: none;" onclick="location.href='/logs#errors-section'">
+    <div class="error-alert-content">
+        <span class="error-alert-icon">⚠️</span>
+        <div class="error-alert-text">
+            <span class="error-alert-title">发现 <strong id="error-count">0</strong> 条内容提取失败</span>
+            <span class="error-alert-subtitle">点击查看详情并排查问题</span>
         </div>
+        <span class="error-alert-arrow">→</span>
     </div>
+</div>
+
+<!-- 统计卡片 - 布局：含评论/总回答 | 已删贴 | 采集异常 | 关注用户 -->
+<div class="stats-grid">
+    <!-- 1. 含评论/总回答 -->
     <div class="stat-card clickable" onclick="location.href='/content'" title="点击查看明细">
         <div class="stat-icon">💬</div>
         <div class="stat-content">
@@ -86,19 +100,58 @@
             <div class="stat-label">含评论/总回答</div>
         </div>
     </div>
+    
+    <!-- 2. 已删除(404) -->
     <div class="stat-card clickable" onclick="location.href='/content?filter=deleted'" title="点击查看已删除">
-        <div class="stat-icon">⚠️</div>
+        <div class="stat-icon">🗑️</div>
         <div class="stat-content">
             <div class="stat-value" id="stat-deleted">-</div>
-            <div class="stat-label">已删除(404)</div>
+            <div class="stat-label">已删贴</div>
         </div>
     </div>
+    
+    <!-- 3. 采集异常（评论异常+下载失败） -->
+    <div class="stat-card clickable" onclick="location.href='/content?filter=anomaly'" title="点击查看采集异常" id="stat-anomaly-card" style="display: none;">
+        <div class="stat-icon">🚨</div>
+        <div class="stat-content">
+            <div class="stat-value" id="stat-anomaly">-</div>
+            <div class="stat-label">采集异常</div>
+        </div>
+    </div>
+    
+    <!-- 4. 监控用户 -->
     <div class="stat-card clickable" onclick="location.href='/config'" title="点击管理用户">
         <div class="stat-icon">👥</div>
         <div class="stat-content">
             <div class="stat-value" id="stat-users">-</div>
-            <div class="stat-label">监控用户</div>
+            <div class="stat-label">关注用户</div>
         </div>
+    </div>
+</div>
+
+<!-- 采集异常警告提示（置顶） -->
+<div class="error-alert-banner alert-danger" id="comment-anomaly-banner" style="display: none;">
+    <div class="error-alert-content">
+        <span class="error-alert-icon">🚨</span>
+        <div class="error-alert-text">
+            <span class="error-alert-title">发现 <strong id="comment-anomaly-count">0</strong> 条评论采集异常</span>
+            <span class="error-alert-subtitle">预期有评论但实际获取数量不符，可能存在403限制</span>
+        </div>
+        <button class="btn btn-danger" onclick="retryCommentAnomaly()" style="margin-right: 12px;">🔄 重新采集评论</button>
+        <span class="error-alert-arrow" onclick="location.href='/content?filter=anomaly'" style="cursor: pointer;">→</span>
+    </div>
+</div>
+
+<!-- 下载失败警告提示 -->
+<div class="error-alert-banner" id="download-failed-banner" style="display: none;">
+    <div class="error-alert-content">
+        <span class="error-alert-icon">❌</span>
+        <div class="error-alert-text">
+            <span class="error-alert-title">发现 <strong id="failed-count">0</strong> 条内容下载失败</span>
+            <span class="error-alert-subtitle">部分内容因网络问题（403等）未能成功备份</span>
+        </div>
+        <button class="btn btn-warning" onclick="retryFailedDownloads()" id="retry-failed-btn" style="margin-right: 12px;">🔄 重新采集</button>
+        <span class="error-alert-arrow" onclick="location.href='/content?filter=failed'" style="cursor: pointer;">→</span>
     </div>
 </div>
 
@@ -525,6 +578,141 @@
     color: var(--warning);
 }
 
+/* 下载失败横幅 - 橙色警告 */
+.error-alert-banner {
+    background: linear-gradient(135deg, #faad14 0%, #d48806 100%);
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin-bottom: 20px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 12px rgba(250, 173, 20, 0.3);
+}
+
+.error-alert-banner:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(250, 173, 20, 0.4);
+}
+
+.error-alert-content {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: white;
+}
+
+.error-alert-icon {
+    font-size: 24px;
+    flex-shrink: 0;
+}
+
+.error-alert-text {
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1;
+    gap: 4px;
+}
+
+.error-alert-title {
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.error-alert-title strong {
+    font-size: 20px;
+    margin: 0 4px;
+}
+
+.error-alert-subtitle {
+    font-size: 13px;
+    opacity: 0.9;
+}
+
+.error-alert-arrow {
+    font-size: 20px;
+    opacity: 0.8;
+    transition: transform 0.2s ease;
+}
+
+.error-alert-banner:hover .error-alert-arrow {
+    transform: translateX(4px);
+}
+
+/* 统计卡片 - 下载失败样式 */
+#stat-failed-card {
+    background: linear-gradient(135deg, #fff7e6 0%, #fff1b8 100%);
+    border: 1px solid #ffd591;
+}
+
+#stat-failed-card .stat-icon {
+    background: linear-gradient(135deg, #faad14 0%, #d48806 100%);
+    color: white;
+}
+
+#stat-failed-card .stat-value {
+    color: #d48806;
+}
+
+/* 错误提示横幅 - 原有红色样式 */
+.error-alert-banner.danger {
+    background: linear-gradient(135deg, #ff4d4f 0%, #f5222d 100%);
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin-bottom: 20px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 12px rgba(245, 34, 45, 0.3);
+}
+
+.error-alert-banner:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(245, 34, 45, 0.4);
+}
+
+.error-alert-content {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: white;
+}
+
+.error-alert-icon {
+    font-size: 24px;
+    flex-shrink: 0;
+}
+
+.error-alert-text {
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1;
+    gap: 4px;
+}
+
+.error-alert-title {
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.error-alert-title strong {
+    font-size: 20px;
+    margin: 0 4px;
+}
+
+.error-alert-subtitle {
+    font-size: 13px;
+    opacity: 0.9;
+}
+
+.error-alert-arrow {
+    font-size: 20px;
+    opacity: 0.8;
+    transition: transform 0.2s ease;
+}
+
+.error-alert-banner:hover .error-alert-arrow {
+    transform: translateX(4px);
+}
+
 </style>
 
 <script>
@@ -669,15 +857,108 @@ async function loadStats() {
         const res = await fetch('/api/stats');
         const data = await res.json();
 
-        document.getElementById('stat-answers').textContent = data.total_answers.toLocaleString();
+        // 更新统计卡片（注意：不存在 stat-answers 元素）
         document.getElementById('stat-with-comments').textContent = data.with_comments.toLocaleString();
         document.getElementById('stat-total-with-comments').textContent = data.total_answers.toLocaleString();
         document.getElementById('stat-deleted').textContent = data.deleted_answers.toLocaleString();
+        
+        // 更新采集异常卡片（如果有）
+        const anomalyCard = document.getElementById('stat-anomaly-card');
+        const anomalyValue = document.getElementById('stat-anomaly');
+        if (anomalyCard && anomalyValue) {
+            const totalAnomaly = (data.comment_anomaly || 0) + (data.failed_downloads || 0);
+            if (totalAnomaly > 0) {
+                anomalyValue.textContent = totalAnomaly.toLocaleString();
+                anomalyCard.style.display = 'flex';
+            } else {
+                anomalyCard.style.display = 'none';
+            }
+        }
+
+        // 更新错误提示横幅
+        const errorBanner = document.getElementById('error-alert-banner');
+        const errorCount = document.getElementById('error-count');
+        if (data.extraction_errors > 0) {
+            errorCount.textContent = data.extraction_errors;
+            errorBanner.style.display = 'block';
+        } else {
+            errorBanner.style.display = 'none';
+        }
+        
+        // 更新评论异常横幅
+        const commentAnomalyBanner = document.getElementById('comment-anomaly-banner');
+        const commentAnomalyCount = document.getElementById('comment-anomaly-count');
+        if (commentAnomalyBanner && commentAnomalyCount) {
+            if ((data.comment_anomaly || 0) + (data.comment_errors || 0) > 0) {
+                commentAnomalyBanner.style.display = 'block';
+                commentAnomalyCount.textContent = (data.comment_anomaly || 0) + (data.comment_errors || 0);
+            } else {
+                commentAnomalyBanner.style.display = 'none';
+            }
+        }
+        
+        // 更新下载失败统计
+        const failedBanner = document.getElementById('download-failed-banner');
+        const failedCountBanner = document.getElementById('failed-count');
+        const totalFailed = (data.failed_downloads || 0) + (data.pending_downloads || 0);
+        
+        if (totalFailed > 0) {
+            failedBanner.style.display = 'block';
+            failedCountBanner.textContent = totalFailed;
+        } else {
+            failedBanner.style.display = 'none';
+        }
 
         // 更新侧边栏状态
         updateSidebarStatus(data.sync_status);
     } catch (e) {
         console.error('加载统计失败:', e);
+    }
+}
+
+// 重新采集评论异常
+async function retryCommentAnomaly() {
+    try {
+        showToast('开始重新采集评论异常项...', 'info');
+        
+        const res = await fetch('/api/comments/retry-anomaly', { method: 'POST' });
+        const data = await res.json();
+        
+        if (res.ok) {
+            showToast(data.message || '已开始重新采集评论', 'success');
+            setTimeout(loadStats, 3000);
+        } else {
+            showToast(data.detail || '启动失败', 'error');
+        }
+    } catch (e) {
+        showToast('启动失败: ' + e.message, 'error');
+    }
+}
+
+// 重新采集失败的下载
+async function retryFailedDownloads() {
+    const btn = document.getElementById('retry-failed-btn');
+    const originalText = btn.textContent;
+    
+    try {
+        btn.textContent = '⏳ 采集中...';
+        btn.disabled = true;
+        
+        const res = await fetch('/api/download-failures/retry-all?max_items=50', { method: 'POST' });
+        const data = await res.json();
+        
+        if (res.ok) {
+            showToast('已开始重新采集失败的下载', 'success');
+            // 刷新统计
+            setTimeout(loadStats, 2000);
+        } else {
+            showToast(data.detail || '启动失败', 'error');
+        }
+    } catch (e) {
+        showToast('启动失败: ' + e.message, 'error');
+    } finally {
+        btn.textContent = originalText;
+        btn.disabled = false;
     }
 }
 
@@ -690,21 +971,32 @@ async function checkSyncStatus() {
         const syncCard = document.getElementById('sync-card');
         const syncBtn = document.getElementById('sync-btn');
         const syncBtnText = document.getElementById('sync-btn-text');
+        const normalSyncGroup = document.getElementById('normal-sync-group');
+        const fullSyncGroup = document.getElementById('full-sync-group');
+        const stopSyncGroup = document.getElementById('stop-sync-group');
 
-        if (data.status === 'running') {
+        if (data.status === 'running' || data.status === 'stopping') {
+            // 同步中：显示停止按钮，隐藏其他按钮
             if (syncCard) syncCard.style.display = 'block';
+            if (normalSyncGroup) normalSyncGroup.style.display = 'none';
+            if (fullSyncGroup) fullSyncGroup.style.display = 'none';
+            if (stopSyncGroup) stopSyncGroup.style.display = 'flex';
             if (syncBtn) {
                 syncBtn.disabled = true;
                 const btnText = syncBtn.querySelector('#sync-btn-text');
-                if (btnText) btnText.textContent = '同步中...';
+                if (btnText) btnText.textContent = data.status === 'stopping' ? '停止中...' : '同步中...';
             }
             const progressBar = document.getElementById('sync-progress-bar');
             const progressText = document.getElementById('sync-progress-text');
             if (progressBar) progressBar.style.width = data.progress + '%';
             if (progressText) progressText.textContent = data.message;
-            updateSidebarStatus('running');
+            updateSidebarStatus(data.status);
         } else {
+            // 未运行：显示正常按钮，隐藏停止按钮
             if (syncCard) syncCard.style.display = 'none';
+            if (normalSyncGroup) normalSyncGroup.style.display = 'flex';
+            if (fullSyncGroup) fullSyncGroup.style.display = 'flex';
+            if (stopSyncGroup) stopSyncGroup.style.display = 'none';
             if (syncBtn) {
                 syncBtn.disabled = false;
                 const btnText = syncBtn.querySelector('#sync-btn-text');
@@ -790,12 +1082,32 @@ async function startFullSync() {
 
 // 停止同步
 async function stopSync() {
+    const stopBtn = document.getElementById('stop-sync-btn');
     try {
-        await fetch('/api/sync/stop', { method: 'POST' });
-        showToast('同步已停止', 'info');
-        checkSyncStatus();
+        // 禁用按钮，防止重复点击
+        if (stopBtn) {
+            stopBtn.disabled = true;
+            stopBtn.innerHTML = '<span class="icon">⏳</span><span>停止中...</span>';
+        }
+        
+        const res = await fetch('/api/sync/stop', { method: 'POST' });
+        const data = await res.json();
+        
+        if (res.ok) {
+            showToast(data.message || '同步已停止', 'success');
+        } else {
+            showToast(data.detail || '停止失败', 'error');
+        }
+        
+        // 延迟刷新状态，让后端有时间处理
+        setTimeout(checkSyncStatus, 1000);
+        setTimeout(loadStats, 1500);
     } catch (e) {
         showToast('停止失败: ' + e.message, 'error');
+        if (stopBtn) {
+            stopBtn.disabled = false;
+            stopBtn.innerHTML = '<span class="icon">⏹️</span><span>停止采集</span>';
+        }
     }
 }
 

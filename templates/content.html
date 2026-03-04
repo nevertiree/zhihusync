@@ -14,7 +14,7 @@
     </div>
 </div>
 
-<!-- 筛选栏 - 仅删除状态 -->
+<!-- 筛选栏 - 删除状态和下载状态 -->
 <div class="card filter-card">
     <div class="card-body">
         <div class="filter-row">
@@ -26,7 +26,19 @@
                     <option value="true">已删除</option>
                 </select>
             </div>
-            <button class="btn btn-secondary btn-sm" onclick="resetFilters()">重置筛选</button>
+            <div class="filter-group">
+                <label>下载状态</label>
+                <select id="filter-download-status" onchange="loadAnswers(1)">
+                    <option value="">全部</option>
+                    <option value="success">已下载</option>
+                    <option value="failed">下载失败</option>
+                    <option value="pending">等待下载</option>
+                </select>
+            </div>
+            <div class="filter-actions">
+                <button class="btn btn-secondary btn-sm" onclick="resetFilters()">重置筛选</button>
+                <button class="btn btn-warning btn-sm" id="btn-retry-failed" onclick="retryFailedInFilter()" style="display: none;">🔄 重试失败项</button>
+            </div>
         </div>
     </div>
 </div>
@@ -83,6 +95,7 @@
                             </div>
                         </th>
                         <th style="width: 90px;">修改时间</th>
+                        <th style="width: 80px;">下载状态</th>
                         <th class="sortable-header" style="width: 100px;" data-sort="synced_at">
                             <div class="header-content">
                                 <span>备份时间</span>
@@ -608,6 +621,48 @@
     cursor: pointer;
 }
 
+.filter-actions {
+    display: flex;
+    gap: 8px;
+    margin-left: auto;
+}
+
+/* 状态徽章 */
+.badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 500;
+    min-width: 24px;
+}
+
+.badge-success {
+    background: rgba(82, 196, 26, 0.1);
+    color: var(--success);
+}
+
+.badge-danger {
+    background: rgba(255, 77, 79, 0.1);
+    color: var(--danger);
+}
+
+.badge-warning {
+    background: rgba(250, 173, 20, 0.1);
+    color: var(--warning);
+}
+
+.badge-secondary {
+    background: rgba(0, 0, 0, 0.05);
+    color: var(--text-secondary);
+}
+
+.status-cell {
+    text-align: center;
+}
+
 /* 分页容器 */
 .pagination-container {
     display: flex;
@@ -745,6 +800,66 @@ function formatDate(isoString) {
     });
 }
 
+// 获取下载状态徽章
+function getDownloadStatusBadge(status, htmlPath) {
+    if (htmlPath) {
+        return '<span class="badge badge-success" title="已下载">✓</span>';
+    }
+    switch (status) {
+        case 'failed':
+            return '<span class="badge badge-danger" title="下载失败">✗</span>';
+        case 'pending':
+            return '<span class="badge badge-warning" title="等待下载">⏳</span>';
+        case 'skipped':
+            return '<span class="badge badge-secondary" title="已跳过">⊘</span>';
+        default:
+            return '<span class="badge badge-warning" title="等待下载">⏳</span>';
+    }
+}
+
+// 重新下载单个回答
+async function retryAnswerDownload(answerId) {
+    try {
+        showToast('开始重新下载...', 'info');
+        const res = await fetch(`/api/answers/${answerId}/retry`, { method: 'POST' });
+        const data = await res.json();
+        
+        if (res.ok) {
+            showToast('下载成功', 'success');
+            loadAnswers(currentPage);
+        } else {
+            showToast(data.detail || '下载失败', 'error');
+        }
+    } catch (e) {
+        showToast('下载失败: ' + e.message, 'error');
+    }
+}
+
+// 重新下载筛选中的失败项
+async function retryFailedInFilter() {
+    const downloadStatus = document.getElementById('filter-download-status').value;
+    if (!downloadStatus || downloadStatus === 'success') {
+        showToast('请先选择下载失败或等待下载筛选', 'warning');
+        return;
+    }
+    
+    try {
+        showToast('开始批量重新下载...', 'info');
+        const res = await fetch('/api/download-failures/retry-all?max_items=50', { method: 'POST' });
+        const data = await res.json();
+        
+        if (res.ok) {
+            showToast('批量重新下载已启动', 'success');
+            // 刷新列表
+            setTimeout(() => loadAnswers(currentPage), 3000);
+        } else {
+            showToast(data.detail || '启动失败', 'error');
+        }
+    } catch (e) {
+        showToast('启动失败: ' + e.message, 'error');
+    }
+}
+
 // 加载回答列表
 async function loadAnswers(page = 1) {
     currentPage = page;
@@ -753,6 +868,17 @@ async function loadAnswers(page = 1) {
     
     // 获取删除状态筛选
     const deleted = document.getElementById('filter-deleted').value;
+    
+    // 获取下载状态筛选
+    const downloadStatus = document.getElementById('filter-download-status').value;
+    
+    // 显示/隐藏重试按钮
+    const retryBtn = document.getElementById('btn-retry-failed');
+    if (downloadStatus === 'failed' || downloadStatus === 'pending') {
+        retryBtn.style.display = 'inline-block';
+    } else {
+        retryBtn.style.display = 'none';
+    }
 
     try {
         const tbody = document.getElementById('answers-body');
@@ -761,6 +887,7 @@ async function loadAnswers(page = 1) {
         let url = `/api/answers?page=${page}&page_size=${pageSize}`;
         if (search) url += `&search=${encodeURIComponent(search)}`;
         if (deleted) url += `&is_deleted=${deleted}`;
+        if (downloadStatus) url += `&download_status=${downloadStatus}`;
         
         // 点赞数筛选
         if (voteupFilter.min !== null) url += `&voteup_min=${voteupFilter.min}`;
@@ -831,6 +958,7 @@ async function loadAnswers(page = 1) {
                     <td class="time-cell">${formatTime(item.liked_time)}</td>
                     <td class="time-cell">${formatDate(item.created_time)}</td>
                     <td class="time-cell">${formatDate(item.updated_time)}</td>
+                    <td class="status-cell">${getDownloadStatusBadge(item.download_status, item.html_path)}</td>
                     <td class="time-cell">${formatTime(item.synced_at)}</td>
                     <td class="actions-cell">
                         ${item.html_path ? `
@@ -839,7 +967,9 @@ async function loadAnswers(page = 1) {
                             <button class="btn btn-screenshot"
                                     onclick="openImageModal('${item.id}', '${escapeHtml(title)}')"
                                     title="截图">📷</button>
-                        ` : '<span class="text-muted">-</span>'}
+                        ` : item.download_status === 'failed' ? `
+                            <button class="btn btn-warning" onclick="retryAnswerDownload('${item.id}')" title="重新下载">🔄</button>
+                        ` : '<span class="text-muted" title="等待下载">⏳</span>'}
                         <button class="btn btn-delete" onclick="deleteAnswer('${item.id}', '${escapeHtml(title)}')" title="删除">🗑</button>
                     </td>
                 </tr>
@@ -1132,6 +1262,7 @@ function jumpToPage() {
 // 重置筛选器
 function resetFilters() {
     document.getElementById('filter-deleted').value = '';
+    document.getElementById('filter-download-status').value = '';
     document.getElementById('search-input').value = '';
     
     // 重置排序
@@ -1153,6 +1284,9 @@ function parseUrlParams() {
     const filter = params.get('filter');
     if (filter === 'deleted') {
         document.getElementById('filter-deleted').value = 'true';
+    } else if (filter === 'failed') {
+        // 下载失败筛选
+        document.getElementById('filter-download-status').value = 'failed';
     }
     
     // 处理排序参数

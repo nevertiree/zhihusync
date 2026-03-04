@@ -93,6 +93,9 @@ class Answer(Base):
         original_url: 原始URL.
         has_comments: 是否已保存评论.
         is_deleted: 是否已被知乎删除.
+        download_status: 下载状态(success/failed/pending).
+        retry_count: 重试次数.
+        last_error: 最后一次错误信息.
         extra_meta: 额外元数据.
         user: 关联的用户对象.
         comments: 关联的评论列表.
@@ -129,6 +132,9 @@ class Answer(Base):
     # 状态标记
     has_comments = Column(Boolean, default=False, comment="是否已保存评论")
     is_deleted = Column(Boolean, default=False, comment="是否已被知乎删除")
+    download_status = Column(String(20), default="pending", comment="下载状态: success/failed/pending/skipped")
+    retry_count = Column(Integer, default=0, comment="重试次数")
+    last_error = Column(Text, nullable=True, comment="最后一次错误信息")
 
     # 额外元数据
     extra_meta = Column(JSON, default=dict, comment="额外元数据")
@@ -143,6 +149,7 @@ class Answer(Base):
         Index("idx_author_id", "author_id"),
         Index("idx_liked_time", "liked_time"),
         Index("idx_synced_at", "synced_at"),
+        Index("idx_download_status", "download_status"),
     )
 
 
@@ -303,3 +310,95 @@ class AlertHistory(Base):
     status = Column(String(20), comment="状态: success/failed")
     error_info = Column(Text, nullable=True, comment="错误信息")
     created_at = Column(DateTime, default=get_beijing_now_naive, comment="创建时间")
+
+
+class ExtractionError(Base):
+    """内容提取错误记录表.
+
+    记录采集过程中内容提取失败的错误信息，便于用户发现和调试问题。
+
+    Attributes:
+        id: 错误记录ID，主键，自增.
+        answer_id: 回答ID.
+        question_title: 问题标题.
+        error_type: 错误类型(parse_error/network_error/timeout/other).
+        error_message: 错误详情.
+        stack_trace: 错误堆栈.
+        html_snapshot: HTML快照(可选).
+        created_at: 创建时间.
+        resolved: 是否已解决.
+        resolved_at: 解决时间.
+    """
+
+    __tablename__ = "extraction_errors"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    answer_id = Column(String(50), nullable=True, comment="回答ID")
+    question_title = Column(String(500), nullable=True, comment="问题标题")
+    error_type = Column(String(50), comment="错误类型: parse_error/network_error/timeout/other")
+    error_message = Column(Text, comment="错误详情")
+    stack_trace = Column(Text, nullable=True, comment="错误堆栈")
+    html_snapshot = Column(Text, nullable=True, comment="HTML快照")
+    created_at = Column(DateTime, default=get_beijing_now_naive, comment="创建时间")
+    resolved = Column(Boolean, default=False, comment="是否已解决")
+    resolved_at = Column(DateTime, nullable=True, comment="解决时间")
+
+    __table_args__ = (
+        Index("idx_error_created_at", "created_at"),
+        Index("idx_error_resolved", "resolved"),
+        Index("idx_error_type", "error_type"),
+    )
+
+
+class DownloadFailure(Base):
+    """下载失败记录表.
+
+    记录因403等网络错误导致的下载失败，支持重试机制。
+
+    Attributes:
+        id: 记录ID，主键，自增.
+        answer_id: 回答ID.
+        question_title: 问题标题.
+        user_id: 所属用户ID.
+        question_id: 问题ID.
+        error_type: 错误类型(403/404/timeout/network_error/other).
+        error_message: 错误详情.
+        http_status: HTTP状态码.
+        retry_count: 已重试次数.
+        max_retries: 最大重试次数.
+        last_retry_at: 最后重试时间.
+        resolved: 是否已解决.
+        resolved_at: 解决时间.
+        created_at: 创建时间.
+    """
+
+    __tablename__ = "download_failures"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    answer_id = Column(String(50), nullable=False, comment="回答ID")
+    question_title = Column(String(500), nullable=True, comment="问题标题")
+    user_id = Column(String(50), ForeignKey("users.id"), nullable=False, comment="所属用户ID")
+    question_id = Column(String(50), nullable=True, comment="问题ID")
+
+    # 错误信息
+    error_type = Column(String(50), comment="错误类型: 403/404/timeout/network_error/other")
+    error_message = Column(Text, comment="错误详情")
+    http_status = Column(Integer, nullable=True, comment="HTTP状态码")
+
+    # 重试相关
+    retry_count = Column(Integer, default=0, comment="已重试次数")
+    max_retries = Column(Integer, default=3, comment="最大重试次数")
+    last_retry_at = Column(DateTime, nullable=True, comment="最后重试时间")
+
+    # 状态
+    resolved = Column(Boolean, default=False, comment="是否已解决")
+    resolved_at = Column(DateTime, nullable=True, comment="解决时间")
+    created_at = Column(DateTime, default=get_beijing_now_naive, comment="创建时间")
+
+    __table_args__ = (
+        Index("idx_download_failure_answer_id", "answer_id"),
+        Index("idx_download_failure_user_id", "user_id"),
+        Index("idx_download_failure_resolved", "resolved"),
+        Index("idx_download_failure_error_type", "error_type"),
+        Index("idx_download_failure_created_at", "created_at"),
+    )
