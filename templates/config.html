@@ -7,25 +7,6 @@
     <h2>⚙️ 配置管理</h2>
 </div>
 
-<!-- 配置指南折叠面板 -->
-<div class="card card-collapsible" id="guide-card">
-    <div class="card-header" onclick="toggleGuide()">
-        <h3>📖 配置指南</h3>
-        <span class="toggle-icon" id="guide-toggle-icon">▼</span>
-    </div>
-    <div class="card-body" id="guide-body" style="display: none;">
-        <div class="guide-content-compact">
-            <h4>🔑 配置 Cookie（必需）</h4>
-            <ol>
-                <li>打开浏览器，访问 <a href="https://www.zhihu.com" target="_blank">zhihu.com</a> 并登录</li>
-                <li>按 <kbd>F12</kbd> 打开开发者工具 → Application → Cookies → zhihu.com</li>
-                <li>右键复制全部 Cookie，粘贴到下方"手动配置"中</li>
-            </ol>
-            <p class="guide-tip">💡 建议安装浏览器扩展实现一键获取 Cookie</p>
-        </div>
-    </div>
-</div>
-
 <!-- 状态概览栏 -->
 <div class="status-bar">
     <div class="status-item" id="status-cookie">
@@ -66,6 +47,31 @@
 
 <!-- Cookie 配置 -->
 <div class="tab-content active" id="tab-cookie">
+    <!-- Cookie配置指南 -->
+    <div class="card">
+        <div class="card-header">
+            <h3>📖 Cookie 配置指南</h3>
+        </div>
+        <div class="card-body compact">
+            <div class="guide-section">
+                <h4>🔑 获取 Cookie 的步骤</h4>
+                <ol class="guide-steps">
+                    <li>打开浏览器，访问 <a href="https://www.zhihu.com" target="_blank">zhihu.com</a> 并登录</li>
+                    <li>按 <kbd>F12</kbd> 打开开发者工具 → Application → Cookies → zhihu.com</li>
+                    <li>右键复制全部 Cookie，粘贴到下方"手动配置"中</li>
+                </ol>
+                <p class="guide-tip">💡 建议安装浏览器扩展实现一键获取 Cookie（见下方"浏览器扩展"卡片）</p>
+                
+                <h4 style="margin-top: 16px;">⚠️ 注意事项</h4>
+                <ul class="guide-notes">
+                    <li>Cookie 有效期通常为 1-3 个月，过期后需要重新配置</li>
+                    <li>如果同步失败，请先测试 Cookie 是否有效</li>
+                    <li>请勿泄露您的 Cookie，它包含登录凭证</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
     <!-- 自动获取 -->
     <div class="card">
         <div class="card-header">
@@ -139,6 +145,67 @@
 
 <!-- 采集配置 -->
 <div class="tab-content" id="tab-collection">
+    <!-- 采集模式说明 -->
+    <div class="card">
+        <div class="card-header">
+            <h3>📖 采集模式说明</h3>
+        </div>
+        <div class="card-body compact">
+            <div class="sync-modes">
+                <!-- 普通采集 -->
+                <div class="sync-mode-card">
+                    <div class="sync-mode-header normal">
+                        <span class="sync-mode-icon">🔄</span>
+                        <h4>普通采集</h4>
+                        <span class="sync-mode-badge">日常使用</span>
+                    </div>
+                    <div class="sync-mode-content">
+                        <ul>
+                            <li><strong>触发方式：</strong>定时自动触发或手工点击"立即同步"</li>
+                            <li><strong>停止条件：</strong>遇到已存在的重复数据时自动停止</li>
+                            <li><strong>适用场景：</strong>日常增量同步，只获取新增的点赞</li>
+                            <li><strong>404处理：</strong>未下载过的404回答会保存为删除状态记录</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- 全量采集 -->
+                <div class="sync-mode-card">
+                    <div class="sync-mode-header full">
+                        <span class="sync-mode-icon">🚀</span>
+                        <h4>全量采集</h4>
+                        <span class="sync-mode-badge badge-warning">首次推荐</span>
+                    </div>
+                    <div class="sync-mode-content">
+                        <ul>
+                            <li><strong>触发方式：</strong>仅手工点击"全量同步"按钮</li>
+                            <li><strong>停止条件：</strong>穷尽用户的所有点赞记录为止</li>
+                            <li><strong>适用场景：</strong>初次使用或需要完整备份时</li>
+                            <li><strong>404处理：</strong>未下载过的404回答直接跳过（节省空间）</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 特殊说明 -->
+            <div class="sync-special-notes" style="margin-top: 20px; padding: 16px; background: #fafafa; border-radius: 8px;">
+                <h4>⚠️ 特殊情况说明</h4>
+                <div class="note-item">
+                    <strong>初次使用：</strong>
+                    <p>数据库为空时，普通采集等同于全量采集。建议直接使用<span class="highlight">"全量同步"</span>以获得最佳效果。</p>
+                </div>
+                <div class="note-item">
+                    <strong>404回答处理策略：</strong>
+                    <ul style="margin-top: 8px; padding-left: 18px;">
+                        <li><span class="highlight-green">本地已下载过：</span>高亮标注删除状态，<strong>保留原内容</strong>，不会被404页面覆盖</li>
+                        <li><span class="highlight-orange">本地未下载过（全量）：</span>直接跳过，节省存储空间</li>
+                        <li><span class="highlight-blue">本地未下载过（普通）：</span>保存删除状态记录（用于数据完整性）</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="card">
         <div class="card-header">
             <h3>⚙️ 采集参数</h3>
@@ -682,6 +749,186 @@
 
 .list-item:last-child {
     margin-bottom: 0;
+}
+
+/* 采集模式说明样式 */
+.sync-modes {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+}
+
+@media (max-width: 768px) {
+    .sync-modes {
+        grid-template-columns: 1fr;
+    }
+}
+
+.sync-mode-card {
+    border: 1px solid #e8e8e8;
+    border-radius: 12px;
+    overflow: hidden;
+    background: white;
+}
+
+.sync-mode-header {
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border-bottom: 1px solid #e8e8e8;
+}
+
+.sync-mode-header.normal {
+    background: linear-gradient(135deg, rgba(0, 102, 255, 0.05) 0%, rgba(0, 102, 255, 0.1) 100%);
+}
+
+.sync-mode-header.full {
+    background: linear-gradient(135deg, rgba(250, 173, 20, 0.05) 0%, rgba(250, 173, 20, 0.1) 100%);
+}
+
+.sync-mode-icon {
+    font-size: 24px;
+}
+
+.sync-mode-header h4 {
+    flex: 1;
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.sync-mode-badge {
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 500;
+    background: rgba(82, 196, 26, 0.1);
+    color: var(--success);
+}
+
+.sync-mode-badge.badge-warning {
+    background: rgba(250, 173, 20, 0.1);
+    color: var(--warning);
+}
+
+.sync-mode-content {
+    padding: 16px 20px;
+}
+
+.sync-mode-content ul {
+    margin: 0;
+    padding-left: 18px;
+    font-size: 14px;
+    line-height: 1.8;
+    color: var(--text-secondary);
+}
+
+.sync-mode-content li {
+    margin-bottom: 6px;
+}
+
+.note-item {
+    margin-bottom: 12px;
+}
+
+.note-item:last-child {
+    margin-bottom: 0;
+}
+
+.note-item p {
+    margin: 4px 0 0 0;
+    font-size: 14px;
+    color: var(--text-secondary);
+}
+
+.highlight {
+    background: rgba(250, 173, 20, 0.15);
+    color: var(--warning);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: 500;
+}
+
+.highlight-green {
+    background: rgba(82, 196, 26, 0.1);
+    color: var(--success);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: 500;
+}
+
+.highlight-orange {
+    background: rgba(250, 173, 20, 0.1);
+    color: #d48806;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: 500;
+}
+
+.highlight-blue {
+    background: rgba(0, 102, 255, 0.1);
+    color: var(--primary);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: 500;
+}
+
+/* 指南样式 */
+.guide-section h4 {
+    margin: 0 0 12px 0;
+    font-size: 15px;
+    color: var(--text-primary);
+}
+
+.guide-steps {
+    margin: 0 0 16px 0;
+    padding-left: 20px;
+    line-height: 1.8;
+    color: var(--text-secondary);
+}
+
+.guide-steps li {
+    margin-bottom: 6px;
+}
+
+.guide-steps kbd {
+    background: #f3f4f6;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 13px;
+}
+
+.guide-steps a {
+    color: var(--primary);
+    text-decoration: none;
+}
+
+.guide-steps a:hover {
+    text-decoration: underline;
+}
+
+.guide-tip {
+    margin: 0;
+    padding: 12px;
+    background: rgba(0, 102, 255, 0.05);
+    border-left: 3px solid var(--primary);
+    border-radius: 0 8px 8px 0;
+    font-size: 14px;
+    color: var(--text-secondary);
+}
+
+.guide-notes {
+    margin: 0;
+    padding-left: 20px;
+    color: var(--text-secondary);
+    font-size: 14px;
+    line-height: 1.8;
+}
+
+.guide-notes li {
+    margin-bottom: 4px;
 }
 
 /* 响应式 */
