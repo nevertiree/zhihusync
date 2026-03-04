@@ -777,17 +777,50 @@ from sqlalchemy import or_
 
 
 @app.get("/api/answers")
-async def get_answers(page: int = 1, page_size: int = 20, search: str = ""):
+async def get_answers(
+    page: int = 1,
+    page_size: int = 20,
+    search: str = "",
+    is_deleted: bool | None = None,
+    voteup_min: int | None = None,
+    voteup_max: int | None = None,
+    comment_min: int | None = None,
+    comment_max: int | None = None,
+    sort: str = "liked_time",
+    order: str = "desc",
+):
     """获取回答列表"""
     session = db.get_session()
     try:
         query = session.query(Answer)
 
+        # 搜索筛选
         if search:
             query = query.filter(or_(Answer.question_title.contains(search), Answer.author_name.contains(search)))
 
+        # 删除状态筛选
+        if is_deleted is not None:
+            query = query.filter(Answer.is_deleted == is_deleted)
+
+        # 点赞数范围筛选
+        if voteup_min is not None:
+            query = query.filter(Answer.voteup_count >= voteup_min)
+        if voteup_max is not None:
+            query = query.filter(Answer.voteup_count <= voteup_max)
+
+        # 评论数范围筛选
+        if comment_min is not None:
+            query = query.filter(Answer.comment_count >= comment_min)
+        if comment_max is not None:
+            query = query.filter(Answer.comment_count <= comment_max)
+
         total = query.count()
-        answers = query.order_by(Answer.liked_time.desc()).offset((page - 1) * page_size).limit(page_size).all()
+
+        # 排序
+        sort_column = getattr(Answer, sort, Answer.liked_time)
+        query = query.order_by(sort_column.desc() if order == "desc" else sort_column.asc())
+
+        answers = query.offset((page - 1) * page_size).limit(page_size).all()
 
         items = []
         for a in answers:
