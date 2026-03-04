@@ -236,6 +236,10 @@ class DatabaseManager:
                 # 更新现有记录
                 for key, value in answer_data.items():
                     if hasattr(existing, key):
+                        # 特殊处理：不要覆盖 html_path 为 None（保留已有备份）
+                        if key == "html_path" and value is None and existing.html_path:
+                            logger.debug(f"保留现有HTML路径: {existing.html_path}")
+                            continue
                         setattr(existing, key, value)
                 existing.synced_at = get_beijing_now()
                 session.commit()

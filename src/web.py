@@ -262,6 +262,112 @@ async def get_users():
         session.close()
 
 
+class UserCreate(BaseModel):
+    """创建用户请求模型."""
+
+    user_id: str
+    name: str | None = None
+
+
+@app.post("/api/users")
+async def create_user(user_data: UserCreate):
+    """添加监控用户"""
+    from models import User
+
+    if not user_data.user_id:
+        raise HTTPException(status_code=400, detail="用户ID不能为空")
+
+    session = db.get_session()
+    try:
+        # 检查是否已存在
+        existing = session.query(User).filter_by(id=user_data.user_id).first()
+        if existing:
+            if existing.is_active:
+                raise HTTPException(status_code=400, detail="用户已存在")
+            else:
+                # 重新激活
+                existing.is_active = True
+                session.commit()
+                return {"status": "success", "message": "用户已重新激活", "user_id": user_data.user_id}
+
+        # 创建新用户
+        user = User(id=user_data.user_id, name=user_data.name or user_data.user_id, is_active=True)
+        session.add(user)
+        session.commit()
+        logger.info(f"添加用户: {user_data.user_id}")
+        return {"status": "success", "message": "用户添加成功", "user_id": user_data.user_id}
+    except HTTPException:
+        raise
+    except Exception as e:
+        session.rollback()
+        logger.error(f"添加用户失败: {e}")
+        raise HTTPException(status_code=500, detail=f"添加用户失败: {str(e)}")
+    finally:
+        session.close()
+
+
+@app.delete("/api/users/{user_id}")
+async def delete_user(user_id: str):
+    """删除（停用）监控用户"""
+    from models import User
+
+    session = db.get_session()
+    try:
+        user = session.query(User).filter_by(id=user_id).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="用户不存在")
+
+        # 软删除，只标记为非活跃
+        user.is_active = False
+        session.commit()
+        logger.info(f"停用用户: {user_id}")
+        return {"status": "success", "message": "用户已停用", "user_id": user_id}
+    except HTTPException:
+        raise
+    except Exception as e:
+        session.rollback()
+        logger.error(f"删除用户失败: {e}")
+        raise HTTPException(status_code=500, detail=f"删除用户失败: {str(e)}")
+    finally:
+        session.close()
+
+
+@app.post("/api/users/{user_id}/sync")
+async def sync_user(user_id: str):
+    """同步指定用户的数据"""
+    from models import User
+
+    session = db.get_session()
+    try:
+        user = session.query(User).filter_by(id=user_id, is_active=True).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="用户不存在或未激活")
+    finally:
+        session.close()
+
+    # 启动异步同步任务
+    async def do_user_sync():
+        try:
+            async with ZhihuCrawler(
+                user_id=user_id,
+                db_manager=db,
+                storage_manager=storage,
+                headless=True,
+                request_delay=config.browser.request_delay,
+                max_comments=config.zhihu.max_comments,
+            ) as crawler:
+                # 用户同步使用普通采集模式
+                await crawler.scan_likes(
+                    max_items=config.zhihu.max_items_per_scan,
+                    scan_mode="normal",
+                )
+        except Exception as e:
+            logger.error(f"同步用户 {user_id} 失败: {e}")
+
+    asyncio.create_task(do_user_sync())
+    return {"status": "started", "message": f"用户 {user_id} 同步任务已启动"}
+
+
 @app.get("/api/config")
 async def get_config():
     """获取当前配置"""
@@ -524,8 +630,13 @@ async def do_sync(sync_type: str = "manual"):
                 app_state["sync_message"] = f"正在同步: {current}/{total_str}"
 
             app_state["sync_message"] = "正在扫描点赞内容..."
+            # 【普通采集模式】
+            # - 遇到已存在的重复数据时停止
+            # - 404处理：保存删除状态记录用于完整性
             new_items, updated_items = await crawler.scan_likes(
-                max_items=config.zhihu.max_items_per_scan, progress_callback=progress_callback
+                max_items=config.zhihu.max_items_per_scan,
+                progress_callback=progress_callback,
+                scan_mode="normal",  # 普通采集模式
             )
 
             if config.zhihu.save_comments:
@@ -627,11 +738,14 @@ async def start_init_sync():
                 request_delay=config.browser.request_delay,
                 max_comments=config.zhihu.max_comments,
             ) as crawler:
-                # 使用 init_mode=True 进行全量采集
+                # 【全量采集模式】
+                # - 穷尽所有点赞记录（max_items=-1 无限制）
+                # - 404处理：未下载过的跳过，已下载的高亮标注
                 new_items, updated_items = await crawler.scan_likes(
                     max_items=-1,  # 无限制
                     progress_callback=progress_callback,
                     init_mode=True,
+                    scan_mode="full",  # 全量采集模式
                 )
 
             # 更新同步日志
