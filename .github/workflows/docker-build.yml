@@ -51,6 +51,12 @@ jobs:
             type=raw,value=latest,enable={{is_default_branch}}
             type=raw,value=${{ github.event.inputs.version }},enable=${{ github.event_name == 'workflow_dispatch' }}
 
+      - name: Debug - Check Dockerfile content
+        run: |
+          echo "=== Dockerfile content ==="
+          head -10 Dockerfile
+          echo "=========================="
+
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
@@ -59,8 +65,7 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          no-cache: true
           platforms: linux/amd64
 
   build-slim:
