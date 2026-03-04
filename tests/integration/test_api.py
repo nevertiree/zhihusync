@@ -4,6 +4,7 @@ API Integration Tests - 测试所有API端点的完整功能
 """
 
 import json
+
 import pytest
 import requests
 
@@ -300,8 +301,8 @@ class TestFullWorkflow:
         # 5. 验证设置完成
         response = requests.get(f"{base_url}/api/setup/status", timeout=10)
         final_status = response.json()
-        assert final_status["has_user_id"] == True
-        assert final_status["has_cookie"] == True
+        assert final_status["has_user_id"] is True
+        assert final_status["has_cookie"] is True
 
         print("\n✅ 完整设置流程测试通过")
         print(f"   初始状态: {initial_status}")

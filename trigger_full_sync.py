@@ -13,7 +13,7 @@ def wait_for_service(max_retries=30):
             if response.status_code == 200:
                 print("✅ 服务已就绪")
                 return True
-        except:
+        except Exception:
             pass
         print(f"⏳ 等待服务启动... ({i+1}/{max_retries})")
         time.sleep(1)

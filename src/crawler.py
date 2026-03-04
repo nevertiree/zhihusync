@@ -1,12 +1,14 @@
 """爬虫模块 - 知乎内容抓取"""
 
 import asyncio
+import contextlib
 import json
 import random
 import re
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 from bs4 import BeautifulSoup, Tag
 from db import DatabaseManager
@@ -256,6 +258,9 @@ class ZhihuCrawler:
         5. Canvas/WebGL 指纹
         """
         try:
+            if self.page is None:
+                logger.warning("页面未初始化，无法注入反检测脚本")
+                return
             # 注入脚本隐藏 webdriver 标志
             await self.page.add_init_script(
                 """
@@ -337,7 +342,7 @@ class ZhihuCrawler:
         logger.info("🔍 开始采集前预检查...")
         logger.info("=" * 60)
 
-        result = {
+        result: dict[str, Any] = {
             "success": False,
             "message": "",
             "checks": {
@@ -373,6 +378,11 @@ class ZhihuCrawler:
         # 2. 检查 Cookie 有效性（调用知乎 API 验证）
         try:
             logger.info("🔍 正在验证 Cookie 有效性...")
+
+            if self.page is None:
+                result["message"] = "❌ 页面未初始化，无法验证 Cookie"
+                logger.error(result["message"])
+                return result
 
             # 直接访问知乎 API 验证登录状态（最可靠的方式）
             api_response = await self.page.evaluate(
@@ -454,6 +464,10 @@ class ZhihuCrawler:
         知乎 Cookie 过期后会导致大量 403，需要及时检测。
         """
         try:
+            if self.page is None:
+                logger.warning("页面未初始化，无法验证登录状态")
+                return
+
             # 访问知乎首页检查登录状态
             await self.page.goto("https://www.zhihu.com", wait_until="domcontentloaded", timeout=15000)
             await asyncio.sleep(2)
@@ -525,10 +539,8 @@ class ZhihuCrawler:
                 # 处理过期时间（支持 expires 或 expirationDate）
                 expires = cookie.get("expires") or cookie.get("expirationDate")
                 if expires:
-                    try:
+                    with contextlib.suppress(ValueError, TypeError):
                         cookie_dict["expires"] = int(float(expires))
-                    except (ValueError, TypeError):
-                        pass
                 formatted_cookies.append(cookie_dict)
 
             await self.context.add_cookies(formatted_cookies)
@@ -851,11 +863,11 @@ class ZhihuCrawler:
             logger.warning(f"获取用户资料失败: {e}")
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
-    async def fetch_likes(
+    async def fetch_likes(  # noqa: C901
         self,
         limit: int = 20,
         offset: int = 0,
-        item_callback: Callable[[dict, int], None] | None = None,
+        item_callback: Callable[[dict, int], Awaitable[None]] | None = None,
     ) -> list[dict]:
         """获取用户点赞列表 - 增量滚动模式，边滚动边解析边保存"""
         # 访问用户主页
@@ -905,7 +917,7 @@ class ZhihuCrawler:
 
             # 每次滚动更多次，更激进的滚动策略
             assert self.page is not None  # noqa: S101
-            for i in range(5):  # 增加滚动次数到5次
+            for _ in range(5):  # 增加滚动次数到5次
                 await self.page.evaluate(
                     """() => {
                         window.scrollBy(0, 1500);
@@ -1330,7 +1342,7 @@ class ZhihuCrawler:
 
         return None
 
-    async def fetch_answer_page(
+    async def fetch_answer_page(  # noqa: C901
         self, question_id: str, answer_id: str, max_retries: int = 3
     ) -> tuple[str | None, dict | None]:
         """获取回答页面 HTML，包含完整内容和样式，支持403重试.
@@ -1582,7 +1594,7 @@ class ZhihuCrawler:
 
         return str(soup)
 
-    async def fetch_comments(self, answer_id: str, limit: int = 20) -> tuple[list[dict], dict]:
+    async def fetch_comments(self, answer_id: str, limit: int = 20) -> tuple[list[dict], dict]:  # noqa: C901
         """获取评论 - 包括根评论和子评论.
 
         Returns:
@@ -1595,13 +1607,13 @@ class ZhihuCrawler:
                     "api_error": str | None,  # API错误信息
                 }
         """
-        stats = {
+        stats: dict[str, Any] = {
             "root_comments": 0,
             "child_comments": 0,
             "total_expected": 0,
             "api_error": None,
         }
-        all_comments = []
+        all_comments: list[dict[str, Any]] = []
 
         # 知乎 API limit 最大支持 20，超过会返回 400 错误
         api_limit = min(limit, 20)
@@ -1677,7 +1689,7 @@ class ZhihuCrawler:
                         # 获取子评论
                         child_comments = comment.get("child_comments", [])
                         if child_comments:
-                            stats["child_comments"] += len(child_comments)
+                            stats["child_comments"] = stats.get("child_comments", 0) + len(child_comments)
                             all_comments.extend(child_comments)
                             logger.debug(f"评论 {comment.get('id')} 有 {len(child_comments)} 条子评论")
 
@@ -1692,7 +1704,7 @@ class ZhihuCrawler:
                                 comment.get("id"), offset=len(child_comments)
                             )
                             if remaining_child_comments:
-                                stats["child_comments"] += len(remaining_child_comments)
+                                stats["child_comments"] = stats.get("child_comments", 0) + len(remaining_child_comments)
                                 all_comments.extend(remaining_child_comments)
                                 logger.info(f"额外获取了 {len(remaining_child_comments)} 条子评论")
 
@@ -2023,7 +2035,9 @@ class ZhihuCrawler:
         except Exception as e:
             logger.warning(f"添加删除标注失败: {e}")
 
-    async def process_answer(self, activity: dict, liked_time: datetime, scan_mode: str = "normal") -> bool:
+    async def process_answer(  # noqa: C901
+        self, activity: dict, liked_time: datetime, scan_mode: str = "normal"
+    ) -> bool:
         """处理单个回答
 
         Args:
@@ -2191,6 +2205,9 @@ class ZhihuCrawler:
                 return False
 
             # 解析页面获取内容
+            if page_html is None:
+                logger.error("页面内容为空，无法解析")
+                return False
             soup = BeautifulSoup(page_html, "lxml")
 
             # 提取回答内容
@@ -2325,7 +2342,7 @@ class ZhihuCrawler:
                 "anomaly_reason": str | None,
             }
         """
-        result = {
+        result: dict[str, Any] = {
             "success": False,
             "saved_count": 0,
             "expected_count": 0,
@@ -2444,7 +2461,7 @@ class ZhihuCrawler:
             result["anomaly_reason"] = f"Exception: {e}"
             return result
 
-    async def scan_likes(
+    async def scan_likes(  # noqa: C901
         self,
         max_items: int = 50,
         progress_callback: Callable | None = None,
@@ -2635,20 +2652,6 @@ class ZhihuCrawler:
 
                 logger.info(f"重试下载: {failure.question_title[:60]}... (第 {failure.retry_count} 次)")
 
-                # 构建活动数据
-                activity = {
-                    "verb": "MEMBER_VOTEUP_ANSWER",
-                    "target": {
-                        "id": failure.answer_id,
-                        "type": "answer",
-                        "question": {
-                            "id": failure.question_id or "",
-                            "title": failure.question_title or "",
-                        },
-                        "author": {},
-                    },
-                }
-
                 # 尝试重新下载
                 page_html, error_info = await self.fetch_answer_page(
                     failure.question_id or "", failure.answer_id, max_retries=3
@@ -2666,7 +2669,7 @@ class ZhihuCrawler:
                         "backup_time": get_beijing_now().isoformat(),
                     }
 
-                    html_path = await self.storage.save_answer(
+                    await self.storage.save_answer(
                         answer_id=failure.answer_id,
                         question_id=failure.question_id or "",
                         question_title=failure.question_title or "",

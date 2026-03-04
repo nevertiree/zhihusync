@@ -182,7 +182,7 @@ class TestExtractionErrorsUI:
             try:
                 btn = driver.find_element(By.ID, "resolve-all-btn")
                 print(f"  操作后按钮文本: '{btn.text}'")
-            except:
+            except Exception:
                 print("  按钮可能已隐藏（没有更多错误）")
 
             # 打印控制台日志

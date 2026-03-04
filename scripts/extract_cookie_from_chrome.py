@@ -7,6 +7,7 @@ Windows 会自动查找 Chrome Cookie 数据库。
 需要安装 pypiwin32: pip install pypiwin32
 """
 
+import contextlib
 import json
 import os
 import shutil
@@ -133,10 +134,8 @@ def extract_zhihu_cookies(cookie_db_path: Path) -> list:
 
     finally:
         # 清理临时文件
-        try:
+        with contextlib.suppress(Exception):
             os.unlink(temp_path)
-        except:
-            pass
 
 
 def main():

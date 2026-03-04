@@ -225,11 +225,7 @@ def _parse_keyvalue_format(data: str) -> dict[str, Any]:
     cookies = []
 
     # 尝试换行分隔
-    if "\n" in data:
-        pairs = data.strip().split("\n")
-    else:
-        # 尝试分号分隔
-        pairs = data.strip().split(";")
+    pairs = data.strip().split("\n") if "\n" in data else data.strip().split(";")
 
     for pair in pairs:
         pair = pair.strip()
@@ -258,7 +254,7 @@ def _parse_keyvalue_format(data: str) -> dict[str, Any]:
 
 def _normalize_cookie(cookie: dict) -> dict:
     """标准化 cookie 对象，确保必要字段."""
-    normalized = {
+    normalized: dict[str, Any] = {
         "name": str(cookie.get("name", "")),
         "value": str(cookie.get("value", "")),
         "domain": str(cookie.get("domain", ".zhihu.com")),

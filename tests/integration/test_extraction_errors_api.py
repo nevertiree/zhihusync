@@ -87,6 +87,7 @@ class TestErrorWorkflow:
         # 1. 获取初始错误数
         response = client.get("/api/stats")
         initial_count = response.json()["extraction_errors"]
+        assert isinstance(initial_count, int)
 
         # 2. 标记所有为已解决
         response = client.post("/api/extraction-errors/resolve-all")

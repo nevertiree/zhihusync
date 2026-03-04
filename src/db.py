@@ -477,7 +477,7 @@ class DatabaseManager:
             with_comments = query.filter_by(has_comments=True).count()
 
             # 应该有评论但还没有获取的（comment_count > 0 但 has_comments = False）
-            comment_anomaly = query.filter(Answer.comment_count > 0, Answer.has_comments == False).count()
+            comment_anomaly = query.filter(Answer.comment_count > 0, Answer.has_comments.is_(False)).count()
 
             # 下载状态统计
             failed_downloads = query.filter_by(download_status="failed").count()
@@ -489,7 +489,7 @@ class DatabaseManager:
             # 评论采集异常统计（extraction_errors 表中 error_type 包含 comment 的）
             comment_errors = (
                 session.query(ExtractionError)
-                .filter(ExtractionError.error_type.like("%comment%"), ExtractionError.resolved == False)
+                .filter(ExtractionError.error_type.like("%comment%"), ExtractionError.resolved.is_(False))
                 .count()
             )
 
@@ -890,7 +890,7 @@ class DatabaseManager:
         finally:
             session.close()
 
-    def get_download_failure_stats(self) -> dict[str, int]:
+    def get_download_failure_stats(self) -> dict[str, Any]:
         """获取下载失败统计.
 
         Returns:
