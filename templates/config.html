@@ -1134,7 +1134,11 @@ function toggleGuide() {
 
 // 初始化
 document.addEventListener('DOMContentLoaded', () => {
-    const hash = location.hash.slice(1) || 'cookie';
+    let hash = location.hash.slice(1) || 'cookie';
+    // 处理带 tab- 前缀的锚点 (如 #tab-cookie -> cookie)
+    if (hash.startsWith('tab-')) {
+        hash = hash.slice(4);
+    }
     switchTab(hash);
     loadAllStatus();
 });

@@ -18,7 +18,7 @@
                 <div class="step-content">
                     <h3>配置 Cookie</h3>
                     <p>从浏览器获取知乎登录凭证</p>
-                    <a href="/config#cookie-section" class="btn btn-primary">去配置</a>
+                    <a href="/config#cookie" class="btn btn-primary">去配置</a>
                 </div>
                 <div class="step-status">⏳</div>
             </div>
@@ -28,7 +28,7 @@
                 <div class="step-content">
                     <h3>设置用户 ID</h3>
                     <p>指定要备份的知乎账号</p>
-                    <a href="/config#user-section" class="btn btn-primary">去设置</a>
+                    <a href="/config#user" class="btn btn-primary">去设置</a>
                 </div>
                 <div class="step-status">⏳</div>
             </div>
@@ -214,7 +214,7 @@
 <div class="card" id="alerts-card">
     <div class="card-header">
         <h3>🔔 告警状态</h3>
-        <a href="/config#alerts-section" class="btn btn-sm btn-secondary">配置告警</a>
+        <a href="/config#monitor" class="btn btn-sm btn-secondary">配置告警</a>
     </div>
     <div class="card-body">
         <div class="alerts-status" id="alerts-status">
@@ -555,6 +555,18 @@
     box-shadow: 0 2px 6px rgba(0, 102, 255, 0.2);
 }
 
+/* 禁用按钮样式 */
+.btn:disabled {
+    opacity: 0.5 !important;
+    cursor: not-allowed !important;
+    filter: grayscale(0.5);
+}
+
+.btn:disabled:hover {
+    transform: none !important;
+    box-shadow: none !important;
+}
+
 .sync-type-badge {
     display: inline-block;
     padding: 2px 8px;
@@ -746,38 +758,81 @@ async function checkSetupStatus() {
 
         const wizard = document.getElementById('setup-wizard');
         const syncBtn = document.getElementById('sync-btn');
+        const fullSyncBtn = document.getElementById('full-sync-btn');
+        const readyBtn = document.querySelector('#step-ready button');
         const progressBar = document.getElementById('wizard-progress-bar');
 
+        // 更新步骤状态显示
+        let completedSteps = 0;
+
+        if (data.has_cookie) {
+            document.getElementById('step-cookie').classList.add('completed');
+            document.querySelector('#step-cookie .step-status').textContent = '✅';
+            completedSteps++;
+        }
+
+        if (data.has_user_id) {
+            document.getElementById('step-userid').classList.add('completed');
+            document.querySelector('#step-userid .step-status').textContent = '✅';
+            completedSteps++;
+        }
+
+        // 更新进度条
+        progressBar.style.width = (completedSteps / 2 * 100) + '%';
+
+        // 检查是否可以进行同步
         if (data.configured) {
+            // 完全配置好了，隐藏向导，启用所有按钮
             wizard.style.display = 'none';
             syncBtn.disabled = false;
+            syncBtn.title = '增量同步：只同步新增的点赞';
+            fullSyncBtn.disabled = false;
+            fullSyncBtn.title = '全量同步：重新爬取全部历史点赞';
         } else {
+            // 未完全配置，显示向导，禁用同步按钮
             wizard.style.display = 'block';
-            syncBtn.disabled = true;
-            syncBtn.title = '请先完成配置';
 
-            // 更新步骤状态
-            let completedSteps = 0;
-
-            if (data.has_cookie) {
-                document.getElementById('step-cookie').classList.add('completed');
-                document.querySelector('#step-cookie .step-status').textContent = '✅';
-                completedSteps++;
+            // 根据缺少的配置设置不同的提示
+            if (!data.has_cookie && !data.has_user_id) {
+                // 既没有 Cookie 也没有用户
+                const msg = '请先配置 Cookie 并添加用户';
+                syncBtn.disabled = true;
+                syncBtn.title = msg;
+                fullSyncBtn.disabled = true;
+                fullSyncBtn.title = msg;
+                if (readyBtn) {
+                    readyBtn.disabled = true;
+                    readyBtn.title = msg;
+                    readyBtn.style.opacity = '0.5';
+                    readyBtn.style.cursor = 'not-allowed';
+                }
+            } else if (!data.has_cookie) {
+                // 有用户但没有 Cookie
+                const msg = '请先配置 Cookie';
+                syncBtn.disabled = true;
+                syncBtn.title = msg;
+                fullSyncBtn.disabled = true;
+                fullSyncBtn.title = msg;
+                if (readyBtn) {
+                    readyBtn.disabled = true;
+                    readyBtn.title = msg;
+                    readyBtn.style.opacity = '0.5';
+                    readyBtn.style.cursor = 'not-allowed';
+                }
+            } else if (!data.has_user_id) {
+                // 有 Cookie 但没有用户
+                const msg = '请先添加用户';
+                syncBtn.disabled = true;
+                syncBtn.title = msg;
+                fullSyncBtn.disabled = true;
+                fullSyncBtn.title = msg;
+                if (readyBtn) {
+                    readyBtn.disabled = true;
+                    readyBtn.title = msg;
+                    readyBtn.style.opacity = '0.5';
+                    readyBtn.style.cursor = 'not-allowed';
+                }
             }
-
-            if (data.has_user_id) {
-                document.getElementById('step-userid').classList.add('completed');
-                document.querySelector('#step-userid .step-status').textContent = '✅';
-                completedSteps++;
-            }
-
-            if (data.configured) {
-                document.getElementById('step-ready').classList.add('completed');
-                completedSteps++;
-            }
-
-            // 更新进度条
-            progressBar.style.width = (completedSteps / 3 * 100) + '%';
         }
     } catch (e) {
         console.error('检查配置状态失败:', e);
@@ -1011,7 +1066,24 @@ async function checkSyncStatus() {
 
 // 开始同步（增量）
 async function startSync() {
+    // 先检查配置状态
     try {
+        const statusRes = await fetch('/api/setup/status');
+        const statusData = await statusRes.json();
+
+        if (!statusData.configured) {
+            if (!statusData.has_cookie && !statusData.has_user_id) {
+                showToast('请先配置 Cookie 并添加用户', 'warning');
+            } else if (!statusData.has_cookie) {
+                showToast('请先配置 Cookie', 'warning');
+            } else if (!statusData.has_user_id) {
+                showToast('请先添加用户', 'warning');
+            }
+            // 显示配置向导
+            document.getElementById('setup-wizard').style.display = 'block';
+            return;
+        }
+
         const res = await fetch('/api/sync/start', { method: 'POST' });
         const data = await res.json();
 
@@ -1029,6 +1101,28 @@ async function startSync() {
 
 // 开始全量同步（带点击反馈）
 async function startFullSyncWithFeedback(btn) {
+    // 先检查配置状态
+    try {
+        const statusRes = await fetch('/api/setup/status');
+        const statusData = await statusRes.json();
+
+        if (!statusData.configured) {
+            if (!statusData.has_cookie && !statusData.has_user_id) {
+                showToast('请先配置 Cookie 并添加用户', 'warning');
+            } else if (!statusData.has_cookie) {
+                showToast('请先配置 Cookie', 'warning');
+            } else if (!statusData.has_user_id) {
+                showToast('请先添加用户', 'warning');
+            }
+            // 显示配置向导
+            document.getElementById('setup-wizard').style.display = 'block';
+            return;
+        }
+    } catch (e) {
+        showToast('检查配置状态失败: ' + e.message, 'error');
+        return;
+    }
+
     // 按钮点击反馈效果
     const originalText = btn.innerHTML;
     btn.innerHTML = '<span class="icon">⏳</span><span>准备中...</span>';

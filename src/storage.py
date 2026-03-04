@@ -26,19 +26,23 @@ class StorageManager:
 
     管理 HTML 文件、图片和静态资源的存储。
     支持异步下载，缓存已下载图片避免重复下载。
+    图片分类存储：头像和回答图片分开存放。
 
     Attributes:
         html_path: HTML 文件存储路径.
         static_path: 静态资源存储路径.
-        images_path: 图片存储路径.
+        images_path: 图片根目录路径.
+        avatars_path: 头像存储路径.
+        answers_images_path: 回答图片存储路径.
         download_images: 是否下载图片.
         _downloaded_images: 已下载图片缓存集合.
+        _downloaded_avatars: 已下载头像缓存集合.
 
     Examples:
         >>> storage = StorageManager(
         ...     html_path="./data/html",
         ...     static_path="./data/static",
-        ...     images_path="./data/static/images",
+        ...     images_path="./data/images",
         ...     download_images=True
         ... )
         >>> filepath = await storage.save_answer_html(
@@ -61,23 +65,29 @@ class StorageManager:
         Args:
             html_path: HTML 文件存储目录路径.
             static_path: 静态资源存储目录路径.
-            images_path: 图片存储目录路径.
+            images_path: 图片根目录路径(下分 avatars 和 answers 子目录).
             download_images: 是否下载图片.
         """
         self.html_path = Path(html_path)
         self.static_path = Path(static_path)
         self.images_path = Path(images_path)
+        # 图片分类目录
+        self.avatars_path = self.images_path / "avatars"
+        self.answers_images_path = self.images_path / "answers"
         self.download_images = download_images
 
         # 确保目录存在
         self.html_path.mkdir(parents=True, exist_ok=True)
         self.static_path.mkdir(parents=True, exist_ok=True)
         self.images_path.mkdir(parents=True, exist_ok=True)
+        self.avatars_path.mkdir(parents=True, exist_ok=True)
+        self.answers_images_path.mkdir(parents=True, exist_ok=True)
 
         # 已下载的图片缓存
         self._downloaded_images: set[str] = set()
+        self._downloaded_avatars: set[str] = set()
 
-        logger.info(f"存储管理器初始化: html={html_path}, static={static_path}")
+        logger.info(f"存储管理器初始化: html={html_path}, static={static_path}, images={images_path}")
 
     def _sanitize_filename(self, text: str, max_length: int = 100) -> str:
         """清理文件名.
@@ -758,10 +768,10 @@ body {{
         """
         url_hash = hashlib.md5(original_url.encode()).hexdigest()[:16]
         ext = Path(urlparse(original_url).path).suffix or ".jpg"
-        return f"/data/static/images/{url_hash}{ext}"
+        return f"/data/images/answers/{url_hash}{ext}"
 
     async def _download_image(self, url: str, answer_id: str) -> str | None:
-        """下载单张图片.
+        """下载单张图片到 answers 目录.
 
         Args:
             url: 图片 URL.
@@ -788,7 +798,8 @@ body {{
             url_hash = hashlib.md5(url.encode()).hexdigest()[:16]
             ext = Path(urlparse(url).path).suffix or ".jpg"
             local_filename = f"{url_hash}{ext}"
-            local_path = self.images_path / local_filename
+            # 保存到 answers 子目录
+            local_path = self.answers_images_path / local_filename
 
             # 检查是否已存在
             if local_path.exists():
@@ -814,7 +825,7 @@ body {{
         return None
 
     async def download_avatar(self, avatar_url: str, user_id: str) -> str | None:
-        """下载用户头像.
+        """下载用户头像到 avatars 目录.
 
         Args:
             avatar_url: 头像URL.
@@ -826,6 +837,11 @@ body {{
         if not avatar_url:
             return None
 
+        # 检查缓存
+        if user_id in self._downloaded_avatars:
+            safe_user_id = hashlib.md5(user_id.encode()).hexdigest()[:16]
+            return f"/data/images/avatars/avatar_{safe_user_id}.jpg"
+
         try:
             # 将缩略图URL转为高清图URL (_l.jpg -> .jpg)
             hd_avatar_url = avatar_url.replace("_l.jpg", ".jpg")
@@ -836,12 +852,14 @@ body {{
             safe_user_id = hashlib.md5(user_id.encode()).hexdigest()[:16]
             ext = ".jpg"  # 强制使用.jpg
             local_filename = f"avatar_{safe_user_id}{ext}"
-            local_path = self.images_path / local_filename
+            # 保存到 avatars 子目录
+            local_path = self.avatars_path / local_filename
 
             # 检查是否已存在且文件有效(大于5KB)
             if local_path.exists() and local_path.stat().st_size > 5120:
                 logger.debug(f"头像已存在: {local_path} ({local_path.stat().st_size} bytes)")
-                return f"/data/static/images/{local_filename}"
+                self._downloaded_avatars.add(user_id)
+                return f"/data/images/avatars/{local_filename}"
 
             # 下载高清头像
             timeout = aiohttp.ClientTimeout(total=30)
@@ -857,12 +875,69 @@ body {{
                         return None
                     async with aiofiles.open(local_path, "wb") as f:
                         await f.write(content)
+                        self._downloaded_avatars.add(user_id)
                         logger.debug(f"下载头像: {user_id} -> {local_path} ({len(content)} bytes)")
-                        return f"/data/static/images/{local_filename}"
+                        return f"/data/images/avatars/{local_filename}"
         except Exception as e:
             logger.warning(f"下载头像失败 {user_id}: {e}")
 
         return None
+
+    async def delete_answer_files(self, answer_id: str) -> dict:
+        """删除回答相关的所有文件(HTML和图片).
+
+        Args:
+            answer_id: 回答ID.
+
+        Returns:
+            dict: 删除结果统计.
+        """
+        result = {
+            "html_deleted": 0,
+            "images_deleted": 0,
+            "errors": [],
+        }
+
+        try:
+            # 1. 查找并删除HTML文件
+            html_pattern = f"*{answer_id}.html"
+            html_files = list(self.html_path.glob(html_pattern))
+
+            for html_file in html_files:
+                try:
+                    # 先提取并删除HTML中引用的本地图片
+                    async with aiofiles.open(html_file, "r", encoding="utf-8") as f:
+                        content = await f.read()
+
+                    # 查找引用的本地图片 (/data/images/answers/xxx.jpg)
+                    import re
+
+                    local_images = re.findall(r'/data/images/answers/[^"\'\s]+', content)
+
+                    for img_path in local_images:
+                        try:
+                            # 转换为绝对路径
+                            img_name = Path(img_path).name
+                            img_file = self.answers_images_path / img_name
+                            if img_file.exists():
+                                img_file.unlink()
+                                result["images_deleted"] += 1
+                                logger.debug(f"删除图片: {img_file}")
+                        except Exception as e:
+                            result["errors"].append(f"删除图片失败 {img_path}: {e}")
+
+                    # 删除HTML文件
+                    html_file.unlink()
+                    result["html_deleted"] += 1
+                    logger.info(f"删除HTML文件: {html_file}")
+
+                except Exception as e:
+                    result["errors"].append(f"删除HTML文件失败 {html_file}: {e}")
+
+        except Exception as e:
+            result["errors"].append(f"删除操作失败: {e}")
+
+        return result
 
     def check_answer_exists(self, answer_id: str, content: str | None = None) -> bool:
         """检查回答是否已存在.
@@ -891,16 +966,22 @@ body {{
             dict: 统计信息.
         """
         html_files = list(self.html_path.glob("*.html"))
-        image_files = list(self.images_path.glob("*"))
+        avatar_files = list(self.avatars_path.glob("*.jpg"))
+        answer_image_files = list(self.answers_images_path.glob("*"))
 
         total_html_size = sum(f.stat().st_size for f in html_files)
-        total_image_size = sum(f.stat().st_size for f in image_files if f.is_file())
+        total_avatar_size = sum(f.stat().st_size for f in avatar_files if f.is_file())
+        total_answer_image_size = sum(f.stat().st_size for f in answer_image_files if f.is_file())
 
         return {
             "html_count": len(html_files),
-            "image_count": len(image_files),
+            "avatar_count": len(avatar_files),
+            "answer_image_count": len(answer_image_files),
+            "total_image_count": len(avatar_files) + len(answer_image_files),
             "html_size_mb": round(total_html_size / 1024 / 1024, 2),
-            "image_size_mb": round(total_image_size / 1024 / 1024, 2),
+            "avatar_size_mb": round(total_avatar_size / 1024 / 1024, 2),
+            "answer_image_size_mb": round(total_answer_image_size / 1024 / 1024, 2),
+            "total_image_size_mb": round((total_avatar_size + total_answer_image_size) / 1024 / 1024, 2),
         }
 
     async def append_comments(self, html_path: str, comments: list[dict]) -> bool:

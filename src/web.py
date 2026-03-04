@@ -86,7 +86,14 @@ app.mount(
     name="html_files",
 )
 
-# 挂载静态资源目录以便访问生成的图片
+# 挂载图片目录
+app.mount(
+    "/data/images",
+    StaticFiles(directory=config.storage.images_path),
+    name="data_images",
+)
+
+# 挂载静态资源目录(兼容旧路径)
 app.mount(
     "/data/static",
     StaticFiles(directory=config.storage.static_path),
@@ -994,17 +1001,15 @@ async def get_sync_history(page: int = 1, page_size: int = 10):
 
 @app.delete("/api/answers/{answer_id}")
 async def delete_answer(answer_id: str):
-    """删除回答"""
+    """删除回答及其关联的图片"""
     try:
         answer = db.get_answer_by_id(answer_id)
         if not answer:
             raise HTTPException(status_code=404, detail="回答不存在")
 
-        # 删除文件
-        if answer.html_path:
-            html_file = Path(answer.html_path)
-            if html_file.exists():
-                html_file.unlink()
+        # 删除文件(HTML和相关图片)
+        delete_result = await storage.delete_answer_files(answer_id)
+        logger.info(f"删除回答文件: {delete_result}")
 
         # 从数据库删除
         session = db.get_session()
@@ -1016,7 +1021,11 @@ async def delete_answer(answer_id: str):
         finally:
             session.close()
 
-        return {"status": "success", "message": "已删除"}
+        return {
+            "status": "success",
+            "message": "已删除",
+            "detail": delete_result,
+        }
     except HTTPException:
         raise
     except Exception as e:
@@ -1068,7 +1077,7 @@ async def generate_answer_image_api(
             )
 
         # 计算相对路径用于访问
-        relative_path = Path(image_path).relative_to(config.storage.static_path)
+        relative_path = Path(image_path).relative_to(config.storage.images_path)
 
         return {
             "status": "success",
@@ -1076,7 +1085,7 @@ async def generate_answer_image_api(
             "data": {
                 "image_path": image_path,
                 "relative_path": str(relative_path),
-                "image_url": f"/data/static/images/{Path(image_path).name}",
+                "image_url": f"/data/images/answers/{Path(image_path).name}",
                 "answer_id": answer_id,
                 "question_title": answer.question_title,
             },
@@ -1104,7 +1113,7 @@ async def list_generated_images(
         图片列表.
     """
     try:
-        images_dir = Path(config.storage.static_path) / "images"
+        images_dir = Path(config.storage.images_path) / "screenshots"
         if not images_dir.exists():
             return {"items": [], "total": 0, "page": page, "page_size": page_size}
 
@@ -1126,7 +1135,7 @@ async def list_generated_images(
             items.append(
                 {
                     "filename": f.name,
-                    "url": f"/data/static/images/{f.name}",
+                    "url": f"/data/images/screenshots/{f.name}",
                     "size": stat.st_size,
                     "created_at": datetime.fromtimestamp(stat.st_mtime).isoformat(),
                 }
