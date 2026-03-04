@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from loguru import logger
-from models import AlertConfig, Answer, Base, Comment, SyncLog, User
+from models import AlertConfig, Answer, Base, Comment, DownloadFailure, ExtractionError, SyncLog, User
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import Session, sessionmaker
 from timezone_utils import get_beijing_now
@@ -471,12 +471,443 @@ class DatabaseManager:
             if user_id:
                 query = query.filter_by(user_id=user_id)
 
+            total_answers = query.count()
+
+            # 评论统计 - 区分有评论和无评论但应该有评论的（异常）
+            with_comments = query.filter_by(has_comments=True).count()
+
+            # 应该有评论但还没有获取的（comment_count > 0 但 has_comments = False）
+            comment_anomaly = query.filter(Answer.comment_count > 0, Answer.has_comments == False).count()
+
+            # 下载状态统计
+            failed_downloads = query.filter_by(download_status="failed").count()
+            pending_downloads = query.filter_by(download_status="pending").count()
+
+            # 未解决的下载失败
+            unresolved_failures = session.query(DownloadFailure).filter_by(resolved=False).count()
+
+            # 评论采集异常统计（extraction_errors 表中 error_type 包含 comment 的）
+            comment_errors = (
+                session.query(ExtractionError)
+                .filter(ExtractionError.error_type.like("%comment%"), ExtractionError.resolved == False)
+                .count()
+            )
+
             return {
-                "total_answers": query.count(),
+                "total_answers": total_answers,
                 "total_comments": session.query(Comment).count(),
-                "with_comments": query.filter_by(has_comments=True).count(),
+                "with_comments": with_comments,
+                "comment_anomaly": comment_anomaly,  # 应该有评论但未获取的
+                "comment_errors": comment_errors,  # 评论采集错误数
                 "deleted_answers": query.filter_by(is_deleted=True).count(),
                 "total_users": session.query(User).filter_by(is_active=True).count(),
+                "failed_downloads": failed_downloads,
+                "pending_downloads": pending_downloads,
+                "unresolved_failures": unresolved_failures,
+            }
+        finally:
+            session.close()
+
+    # ========== 提取错误记录 ==========
+
+    def add_extraction_error(
+        self,
+        answer_id: str | None = None,
+        question_title: str | None = None,
+        error_type: str = "other",
+        error_message: str = "",
+        stack_trace: str | None = None,
+        html_snapshot: str | None = None,
+    ) -> int:
+        """添加内容提取错误记录.
+
+        Args:
+            answer_id: 回答ID.
+            question_title: 问题标题.
+            error_type: 错误类型(parse_error/network_error/timeout/other).
+            error_message: 错误详情.
+            stack_trace: 错误堆栈.
+            html_snapshot: HTML快照.
+
+        Returns:
+            int: 错误记录ID.
+        """
+        session = self.get_session()
+        try:
+            error = ExtractionError(
+                answer_id=answer_id,
+                question_title=question_title,
+                error_type=error_type,
+                error_message=error_message,
+                stack_trace=stack_trace,
+                html_snapshot=html_snapshot,
+            )
+            session.add(error)
+            session.commit()
+            logger.warning(f"记录提取错误: answer_id={answer_id}, type={error_type}")
+            return error.id
+        except Exception as e:
+            session.rollback()
+            logger.error(f"保存提取错误记录失败: {e}")
+            return -1
+        finally:
+            session.close()
+
+    def get_extraction_errors(
+        self, resolved: bool | None = None, limit: int = 50, offset: int = 0
+    ) -> list[ExtractionError]:
+        """获取提取错误列表.
+
+        Args:
+            resolved: 是否已解决(None表示全部).
+            limit: 限制数量.
+            offset: 偏移量.
+
+        Returns:
+            List[ExtractionError]: 错误记录列表.
+        """
+        session = self.get_session()
+        try:
+            query = session.query(ExtractionError)
+            if resolved is not None:
+                query = query.filter_by(resolved=resolved)
+            return query.order_by(ExtractionError.created_at.desc()).limit(limit).offset(offset).all()
+        finally:
+            session.close()
+
+    def get_extraction_error_count(self, resolved: bool = False) -> int:
+        """获取提取错误数量.
+
+        Args:
+            resolved: 是否已解决.
+
+        Returns:
+            int: 错误数量.
+        """
+        session = self.get_session()
+        try:
+            return session.query(ExtractionError).filter_by(resolved=resolved).count()
+        finally:
+            session.close()
+
+    def resolve_extraction_error(self, error_id: int) -> bool:
+        """标记提取错误为已解决.
+
+        Args:
+            error_id: 错误记录ID.
+
+        Returns:
+            bool: 操作成功返回True.
+        """
+        session = self.get_session()
+        try:
+            error = session.query(ExtractionError).filter_by(id=error_id).first()
+            if error:
+                error.resolved = True
+                error.resolved_at = get_beijing_now()
+                session.commit()
+                return True
+            return False
+        except Exception as e:
+            session.rollback()
+            logger.error(f"标记错误为已解决失败: {e}")
+            return False
+        finally:
+            session.close()
+
+    def resolve_all_extraction_errors(self) -> int:
+        """标记所有未解决的提取错误为已解决.
+
+        Returns:
+            int: 更新的记录数量.
+        """
+        session = self.get_session()
+        try:
+            count = (
+                session.query(ExtractionError)
+                .filter_by(resolved=False)
+                .update({"resolved": True, "resolved_at": get_beijing_now()})
+            )
+            session.commit()
+            logger.info(f"批量标记 {count} 条错误记录为已解决")
+            return count
+        except Exception as e:
+            session.rollback()
+            logger.error(f"批量标记错误失败: {e}")
+            return 0
+        finally:
+            session.close()
+
+    def delete_extraction_error(self, error_id: int) -> bool:
+        """删除提取错误记录.
+
+        Args:
+            error_id: 错误记录ID.
+
+        Returns:
+            bool: 删除成功返回True.
+        """
+        session = self.get_session()
+        try:
+            error = session.query(ExtractionError).filter_by(id=error_id).first()
+            if error:
+                session.delete(error)
+                session.commit()
+                return True
+            return False
+        except Exception as e:
+            session.rollback()
+            logger.error(f"删除错误记录失败: {e}")
+            return False
+        finally:
+            session.close()
+
+    # ========== 下载失败记录管理 ==========
+
+    def add_download_failure(
+        self,
+        answer_id: str,
+        user_id: str,
+        question_title: str | None = None,
+        question_id: str | None = None,
+        error_type: str = "other",
+        error_message: str = "",
+        http_status: int | None = None,
+    ) -> int:
+        """添加下载失败记录.
+
+        Args:
+            answer_id: 回答ID.
+            user_id: 用户ID.
+            question_title: 问题标题.
+            question_id: 问题ID.
+            error_type: 错误类型.
+            error_message: 错误详情.
+            http_status: HTTP状态码.
+
+        Returns:
+            int: 记录ID.
+        """
+        session = self.get_session()
+        try:
+            # 检查是否已存在未解决的记录
+            existing = session.query(DownloadFailure).filter_by(answer_id=answer_id, resolved=False).first()
+            if existing:
+                existing.retry_count += 1
+                existing.last_retry_at = get_beijing_now()
+                existing.error_message = error_message
+                existing.http_status = http_status
+                session.commit()
+                return existing.id
+
+            failure = DownloadFailure(
+                answer_id=answer_id,
+                user_id=user_id,
+                question_title=question_title,
+                question_id=question_id,
+                error_type=error_type,
+                error_message=error_message,
+                http_status=http_status,
+            )
+            session.add(failure)
+            session.commit()
+            return failure.id
+        except Exception as e:
+            session.rollback()
+            logger.error(f"添加下载失败记录失败: {e}")
+            return -1
+        finally:
+            session.close()
+
+    def get_download_failures(
+        self,
+        resolved: bool = False,
+        user_id: str | None = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> list[DownloadFailure]:
+        """获取下载失败列表.
+
+        Args:
+            resolved: 是否已解决.
+            user_id: 过滤用户ID.
+            limit: 限制数量.
+            offset: 偏移量.
+
+        Returns:
+            List[DownloadFailure]: 失败记录列表.
+        """
+        session = self.get_session()
+        try:
+            query = session.query(DownloadFailure).filter_by(resolved=resolved)
+            if user_id:
+                query = query.filter_by(user_id=user_id)
+            return query.order_by(DownloadFailure.created_at.desc()).offset(offset).limit(limit).all()
+        finally:
+            session.close()
+
+    def get_download_failure_count(self, resolved: bool = False, user_id: str | None = None) -> int:
+        """获取下载失败数量.
+
+        Args:
+            resolved: 是否已解决.
+            user_id: 过滤用户ID.
+
+        Returns:
+            int: 失败数量.
+        """
+        session = self.get_session()
+        try:
+            query = session.query(DownloadFailure).filter_by(resolved=resolved)
+            if user_id:
+                query = query.filter_by(user_id=user_id)
+            return query.count()
+        finally:
+            session.close()
+
+    def resolve_download_failure(self, failure_id: int) -> bool:
+        """标记下载失败为已解决.
+
+        Args:
+            failure_id: 记录ID.
+
+        Returns:
+            bool: 操作成功返回True.
+        """
+        session = self.get_session()
+        try:
+            failure = session.query(DownloadFailure).filter_by(id=failure_id).first()
+            if failure:
+                failure.resolved = True
+                failure.resolved_at = get_beijing_now()
+                session.commit()
+                return True
+            return False
+        except Exception as e:
+            session.rollback()
+            logger.error(f"标记下载失败为已解决失败: {e}")
+            return False
+        finally:
+            session.close()
+
+    def resolve_download_failure_by_answer(self, answer_id: str) -> bool:
+        """根据回答ID标记下载失败为已解决.
+
+        Args:
+            answer_id: 回答ID.
+
+        Returns:
+            bool: 操作成功返回True.
+        """
+        session = self.get_session()
+        try:
+            count = (
+                session.query(DownloadFailure)
+                .filter_by(answer_id=answer_id, resolved=False)
+                .update({"resolved": True, "resolved_at": get_beijing_now()})
+            )
+            session.commit()
+            return count > 0
+        except Exception as e:
+            session.rollback()
+            logger.error(f"标记下载失败为已解决失败: {e}")
+            return False
+        finally:
+            session.close()
+
+    def get_pending_retry_failures(self, max_retries: int = 3) -> list[DownloadFailure]:
+        """获取待重试的下载失败记录.
+
+        Args:
+            max_retries: 最大重试次数.
+
+        Returns:
+            List[DownloadFailure]: 待重试记录列表.
+        """
+        session = self.get_session()
+        try:
+            return (
+                session.query(DownloadFailure)
+                .filter_by(resolved=False)
+                .filter(DownloadFailure.retry_count < max_retries)
+                .order_by(DownloadFailure.last_retry_at.asc().nullsfirst())
+                .all()
+            )
+        finally:
+            session.close()
+
+    def update_answer_download_status(
+        self,
+        answer_id: str,
+        status: str,
+        error: str | None = None,
+    ) -> None:
+        """更新回答下载状态.
+
+        Args:
+            answer_id: 回答ID.
+            status: 下载状态(success/failed/pending/skipped).
+            error: 错误信息.
+        """
+        session = self.get_session()
+        try:
+            answer = session.query(Answer).filter_by(id=answer_id).first()
+            if answer:
+                answer.download_status = status
+                if error:
+                    answer.last_error = error
+                if status == "failed":
+                    answer.retry_count = (answer.retry_count or 0) + 1
+                session.commit()
+        finally:
+            session.close()
+
+    def get_answers_by_download_status(
+        self,
+        status: str,
+        user_id: str | None = None,
+        limit: int | None = None,
+    ) -> list[Answer]:
+        """根据下载状态获取回答.
+
+        Args:
+            status: 下载状态.
+            user_id: 过滤用户ID.
+            limit: 限制数量.
+
+        Returns:
+            List[Answer]: 回答列表.
+        """
+        session = self.get_session()
+        try:
+            query = session.query(Answer).filter_by(download_status=status)
+            if user_id:
+                query = query.filter_by(user_id=user_id)
+            query = query.order_by(Answer.liked_time.desc())
+            if limit:
+                query = query.limit(limit)
+            return query.all()
+        finally:
+            session.close()
+
+    def get_download_failure_stats(self) -> dict[str, int]:
+        """获取下载失败统计.
+
+        Returns:
+            Dict[str, int]: 统计字典.
+        """
+        session = self.get_session()
+        try:
+            total = session.query(DownloadFailure).count()
+            unresolved = session.query(DownloadFailure).filter_by(resolved=False).count()
+            by_type = {}
+            for error_type in ["403", "404", "timeout", "network_error", "other"]:
+                count = session.query(DownloadFailure).filter_by(error_type=error_type, resolved=False).count()
+                by_type[error_type] = count
+            return {
+                "total": total,
+                "unresolved": unresolved,
+                "by_type": by_type,
             }
         finally:
             session.close()

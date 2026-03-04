@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>测试错误提取功能</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; max-width: 1200px; margin: 0 auto; }
+        .test-section { border: 1px solid #ddd; padding: 20px; margin: 20px 0; border-radius: 8px; }
+        .btn { padding: 8px 16px; margin: 5px; cursor: pointer; border: none; border-radius: 4px; }
+        .btn-success { background: #52c41a; color: white; }
+        .btn-danger { background: #ff4d4f; color: white; }
+        .btn-primary { background: #1890ff; color: white; }
+        #log { background: #f5f5f5; padding: 15px; border-radius: 4px; font-family: monospace; white-space: pre-wrap; min-height: 200px; }
+        .error { color: #ff4d4f; }
+        .success { color: #52c41a; }
+        .info { color: #1890ff; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { padding: 8px; text-align: left; border-bottom: 1px solid #ddd; }
+        th { background: #fafafa; }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+    <h1>🧪 错误提取功能测试页面</h1>
+    
+    <div class="test-section">
+        <h2>JavaScript 函数检查</h2>
+        <button class="btn btn-primary" onclick="checkFunctions()">检查函数是否存在</button>
+        <div id="function-check-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>模拟错误数据测试</h2>
+        <p>点击按钮模拟有错误数据的情况：</p>
+        <button class="btn btn-primary" onclick="simulateWithErrors()">模拟有错误数据</button>
+        <button class="btn btn-primary" onclick="simulateNoErrors()">模拟无错误数据</button>
+        <button class="btn btn-primary" onclick="testResolveAll()">测试 resolveAllErrors</button>
+        <button class="btn btn-primary" onclick="testDeleteAll()">测试 deleteAllErrors</button>
+    </div>
+
+    <div class="test-section" id="errors-section">
+        <h2>⚠️ 内容提取错误</h2>
+        <div class="header-actions">
+            <button class="btn btn-primary" onclick="showResolvedErrors()" id="show-resolved-btn">
+                查看已解决
+            </button>
+            <button class="btn btn-success hidden" onclick="resolveAllErrors()" id="resolve-all-btn">
+                全部标为已解决
+            </button>
+            <button class="btn btn-danger hidden" onclick="deleteAllErrors()" id="delete-all-btn">
+                全部删除
+            </button>
+        </div>
+        <div id="errors-empty" class="empty-state">
+            暂无提取错误
+        </div>
+        <div id="errors-container" class="hidden">
+            <table id="errors-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>时间</th>
+                        <th>类型</th>
+                        <th>问题标题</th>
+                        <th>错误信息</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody id="errors-body"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>运行日志</h2>
+        <div id="log"></div>
+        <button class="btn btn-primary" onclick="clearLog()">清除日志</button>
+    </div>
+
+    <script>
+        // 日志功能
+        function log(message, type = 'info') {
+            const logEl = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            const className = type === 'error' ? 'error' : type === 'success' ? 'success' : 'info';
+            logEl.innerHTML += `<div class="${className}">[${timestamp}] ${message}</div>`;
+            console.log(`[${type}] ${message}`);
+        }
+
+        function clearLog() {
+            document.getElementById('log').innerHTML = '';
+        }
+
+        // 检查函数是否存在
+        function checkFunctions() {
+            const result = document.getElementById('function-check-result');
+            const functions = [
+                'resolveAllErrors',
+                'deleteAllErrors',
+                'showResolvedErrors',
+                'loadErrors',
+                'resolveError',
+                'deleteError'
+            ];
+            
+            let html = '<ul>';
+            functions.forEach(fn => {
+                const exists = typeof window[fn] === 'function';
+                const color = exists ? 'green' : 'red';
+                html += `<li style="color: ${color}">${fn}: ${exists ? '✓ 存在' : '✗ 不存在'}</li>`;
+            });
+            html += '</ul>';
+            result.innerHTML = html;
+        }
+
+        // 模拟有错误数据
+        function simulateWithErrors() {
+            log('模拟有错误数据...', 'info');
+            
+            // 模拟数据
+            const mockData = {
+                total: 3,
+                page_size: 10,
+                items: [
+                    { id: 1, error_type: 'parse_error', question_title: '测试问题1', error_message: '解析失败', created_at: new Date().toISOString(), resolved: false },
+                    { id: 2, error_type: 'network_error', question_title: '测试问题2', error_message: '网络超时', created_at: new Date().toISOString(), resolved: false },
+                    { id: 3, error_type: 'other', question_title: '测试问题3', error_message: '其他错误', created_at: new Date().toISOString(), resolved: false }
+                ]
+            };
+            
+            renderErrors(mockData);
+            log('已渲染错误数据', 'success');
+        }
+
+        // 模拟无错误数据
+        function simulateNoErrors() {
+            log('模拟无错误数据...', 'info');
+            
+            const mockData = { total: 0, items: [] };
+            renderErrors(mockData);
+            log('已渲染空状态', 'success');
+        }
+
+        // 渲染错误列表
+        function renderErrors(data) {
+            const tbody = document.getElementById('errors-body');
+            const emptyDiv = document.getElementById('errors-empty');
+            const table = document.getElementById('errors-table');
+            const container = document.getElementById('errors-container');
+            const resolveAllBtn = document.getElementById('resolve-all-btn');
+            const deleteAllBtn = document.getElementById('delete-all-btn');
+
+            if (data.total === 0) {
+                tbody.innerHTML = '';
+                emptyDiv.style.display = 'block';
+                container.classList.add('hidden');
+                resolveAllBtn.classList.add('hidden');
+                deleteAllBtn.classList.add('hidden');
+                return;
+            }
+
+            emptyDiv.style.display = 'none';
+            container.classList.remove('hidden');
+            resolveAllBtn.classList.remove('hidden');
+            deleteAllBtn.classList.remove('hidden');
+
+            const errorTypeMap = {
+                'parse_error': { text: '解析错误', class: 'badge-danger' },
+                'network_error': { text: '网络错误', class: 'badge-warning' },
+                'timeout': { text: '超时', class: 'badge-warning' },
+                'other': { text: '其他', class: 'badge-secondary' }
+            };
+
+            tbody.innerHTML = data.items.map(error => {
+                const typeConfig = errorTypeMap[error.error_type] || errorTypeMap['other'];
+                return `
+                    <tr>
+                        <td>${error.id}</td>
+                        <td>${new Date(error.created_at).toLocaleString('zh-CN')}</td>
+                        <td><span class="${typeConfig.class}">${typeConfig.text}</span></td>
+                        <td>${error.question_title}</td>
+                        <td>${error.error_message}</td>
+                        <td>
+                            <button class="btn btn-success" onclick="resolveError(${error.id})" title="标记为已解决">✓</button>
+                            <button class="btn btn-danger" onclick="deleteError(${error.id})" title="删除">🗑</button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        // 测试 resolveAllErrors
+        async function testResolveAll() {
+            log('测试 resolveAllErrors...', 'info');
+            try {
+                await resolveAllErrors();
+                log('resolveAllErrors 执行完成', 'success');
+            } catch (e) {
+                log('resolveAllErrors 执行失败: ' + e.message, 'error');
+                console.error(e);
+            }
+        }
+
+        // 测试 deleteAllErrors
+        async function testDeleteAll() {
+            log('测试 deleteAllErrors...', 'info');
+            try {
+                await deleteAllErrors();
+                log('deleteAllErrors 执行完成', 'success');
+            } catch (e) {
+                log('deleteAllErrors 执行失败: ' + e.message, 'error');
+                console.error(e);
+            }
+        }
+
+        // ============ 从 logs.html 复制的函数 ============
+        
+        let showingResolved = false;
+        let errorsPage = 1;
+
+        async function showResolvedErrors() {
+            showingResolved = !showingResolved;
+            const btn = document.getElementById('show-resolved-btn');
+            btn.textContent = showingResolved ? '查看未解决' : '查看已解决';
+            log(`切换到: ${btn.textContent}`, 'info');
+        }
+
+        async function resolveAllErrors() {
+            if (!confirm('确定标记所有错误为已解决？')) {
+                log('用户取消操作', 'info');
+                return;
+            }
+
+            const btn = document.getElementById('resolve-all-btn');
+            const originalText = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = '处理中...';
+
+            log('开始标记所有错误为已解决...', 'info');
+
+            try {
+                // 模拟 API 调用
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                log('API 调用成功（模拟）', 'success');
+                
+                // 模拟成功后刷新
+                simulateNoErrors();
+            } catch (e) {
+                log('操作失败: ' + e.message, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = originalText;
+            }
+        }
+
+        async function deleteAllErrors() {
+            if (!confirm('确定删除所有错误记录？')) {
+                log('用户取消操作', 'info');
+                return;
+            }
+            
+            if (!confirm('再次确认：真的要删除所有记录吗？')) {
+                log('用户二次取消操作', 'info');
+                return;
+            }
+
+            const btn = document.getElementById('delete-all-btn');
+            const originalText = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = '删除中...';
+
+            log('开始删除所有错误...', 'info');
+
+            try {
+                // 模拟 API 调用
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                log('删除 API 调用成功（模拟）', 'success');
+                
+                // 模拟成功后刷新
+                simulateNoErrors();
+            } catch (e) {
+                log('删除失败: ' + e.message, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = originalText;
+            }
+        }
+
+        async function resolveError(id) {
+            log(`标记错误 ${id} 为已解决`, 'info');
+            if (confirm(`确定标记错误 ${id} 为已解决？`)) {
+                log(`错误 ${id} 已标记为已解决（模拟）`, 'success');
+            }
+        }
+
+        async function deleteError(id) {
+            log(`删除错误 ${id}`, 'info');
+            if (confirm(`确定删除错误 ${id}？`)) {
+                log(`错误 ${id} 已删除（模拟）`, 'success');
+            }
+        }
+
+        // 页面加载时执行检查
+        window.onload = function() {
+            log('测试页面已加载', 'success');
+            checkFunctions();
+        };
+    </script>
+</body>
+</html>

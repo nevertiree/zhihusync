@@ -31,6 +31,49 @@
     </div>
 </div>
 
+<!-- 内容提取错误 -->
+<div class="card" id="errors-section">
+    <div class="card-header">
+        <h3>⚠️ 内容提取错误</h3>
+        <div class="header-actions">
+            <button class="btn btn-sm btn-outline-secondary" onclick="showResolvedErrors()" id="show-resolved-btn">
+                查看已解决
+            </button>
+            <button class="btn btn-sm btn-success" onclick="resolveAllErrors()" id="resolve-all-btn" style="display: none;">
+                全部标为已解决
+            </button>
+            <button class="btn btn-sm btn-danger" onclick="deleteAllErrors()" id="delete-all-btn" style="display: none;">
+                全部删除
+            </button>
+        </div>
+    </div>
+    <div class="card-body">
+        <div id="errors-empty" class="empty-state" style="display: none;">
+            暂无提取错误
+        </div>
+        <div id="errors-container">
+            <table class="data-table" id="errors-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>时间</th>
+                        <th>类型</th>
+                        <th>问题标题</th>
+                        <th>错误信息</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody id="errors-body">
+                    <tr>
+                        <td colspan="6" class="text-center text-muted">加载中...</td>
+                    </tr>
+                </tbody>
+            </table>
+            <div class="pagination" id="errors-pagination"></div>
+        </div>
+    </div>
+</div>
+
 <!-- 同步历史详情 -->
 <div class="card">
     <div class="card-header">
@@ -64,6 +107,27 @@
 {% endblock %}
 
 {% block scripts %}
+<style>
+/* 已解决的错误行样式 */
+#errors-table tbody tr.resolved {
+    opacity: 0.6;
+    background-color: rgba(82, 196, 26, 0.05);
+}
+#errors-table tbody tr.resolved td {
+    text-decoration: line-through;
+}
+#errors-table tbody tr.resolved td:last-child {
+    text-decoration: none;
+}
+
+/* 操作按钮间距 */
+#errors-table .btn {
+    margin-right: 4px;
+}
+#errors-table .btn:last-child {
+    margin-right: 0;
+}
+</style>
 <script>
 let autoRefresh = true;
 let refreshInterval;
@@ -236,10 +300,328 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
+// 错误列表分页
+let errorsPage = 1;
+
+// 加载提取错误列表
+async function loadErrors(page = 1) {
+    errorsPage = page;
+    console.log(`[loadErrors] 加载第 ${page} 页错误列表...`);
+    
+    try {
+        const res = await fetch(`/api/extraction-errors?page=${page}&page_size=10&resolved=false`);
+        const data = await res.json();
+        console.log('[loadErrors] 获取到数据:', data);
+
+        const tbody = document.getElementById('errors-body');
+        const emptyDiv = document.getElementById('errors-empty');
+        const table = document.getElementById('errors-table');
+        const resolveAllBtn = document.getElementById('resolve-all-btn');
+        const deleteAllBtn = document.getElementById('delete-all-btn');
+
+        if (data.total === 0) {
+            tbody.innerHTML = '';
+            emptyDiv.style.display = 'block';
+            table.style.display = 'none';
+            if (resolveAllBtn) resolveAllBtn.style.display = 'none';
+            if (deleteAllBtn) deleteAllBtn.style.display = 'none';
+            return;
+        }
+
+        emptyDiv.style.display = 'none';
+        table.style.display = 'table';
+        if (resolveAllBtn) resolveAllBtn.style.display = 'inline-block';
+        if (deleteAllBtn) deleteAllBtn.style.display = 'inline-block';
+
+        // 错误类型映射
+        const errorTypeMap = {
+            'parse_error': { text: '解析错误', class: 'badge-danger' },
+            'network_error': { text: '网络错误', class: 'badge-warning' },
+            'timeout': { text: '超时', class: 'badge-warning' },
+            'other': { text: '其他', class: 'badge-secondary' }
+        };
+
+        tbody.innerHTML = data.items.map(error => {
+            const typeConfig = errorTypeMap[error.error_type] || errorTypeMap['other'];
+            return `
+                <tr>
+                    <td>${error.id}</td>
+                    <td>${error.created_at ? new Date(error.created_at).toLocaleString('zh-CN') : '-'}</td>
+                    <td><span class="badge ${typeConfig.class}">${typeConfig.text}</span></td>
+                    <td title="${escapeHtml(error.question_title || '')}">
+                        ${escapeHtml(error.question_title ? error.question_title.substring(0, 40) + '...' : '-')}
+                    </td>
+                    <td class="text-muted" title="${escapeHtml(error.error_message || '')}">
+                        ${escapeHtml(error.error_message ? error.error_message.substring(0, 50) + '...' : '-')}
+                    </td>
+                    <td>
+                        <button class="btn btn-sm btn-success" onclick="resolveError(${error.id})" title="标记为已解决">
+                            ✓
+                        </button>
+                        <button class="btn btn-sm btn-danger" onclick="deleteError(${error.id})" title="删除">
+                            🗑
+                        </button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+
+        // 分页
+        const totalPages = Math.ceil(data.total / data.page_size);
+        renderErrorsPagination(totalPages);
+    } catch (e) {
+        document.getElementById('errors-body').innerHTML =
+            `<tr><td colspan="6" class="text-center text-danger">加载失败: ${e.message}</td></tr>`;
+    }
+}
+
+// 渲染错误分页
+function renderErrorsPagination(totalPages) {
+    const container = document.getElementById('errors-pagination');
+
+    if (totalPages <= 1) {
+        container.innerHTML = '';
+        return;
+    }
+
+    let html = '';
+    html += `<button class="btn btn-sm ${errorsPage === 1 ? 'disabled' : ''}"
+        ${errorsPage === 1 ? '' : `onclick="loadErrors(${errorsPage - 1})"`}>上一页</button>`;
+
+    for (let i = 1; i <= totalPages; i++) {
+        if (i === 1 || i === totalPages || (i >= errorsPage - 2 && i <= errorsPage + 2)) {
+            html += `<button class="btn btn-sm ${i === errorsPage ? 'active' : ''}"
+                onclick="loadErrors(${i})">${i}</button>`;
+        } else if (i === errorsPage - 3 || i === errorsPage + 3) {
+            html += `<span class="pagination-ellipsis">...</span>`;
+        }
+    }
+
+    html += `<button class="btn btn-sm ${errorsPage === totalPages ? 'disabled' : ''}"
+        ${errorsPage === totalPages ? '' : `onclick="loadErrors(${errorsPage + 1})"`}>下一页</button>`;
+
+    container.innerHTML = html;
+}
+
+// 标记错误为已解决
+async function resolveError(errorId) {
+    if (!confirm('确定标记此错误为已解决？')) return;
+
+    try {
+        const res = await fetch(`/api/extraction-errors/${errorId}/resolve`, { method: 'POST' });
+        const data = await res.json();
+        
+        if (res.ok) {
+            showToast(data.message || '已标记为已解决', 'success');
+            await loadErrors(errorsPage);
+        } else {
+            showToast(data.detail || '操作失败', 'error');
+        }
+    } catch (e) {
+        console.error('resolveError error:', e);
+        showToast('操作失败: ' + e.message, 'error');
+    }
+}
+
+// 标记所有错误为已解决
+async function resolveAllErrors() {
+    if (!confirm('确定标记所有错误为已解决？\n\n这将清除首页的错误提示。')) return;
+
+    const btn = document.getElementById('resolve-all-btn');
+    const originalText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = '处理中...';
+
+    console.log('[resolveAllErrors] 开始标记所有错误为已解决...');
+
+    try {
+        const res = await fetch('/api/extraction-errors/resolve-all', { method: 'POST' });
+        console.log('[resolveAllErrors] 响应状态:', res.status);
+        
+        const data = await res.json();
+        console.log('[resolveAllErrors] 响应数据:', data);
+        
+        if (res.ok) {
+            showToast(data.message || '已标记所有错误为已解决', 'success');
+            // 强制刷新错误列表
+            await loadErrors(1);
+            // 刷新首页统计数据（如果用户在首页也有打开）
+            if (typeof loadStats === 'function') {
+                loadStats();
+            }
+        } else {
+            showToast(data.detail || '操作失败', 'error');
+        }
+    } catch (e) {
+        console.error('[resolveAllErrors] 错误:', e);
+        showToast('操作失败: ' + e.message, 'error');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = originalText;
+    }
+}
+
+// 删除单个错误
+async function deleteError(errorId) {
+    if (!confirm('确定删除此错误记录？\n\n此操作不可恢复。')) return;
+
+    try {
+        const res = await fetch(`/api/extraction-errors/${errorId}`, { method: 'DELETE' });
+        const data = await res.json();
+        
+        if (res.ok) {
+            showToast(data.message || '已删除', 'success');
+            await loadErrors(errorsPage);
+        } else {
+            showToast(data.detail || '删除失败', 'error');
+        }
+    } catch (e) {
+        console.error('[deleteError] 错误:', e);
+        showToast('删除失败: ' + e.message, 'error');
+    }
+}
+
+// 删除所有错误
+async function deleteAllErrors() {
+    if (!confirm('确定删除所有错误记录？\n\n此操作不可恢复，建议先标记为已解决而不是删除。')) return;
+    
+    if (!confirm('再次确认：真的要删除所有记录吗？')) return;
+
+    const btn = document.getElementById('delete-all-btn');
+    const originalText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = '删除中...';
+
+    console.log('[deleteAllErrors] 开始删除所有错误...');
+
+    try {
+        // 先获取所有错误ID，然后逐个删除
+        const res = await fetch('/api/extraction-errors?page=1&page_size=1000&resolved=false');
+        const data = await res.json();
+        
+        if (data.items && data.items.length > 0) {
+            let deleted = 0;
+            let failed = 0;
+            
+            for (const error of data.items) {
+                try {
+                    const delRes = await fetch(`/api/extraction-errors/${error.id}`, { method: 'DELETE' });
+                    if (delRes.ok) {
+                        deleted++;
+                    } else {
+                        failed++;
+                    }
+                } catch (e) {
+                    failed++;
+                    console.error(`删除错误 ${error.id} 失败:`, e);
+                }
+            }
+            
+            showToast(`已删除 ${deleted} 条记录${failed > 0 ? `，${failed} 条失败` : ''}`, failed > 0 ? 'warning' : 'success');
+            await loadErrors(1);
+        } else {
+            showToast('没有需要删除的记录', 'info');
+        }
+    } catch (e) {
+        console.error('[deleteAllErrors] 错误:', e);
+        showToast('删除失败: ' + e.message, 'error');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = originalText;
+    }
+}
+
+// 切换显示已解决的错误
+let showingResolved = false;
+async function showResolvedErrors() {
+    showingResolved = !showingResolved;
+    const btn = document.getElementById('show-resolved-btn');
+    btn.textContent = showingResolved ? '查看未解决' : '查看已解决';
+    btn.className = showingResolved ? 'btn btn-sm btn-primary' : 'btn btn-sm btn-outline-secondary';
+    
+    await loadErrorsWithFilter(1, showingResolved);
+}
+
+// 加载错误列表（带筛选）
+async function loadErrorsWithFilter(page = 1, resolved = false) {
+    errorsPage = page;
+    console.log(`[loadErrorsWithFilter] 加载第 ${page} 页错误列表 (resolved=${resolved})...`);
+    
+    try {
+        const res = await fetch(`/api/extraction-errors?page=${page}&page_size=10&resolved=${resolved}`);
+        const data = await res.json();
+        console.log('[loadErrorsWithFilter] 获取到数据:', data);
+
+        const tbody = document.getElementById('errors-body');
+        const emptyDiv = document.getElementById('errors-empty');
+        const table = document.getElementById('errors-table');
+        const resolveAllBtn = document.getElementById('resolve-all-btn');
+        const deleteAllBtn = document.getElementById('delete-all-btn');
+
+        if (data.total === 0) {
+            tbody.innerHTML = '';
+            emptyDiv.style.display = 'block';
+            emptyDiv.textContent = resolved ? '暂无已解决的错误' : '暂无提取错误';
+            table.style.display = 'none';
+            if (resolveAllBtn) resolveAllBtn.style.display = 'none';
+            if (deleteAllBtn) deleteAllBtn.style.display = 'none';
+            return;
+        }
+
+        emptyDiv.style.display = 'none';
+        table.style.display = 'table';
+        // 只在查看未解决时显示这些按钮
+        if (resolveAllBtn) resolveAllBtn.style.display = resolved ? 'none' : 'inline-block';
+        if (deleteAllBtn) deleteAllBtn.style.display = resolved ? 'none' : 'inline-block';
+
+        // 错误类型映射
+        const errorTypeMap = {
+            'parse_error': { text: '解析错误', class: 'badge-danger' },
+            'network_error': { text: '网络错误', class: 'badge-warning' },
+            'timeout': { text: '超时', class: 'badge-warning' },
+            'other': { text: '其他', class: 'badge-secondary' }
+        };
+
+        tbody.innerHTML = data.items.map(error => {
+            const typeConfig = errorTypeMap[error.error_type] || errorTypeMap['other'];
+            const isResolved = error.resolved;
+            return `
+                <tr class="${isResolved ? 'resolved' : ''}">
+                    <td>${error.id}</td>
+                    <td>${error.created_at ? new Date(error.created_at).toLocaleString('zh-CN') : '-'}</td>
+                    <td><span class="badge ${typeConfig.class}">${typeConfig.text}</span></td>
+                    <td title="${escapeHtml(error.question_title || '')}">
+                        ${escapeHtml(error.question_title ? error.question_title.substring(0, 40) + '...' : '-')}
+                    </td>
+                    <td class="text-muted" title="${escapeHtml(error.error_message || '')}">
+                        ${escapeHtml(error.error_message ? error.error_message.substring(0, 50) + '...' : '-')}
+                    </td>
+                    <td>
+                        ${isResolved 
+                            ? `<span class="badge badge-success">已解决</span>` 
+                            : `<button class="btn btn-sm btn-success" onclick="resolveError(${error.id})" title="标记为已解决">✓</button>
+                               <button class="btn btn-sm btn-danger" onclick="deleteError(${error.id})" title="删除">🗑</button>`
+                        }
+                    </td>
+                </tr>
+            `;
+        }).join('');
+
+        // 分页
+        const totalPages = Math.ceil(data.total / data.page_size);
+        renderErrorsPagination(totalPages);
+    } catch (e) {
+        console.error('[loadErrorsWithFilter] 错误:', e);
+        document.getElementById('errors-body').innerHTML =
+            `<tr><td colspan="6" class="text-center text-danger">加载失败: ${e.message}</td></tr>`;
+    }
+}
+
 // 初始化
 document.addEventListener('DOMContentLoaded', function() {
     loadLogs();
     loadHistory();
+    loadErrors();
     startAutoRefresh();
 });
 

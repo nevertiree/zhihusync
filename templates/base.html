@@ -11,43 +11,46 @@
 <body>
     <div class="app-container">
         <!-- 侧边栏 -->
-        <aside class="sidebar">
-            <div class="sidebar-header">
-                <h1>📦 zhihusync</h1>
-                <p>知乎备份工具</p>
+        <aside class="sidebar" id="sidebar">
+            <!-- Logo 区域 -->
+            <div class="sidebar-logo">
+                <a href="/" class="logo-link" title="返回仪表盘">
+                    <span class="logo-icon">📦</span>
+                    <span class="logo-text">zhihusync</span>
+                </a>
             </div>
 
             <nav class="sidebar-nav">
-                <a href="/" class="nav-item {% if request.url.path == '/' %}active{% endif %}">
+                <a href="/" class="nav-item {% if request.url.path == '/' %}active{% endif %}" title="仪表盘">
                     <span class="icon">📊</span>
-                    <span>仪表盘</span>
+                    <span class="nav-text">仪表盘</span>
                 </a>
-                <a href="/content" class="nav-item {% if request.url.path == '/content' %}active{% endif %}">
+                <a href="/content" class="nav-item {% if request.url.path == '/content' %}active{% endif %}" title="明细">
                     <span class="icon">📋</span>
-                    <span>明细</span>
+                    <span class="nav-text">明细</span>
                 </a>
-                <a href="/config" class="nav-item {% if request.url.path == '/config' %}active{% endif %}">
+                <a href="/config" class="nav-item {% if request.url.path == '/config' %}active{% endif %}" title="配置">
                     <span class="icon">⚙️</span>
-                    <span>配置</span>
+                    <span class="nav-text">配置</span>
                 </a>
-                <a href="/logs" class="nav-item {% if request.url.path == '/logs' %}active{% endif %}">
-                    <span class="icon">📋</span>
-                    <span>日志</span>
+                <a href="/logs" class="nav-item {% if request.url.path == '/logs' %}active{% endif %}" title="日志">
+                    <span class="icon">📝</span>
+                    <span class="nav-text">日志</span>
                 </a>
-                <a href="/docs" class="nav-item" target="_blank">
+                <a href="#" class="nav-item" onclick="openSwaggerModal(); return false;" title="API 文档">
                     <span class="icon">📖</span>
-                    <span>API 文档</span>
+                    <span class="nav-text">API 文档</span>
                 </a>
-                <a href="/donate" class="nav-item {% if request.url.path == '/donate' %}active{% endif %}">
+                <a href="/donate" class="nav-item {% if request.url.path == '/donate' %}active{% endif %}" title="捐赠">
                     <span class="icon">☕</span>
-                    <span>捐赠</span>
+                    <span class="nav-text">捐赠</span>
                 </a>
             </nav>
 
             <div class="sidebar-footer">
-                <div class="sync-status" id="sidebar-status">
+                <div class="sync-status" id="sidebar-status" title="同步状态">
                     <span class="status-dot" id="status-dot"></span>
-                    <span id="status-text">检查中...</span>
+                    <span class="status-text" id="status-text">检查中...</span>
                 </div>
             </div>
         </aside>
@@ -61,7 +64,49 @@
     <!-- Toast 通知容器 -->
     <div class="toast-container" id="toast-container"></div>
 
+    <!-- Swagger 内嵌模态框 -->
+    <div class="swagger-modal" id="swagger-modal">
+        <div class="swagger-modal-overlay" onclick="closeSwaggerModal()"></div>
+        <div class="swagger-modal-content">
+            <div class="swagger-modal-header">
+                <h3>📖 API 文档</h3>
+                <div class="swagger-modal-actions">
+                    <a href="/docs" target="_blank" class="btn btn-sm btn-secondary" title="在新窗口打开">↗️ 新窗口</a>
+                    <button class="btn-close" onclick="closeSwaggerModal()">✕</button>
+                </div>
+            </div>
+            <div class="swagger-modal-body">
+                <iframe id="swagger-iframe" src="/docs" frameborder="0"></iframe>
+            </div>
+        </div>
+    </div>
+
     <script src="/static/js/admin.js"></script>
+    <script>
+        // 打开 Swagger 模态框
+        function openSwaggerModal() {
+            const modal = document.getElementById('swagger-modal');
+            const iframe = document.getElementById('swagger-iframe');
+            // 重新加载 iframe 以确保最新状态
+            iframe.src = '/docs';
+            modal.classList.add('active');
+            document.body.style.overflow = 'hidden';
+        }
+
+        // 关闭 Swagger 模态框
+        function closeSwaggerModal() {
+            const modal = document.getElementById('swagger-modal');
+            modal.classList.remove('active');
+            document.body.style.overflow = '';
+        }
+
+        // ESC 键关闭模态框
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeSwaggerModal();
+            }
+        });
+    </script>
     {% block scripts %}{% endblock %}
 </body>
 </html>

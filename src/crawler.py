@@ -16,6 +16,16 @@ from storage import StorageManager
 from tenacity import retry, stop_after_attempt, wait_exponential
 from timezone_utils import get_beijing_now
 
+# 随机 User-Agent 列表
+USER_AGENTS = [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:120.0) Gecko/20100101 Firefox/120.0",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:120.0) Gecko/20100101 Firefox/120.0",
+]
+
 
 class ZhihuCrawler:
     """知乎爬虫 - 支持多种浏览器"""
@@ -33,6 +43,7 @@ class ZhihuCrawler:
         request_delay: float = 2.0,
         browser_type: str = "auto",
         max_comments: int = -1,
+        stop_check_callback: Callable | None = None,
     ):
         """初始化爬虫.
 
@@ -44,6 +55,7 @@ class ZhihuCrawler:
             request_delay: 请求间隔(秒).
             browser_type: 浏览器类型(auto/chromium/firefox/webkit/edge).
             max_comments: 每篇回答最大评论数，-1表示无限制.
+            stop_check_callback: 停止检查回调函数，返回True表示需要停止.
         """
         self.user_id = user_id
         self.db = db_manager
@@ -52,6 +64,7 @@ class ZhihuCrawler:
         self.request_delay = request_delay
         self.browser_type = browser_type  # auto, chromium, firefox, webkit, edge
         self.max_comments = max_comments
+        self.stop_check_callback = stop_check_callback
 
         self.browser: Browser | None = None
         self.context: BrowserContext | None = None
@@ -60,6 +73,9 @@ class ZhihuCrawler:
         # 统计
         self.new_items = 0
         self.updated_items = 0
+
+        # 停止标志
+        self._stopped = False
 
     async def __aenter__(self):
         """异步上下文管理器入口"""
@@ -175,13 +191,17 @@ class ZhihuCrawler:
             except Exception as e:
                 logger.warning(f"加载 Cookie 失败: {e}")
 
+        # 随机选择 User-Agent
+        user_agent = random.choice(USER_AGENTS)
+
         context_options = {
-            "user_agent": (
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-                "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.0"
-            ),
+            "user_agent": user_agent,
             "viewport": {"width": 1920, "height": 1080},
             "locale": "zh-CN",
+            "timezone_id": "Asia/Shanghai",
+            # 添加更多浏览器参数以绕过检测
+            "permissions": ["geolocation"],
+            "color_scheme": "light",
         }
 
         # 尝试使用 storage_state，如果失败则手动添加 cookie
@@ -201,42 +221,308 @@ class ZhihuCrawler:
 
         self.page = await self.context.new_page()
 
+        # 注入反检测脚本 - 绕过知乎的风控检测
+        await self._inject_anti_detection()
+
+        # 验证登录状态
+        await self._verify_login_status()
+
         logger.info("浏览器初始化完成")
 
+    async def _inject_anti_detection(self):
+        """注入反检测脚本 - 隐藏自动化痕迹.
+
+        知乎会检测以下特征来判断是否为爬虫：
+        1. navigator.webdriver - 浏览器自动化标志
+        2. navigator.plugins - 插件列表为空
+        3. navigator.languages - 语言列表
+        4. window.chrome - Chrome 对象
+        5. Canvas/WebGL 指纹
+        """
+        try:
+            # 注入脚本隐藏 webdriver 标志
+            await self.page.add_init_script(
+                """
+                // 删除 webdriver 标志
+                Object.defineProperty(navigator, 'webdriver', {
+                    get: () => undefined,
+                });
+
+                // 添加 Chrome 对象（如果是 Chromium 浏览器）
+                if (!window.chrome) {
+                    window.chrome = {
+                        runtime: {
+                            OnInstalledReason: {CHROME_UPDATE: "chrome_update"},
+                            OnRestartRequiredReason: {APP_UPDATE: "app_update"},
+                            PlatformArch: {X86_64: "x86-64"},
+                            PlatformNaclArch: {X86_64: "x86-64"},
+                            PlatformOs: {WIN: "win"},
+                            RequestUpdateCheckStatus: {NO_UPDATE: "no_update"},
+                        }
+                    };
+                }
+
+                // 添加插件列表
+                Object.defineProperty(navigator, 'plugins', {
+                    get: () => [
+                        {
+                            0: {type: "application/x-google-chrome-pdf", suffixes: "pdf", description: "Portable Document Format"},
+                            description: "Portable Document Format",
+                            filename: "internal-pdf-viewer",
+                            length: 1,
+                            name: "Chrome PDF Plugin"
+                        },
+                        {
+                            0: {type: "application/pdf", suffixes: "pdf", description: "Portable Document Format"},
+                            description: "Portable Document Format",
+                            filename: "internal-pdf-viewer2",
+                            length: 1,
+                            name: "Chrome PDF Viewer"
+                        }
+                    ],
+                });
+
+                // 添加语言列表
+                Object.defineProperty(navigator, 'languages', {
+                    get: () => ['zh-CN', 'zh', 'en'],
+                });
+
+                // 覆盖 permissions 查询
+                const originalQuery = window.navigator.permissions.query;
+                window.navigator.permissions.query = (parameters) => (
+                    parameters.name === 'notifications'
+                        ? Promise.resolve({state: Notification.permission})
+                        : originalQuery(parameters)
+                );
+
+                // 隐藏 Playwright 特定属性
+                delete navigator.__proto__.webdriver;
+            """
+            )
+            logger.debug("已注入反检测脚本")
+        except Exception as e:
+            logger.warning(f"注入反检测脚本失败: {e}")
+
+    async def pre_check(self) -> dict:
+        """采集前预检查 - 验证 Cookie 和存储有效性.
+
+        Returns:
+            检查结果: {
+                "success": bool,
+                "message": str,
+                "checks": {
+                    "cookie_exists": bool,
+                    "cookie_valid": bool,
+                    "storage_writable": bool,
+                }
+            }
+        """
+        logger.info("=" * 60)
+        logger.info("🔍 开始采集前预检查...")
+        logger.info("=" * 60)
+
+        result = {
+            "success": False,
+            "message": "",
+            "checks": {
+                "cookie_exists": False,
+                "cookie_valid": False,
+                "storage_writable": False,
+            },
+        }
+
+        # 1. 检查 Cookie 文件是否存在
+        cookie_file = self._get_cookie_file_path()
+        if not cookie_file.exists():
+            result["message"] = "❌ Cookie 文件不存在，请先配置 Cookie"
+            logger.error(result["message"])
+            return result
+
+        try:
+            with open(cookie_file, encoding="utf-8") as f:
+                storage_state = json.load(f)
+            cookies = storage_state.get("cookies", [])
+            if not cookies:
+                result["message"] = "❌ Cookie 文件为空，请重新配置"
+                logger.error(result["message"])
+                return result
+
+            result["checks"]["cookie_exists"] = True
+            logger.info(f"✅ Cookie 文件存在: {len(cookies)} 条 cookie")
+        except Exception as e:
+            result["message"] = f"❌ Cookie 文件读取失败: {e}"
+            logger.error(result["message"])
+            return result
+
+        # 2. 检查 Cookie 有效性（调用知乎 API 验证）
+        try:
+            logger.info("🔍 正在验证 Cookie 有效性...")
+
+            # 直接访问知乎 API 验证登录状态（最可靠的方式）
+            api_response = await self.page.evaluate(
+                """
+                async () => {
+                    try {
+                        const response = await fetch('https://www.zhihu.com/api/v4/me', {
+                            method: 'GET',
+                            credentials: 'include',
+                            headers: {
+                                'Accept': 'application/json'
+                            }
+                        });
+                        const data = await response.json();
+                        return {
+                            success: response.ok && data.id && !data.error,
+                            data: data,
+                            status: response.status
+                        };
+                    } catch (e) {
+                        return { success: false, error: e.toString() };
+                    }
+                }
+            """
+            )
+
+            if api_response and api_response.get("success"):
+                result["checks"]["cookie_valid"] = True
+                user_data = api_response.get("data", {})
+                user_name = user_data.get("name", "未知用户")
+                logger.info(f"✅ Cookie 验证通过: {user_name}")
+            else:
+                error_info = api_response.get("data", {}) if api_response else {}
+                error_msg = (
+                    error_info.get("error", {}).get("message", "未知错误")
+                    if isinstance(error_info, dict)
+                    else "Cookie 无效"
+                )
+                result["message"] = "❌ Cookie 已失效，请更新 Cookie 后重试"
+                if error_msg:
+                    result["message"] += f" (错误: {error_msg})"
+                logger.error(result["message"])
+                return result
+
+        except Exception as e:
+            result["message"] = f"❌ Cookie 验证失败: {e}"
+            logger.error(result["message"])
+            return result
+
+        # 3. 检查存储目录是否可写
+        try:
+            html_path = Path(self.storage.html_path)
+            html_path.mkdir(parents=True, exist_ok=True)
+
+            # 尝试写入测试文件
+            test_file = html_path / ".write_test"
+            test_file.write_text("test")
+            test_file.unlink()
+
+            result["checks"]["storage_writable"] = True
+            logger.info(f"✅ 存储目录可写: {html_path}")
+        except Exception as e:
+            result["message"] = f"❌ 存储目录不可写: {e}"
+            logger.error(result["message"])
+            return result
+
+        # 所有检查通过
+        result["success"] = True
+        result["message"] = "✅ 预检查全部通过，开始采集"
+        logger.info("=" * 60)
+        logger.info(result["message"])
+        logger.info("=" * 60)
+
+        return result
+
+    async def _verify_login_status(self):
+        """验证登录状态，如果失效则尝试刷新.
+
+        知乎 Cookie 过期后会导致大量 403，需要及时检测。
+        """
+        try:
+            # 访问知乎首页检查登录状态
+            await self.page.goto("https://www.zhihu.com", wait_until="domcontentloaded", timeout=15000)
+            await asyncio.sleep(2)
+
+            # 检查是否有用户菜单（登录标志）
+            has_user_menu = await self.page.query_selector(".AppHeader-profile") is not None
+
+            if not has_user_menu:
+                # 尝试检查 localStorage 中的用户信息
+                user_info = await self.page.evaluate(
+                    """
+                    () => {
+                        try {
+                            const user = localStorage.getItem('$$user');
+                            return user ? JSON.parse(user) : null;
+                        } catch (e) {
+                            return null;
+                        }
+                    }
+                """
+                )
+
+                if not user_info:
+                    logger.warning("⚠️ Cookie 可能已过期，建议更新 Cookie 以减少 403 错误")
+                else:
+                    logger.info(f"✅ 登录状态有效: {user_info.get('name', '未知用户')}")
+            else:
+                logger.info("✅ 登录状态验证通过")
+
+        except Exception as e:
+            logger.warning(f"验证登录状态失败: {e}")
+
     async def _add_cookies_manually(self, storage_state):
-        """手动添加 cookie 到 context - 使用 JavaScript 方式"""
+        """手动添加 cookie 到 context - 使用 Playwright API"""
         try:
             cookies = storage_state.get("cookies", [])
             if not cookies:
                 return
 
-            # 创建页面访问知乎以便添加 cookie
+            # 使用 Playwright 的 add_cookies API，支持 httpOnly
             assert self.context is not None  # noqa: S101
+
+            # 转换 cookie 格式
+            formatted_cookies = []
+            for cookie in cookies:
+                cookie_dict = {
+                    "name": cookie.get("name", ""),
+                    "value": cookie.get("value", ""),
+                    "domain": cookie.get("domain", ".zhihu.com"),
+                    "path": cookie.get("path", "/"),
+                }
+                # 添加可选属性
+                if cookie.get("httpOnly"):
+                    cookie_dict["httpOnly"] = True
+                if cookie.get("secure"):
+                    cookie_dict["secure"] = True
+                # 修复 sameSite 值：Playwright 只接受 Strict/Lax/None
+                same_site = cookie.get("sameSite")
+                if same_site:
+                    same_site_map = {
+                        "strict": "Strict",
+                        "lax": "Lax",
+                        "none": "None",
+                        "no_restriction": "None",
+                    }
+                    normalized = same_site_map.get(same_site.lower(), same_site)
+                    if normalized in ("Strict", "Lax", "None"):
+                        cookie_dict["sameSite"] = normalized
+                # 处理过期时间（支持 expires 或 expirationDate）
+                expires = cookie.get("expires") or cookie.get("expirationDate")
+                if expires:
+                    try:
+                        cookie_dict["expires"] = int(float(expires))
+                    except (ValueError, TypeError):
+                        pass
+                formatted_cookies.append(cookie_dict)
+
+            await self.context.add_cookies(formatted_cookies)
+            logger.info(f"通过 Playwright API 设置了 {len(formatted_cookies)} 条 cookie")
+
+            # 创建页面并访问知乎以验证 cookie
             self.page = await self.context.new_page()
             assert self.page is not None  # noqa: S101
             await self.page.goto("https://www.zhihu.com", wait_until="domcontentloaded", timeout=10000)
 
-            # 使用 JavaScript 批量设置 cookie
-            success_count = 0
-            for cookie in cookies:
-                name = cookie.get("name", "")
-                value = cookie.get("value", "")
-                domain = cookie.get("domain", ".zhihu.com")
-                path = cookie.get("path", "/")
-
-                try:
-                    # 使用 encodeURIComponent 处理特殊字符
-                    js_code = f"""() => {{
-                        document.cookie = "{name}=" + encodeURIComponent("{value}") +
-                        "; domain={domain}; path={path}";
-                    }}"""
-                    assert self.page is not None  # noqa: S101
-                    await self.page.evaluate(js_code)
-                    success_count += 1
-                except Exception as e:
-                    logger.debug(f"设置 cookie {name} 失败: {e}")
-
-            logger.info(f"通过 JavaScript 设置了 {success_count}/{len(cookies)} 条 cookie")
         except Exception as e:
             logger.warning(f"手动添加 cookie 失败: {e}")
 
@@ -413,9 +699,43 @@ class ZhihuCrawler:
             ts_float = ts_float / 1000
         return datetime.fromtimestamp(ts_float)
 
-    async def _delay(self):
-        """请求延迟"""
-        await asyncio.sleep(self.request_delay)
+    async def _delay(self, extra_delay: float = 0):
+        """请求延迟 - 添加随机扰动模拟人类行为.
+
+        Args:
+            extra_delay: 额外延迟时间（应对403时增加）
+        """
+        # 基础延迟 + 随机扰动 (±30%)
+        base_delay = self.request_delay + extra_delay
+        random_delay = base_delay * (0.7 + random.random() * 0.6)
+
+        # 偶尔增加更长的延迟（模拟用户阅读）
+        if random.random() < 0.1:  # 10% 概率
+            random_delay += random.uniform(1.0, 3.0)
+
+        await asyncio.sleep(random_delay)
+
+    async def _random_mouse_move(self):
+        """随机鼠标移动 - 模拟人类行为.
+
+        知乎会检测鼠标移动轨迹，完全静止或规律移动会被识别为机器人。
+        """
+        try:
+            if not self.page:
+                return
+
+            # 随机移动鼠标到页面某个位置
+            x = random.randint(100, 800)
+            y = random.randint(100, 600)
+            await self.page.mouse.move(x, y)
+
+            # 偶尔滚动页面
+            if random.random() < 0.3:  # 30% 概率
+                scroll_y = random.randint(-200, 200)
+                await self.page.evaluate(f"window.scrollBy(0, {scroll_y})")
+
+        except Exception:
+            pass  # 鼠标移动失败不影响主要功能
 
     async def _fetch_user_profile(self):
         """获取用户详细信息（名称、头像、签名）"""
@@ -994,70 +1314,184 @@ class ZhihuCrawler:
 
         return None
 
-    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
-    async def fetch_answer_page(self, question_id: str, answer_id: str) -> str | None:
-        """获取回答页面 HTML，包含完整内容和样式
+    async def fetch_answer_page(
+        self, question_id: str, answer_id: str, max_retries: int = 3
+    ) -> tuple[str | None, dict | None]:
+        """获取回答页面 HTML，包含完整内容和样式，支持403重试.
+
+        Args:
+            question_id: 问题ID.
+            answer_id: 回答ID.
+            max_retries: 最大重试次数.
 
         Returns:
-            页面HTML内容，如果页面404返回 "__DELETED__"，其他错误返回 None
+            Tuple[页面HTML内容, 错误信息字典]:
+            - 成功: (html_content, None)
+            - 404删除: ("__DELETED__", None)
+            - 失败: (None, error_info)
+            error_info 格式: {
+                "error_type": str,  # "403"/"404"/"timeout"/"network_error"/"other"
+                "error_message": str,
+                "http_status": int | None,
+                "retry_count": int,
+            }
         """
         url = f"{self.ZHIHU_BASE}/question/{question_id}/answer/{answer_id}"
+        last_error = None
 
-        await self._delay()
-        assert self.page is not None  # noqa: S101
-        response = await self.page.goto(url, wait_until="networkidle")
+        for attempt in range(max_retries):
+            try:
+                # 403重试时增加额外延迟
+                extra_delay = attempt * 2  # 每次重试多等2秒
+                await self._delay(extra_delay)
 
-        # 检测404状态
-        if response:
-            status = response.status
-            if status == 404:
-                logger.warning(f"页面404(可能已被删除): {url}")
-                return "__DELETED__"
-            elif status >= 400:
-                logger.warning(f"页面返回错误状态码 {status}: {url}")
+                # 随机鼠标移动模拟人类行为
+                await self._random_mouse_move()
 
-        # 检查页面内容是否包含404提示
-        page_title = await self.page.title()
-        if "404" in page_title or "不存在" in page_title:
-            logger.warning(f"页面标题表明404: {page_title}")
-            return "__DELETED__"
+                assert self.page is not None  # noqa: S101
+                response = await self.page.goto(url, wait_until="networkidle", timeout=30000)
 
-        # 检查是否有内容区域
-        content_exists = await self.page.query_selector(".RichContent, .QuestionAnswer-content")
-        if not content_exists:
-            # 检查是否显示"内容不存在"等提示
-            error_selectors = [
-                "text=/内容不存在/",
-                "text=/页面不存在/",
-                "text=/404/",
-                ".ErrorPage",
-                ".NotFoundPage",
-            ]
-            for selector in error_selectors:
+                # 检测HTTP状态
+                if response:
+                    status = response.status
+                    if status == 404:
+                        logger.warning(f"页面404(可能已被删除): {url}")
+                        return "__DELETED__", None
+                    elif status == 403:
+                        logger.warning(f"页面403(访问被拒绝): {url}, 尝试 {attempt + 1}/{max_retries}")
+                        last_error = {
+                            "error_type": "403",
+                            "error_message": "HTTP 403 Forbidden - 访问被拒绝，可能是Cookie过期或触发风控",
+                            "http_status": 403,
+                            "retry_count": attempt + 1,
+                        }
+                        # 403时增加额外延迟后重试
+                        if attempt < max_retries - 1:
+                            wait_time = (attempt + 1) * 5 + random.randint(1, 5)  # 随机6-20秒递增
+                            logger.info(f"403错误，等待 {wait_time} 秒后重试...")
+                            await asyncio.sleep(wait_time)
+
+                            # 尝试重新验证登录状态并刷新
+                            try:
+                                # 访问首页重新建立会话
+                                await self.page.goto(
+                                    "https://www.zhihu.com", wait_until="domcontentloaded", timeout=15000
+                                )
+                                await asyncio.sleep(2)
+
+                                # 检查是否需要重新登录
+                                signin_link = await self.page.query_selector("a[href*='signin']")
+                                if signin_link:
+                                    logger.error("⚠️ 检测到未登录状态，Cookie 已过期，请更新 Cookie")
+                                    # 不再继续重试，直接返回错误
+                                    return None, {
+                                        "error_type": "403_cookie_expired",
+                                        "error_message": "Cookie 已过期，请更新 Cookie 后重试",
+                                        "http_status": 403,
+                                        "retry_count": attempt + 1,
+                                    }
+
+                                # 重新注入反检测脚本
+                                await self._inject_anti_detection()
+
+                            except Exception as e:
+                                logger.debug(f"刷新会话失败: {e}")
+                        continue
+                    elif status >= 500:
+                        logger.warning(f"服务器错误 {status}: {url}, 尝试 {attempt + 1}/{max_retries}")
+                        last_error = {
+                            "error_type": "server_error",
+                            "error_message": f"HTTP {status} Server Error",
+                            "http_status": status,
+                            "retry_count": attempt + 1,
+                        }
+                        if attempt < max_retries - 1:
+                            await asyncio.sleep((attempt + 1) * 3)
+                        continue
+                    elif status >= 400:
+                        logger.warning(f"客户端错误 {status}: {url}")
+                        # 4xx错误不重试（除403外）
+                        return None, {
+                            "error_type": str(status),
+                            "error_message": f"HTTP {status} Client Error",
+                            "http_status": status,
+                            "retry_count": attempt + 1,
+                        }
+
+                # 检查页面内容是否包含404提示
+                page_title = await self.page.title()
+                if "404" in page_title or "不存在" in page_title:
+                    logger.warning(f"页面标题表明404: {page_title}")
+                    return "__DELETED__", None
+
+                # 检查是否有内容区域
+                content_exists = await self.page.query_selector(".RichContent, .QuestionAnswer-content")
+                if not content_exists:
+                    # 检查是否显示"内容不存在"等提示
+                    error_selectors = [
+                        "text=/内容不存在/",
+                        "text=/页面不存在/",
+                        "text=/404/",
+                        ".ErrorPage",
+                        ".NotFoundPage",
+                    ]
+                    not_found = False
+                    for selector in error_selectors:
+                        try:
+                            error_el = await self.page.query_selector(selector)
+                            if error_el:
+                                logger.warning(f"页面显示不存在提示: {url}")
+                                not_found = True
+                                break
+                        except Exception:
+                            continue
+                    if not_found:
+                        return "__DELETED__", None
+
+                # 等待内容加载
                 try:
-                    error_el = await self.page.query_selector(selector)
-                    if error_el:
-                        logger.warning(f"页面显示不存在提示: {url}")
-                        return "__DELETED__"
+                    assert self.page is not None  # noqa: S101
+                    await self.page.wait_for_selector(".RichContent", timeout=10000)
                 except Exception:
-                    continue
+                    logger.warning(f"等待内容超时: {answer_id}")
 
-        # 等待内容加载
-        try:
-            assert self.page is not None  # noqa: S101
-            await self.page.wait_for_selector(".RichContent", timeout=10000)
-        except Exception:
-            logger.warning(f"等待内容超时: {answer_id}")
+                # 点击所有"展开全文"按钮
+                await self._expand_all_content()
 
-        # 点击所有"展开全文"按钮
-        await self._expand_all_content()
+                # 滚动页面以加载所有内容
+                await self._scroll_page()
 
-        # 滚动页面以加载所有内容
-        await self._scroll_page()
+                # 获取页面内容和样式
+                content = await self._get_page_with_styles()
+                return content, None
 
-        # 获取页面内容和样式
-        content = await self._get_page_with_styles()
-        return content
+            except Exception as e:
+                error_msg = str(e)
+                logger.warning(f"获取页面失败: {url}, 错误: {error_msg}, 尝试 {attempt + 1}/{max_retries}")
+
+                # 判断错误类型
+                error_type = "other"
+                http_status = None
+                if "timeout" in error_msg.lower():
+                    error_type = "timeout"
+                elif "net" in error_msg.lower() or "connection" in error_msg.lower():
+                    error_type = "network_error"
+
+                last_error = {
+                    "error_type": error_type,
+                    "error_message": error_msg,
+                    "http_status": http_status,
+                    "retry_count": attempt + 1,
+                }
+
+                if attempt < max_retries - 1:
+                    wait_time = (attempt + 1) * 3
+                    logger.info(f"等待 {wait_time} 秒后重试...")
+                    await asyncio.sleep(wait_time)
+
+        # 所有重试失败
+        logger.error(f"获取页面失败，已重试 {max_retries} 次: {url}")
+        return None, last_error
 
     async def _expand_all_content(self):
         """点击所有'展开全文'按钮以获取完整内容"""
@@ -1133,44 +1567,93 @@ class ZhihuCrawler:
         return str(soup)
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
-    async def fetch_comments(self, answer_id: str, limit: int = 20) -> list[dict]:
-        """获取评论"""
-        url = f"{self.API_BASE}/answers/{answer_id}/root_comments"
-        params = {"limit": limit, "offset": 0, "order": "normal", "status": "open"}
+    async def fetch_comments(self, answer_id: str, limit: int = 20) -> tuple[list[dict], dict]:
+        """获取评论 - 包括根评论和子评论.
 
-        full_url = f"{url}?{'&'.join(f'{k}={v}' for k, v in params.items())}"
+        Returns:
+            Tuple[评论列表, 统计信息]:
+                - 评论列表: 所有评论数据
+                - 统计信息: {
+                    "root_comments": int,  # 根评论数
+                    "child_comments": int,  # 子评论数
+                    "total_expected": int,  # 预期总数
+                    "api_error": str | None,  # API错误信息
+                }
+        """
+        stats = {
+            "root_comments": 0,
+            "child_comments": 0,
+            "total_expected": 0,
+            "api_error": None,
+        }
+        all_comments = []
+
+        # 1. 获取根评论
+        root_url = f"{self.API_BASE}/answers/{answer_id}/root_comments"
+        params = {"limit": limit, "offset": 0, "order": "normal", "status": "open"}
+        full_url = f"{root_url}?{'&'.join(f'{k}={v}' for k, v in params.items())}"
 
         await self._delay()
-        logger.debug(f"请求评论 API: {full_url}")
-        assert self.page is not None  # noqa: S101
-        await self.page.goto(full_url)
+        logger.debug(f"请求根评论 API: {full_url}")
 
-        assert self.page is not None  # noqa: S101
-        content = await self.page.content()
-        soup = BeautifulSoup(content, "lxml")
-        text_elem = soup.find("pre")
+        try:
+            assert self.page is not None  # noqa: S101
+            response = await self.page.goto(full_url, wait_until="networkidle", timeout=15000)
 
-        if isinstance(text_elem, Tag):
-            try:
+            # 检查响应状态
+            if response and response.status == 403:
+                logger.warning(f"获取评论被403拒绝: {answer_id}")
+                stats["api_error"] = "403 Forbidden"
+                return [], stats
+
+            content = await self.page.content()
+            soup = BeautifulSoup(content, "lxml")
+            text_elem = soup.find("pre")
+
+            if isinstance(text_elem, Tag):
                 raw_text = text_elem.get_text()
-                logger.debug(f"评论 API 原始响应: {raw_text[:500]}...")
                 data = json.loads(raw_text)
-                comments = data.get("data", [])
-                logger.debug(f"评论 API 返回: {len(comments)} 条评论")
-                # 打印数据结构用于调试
-                if comments:
-                    logger.debug(
-                        f"第一条评论结构: {list(comments[0].keys()) if isinstance(comments[0], dict) else type(comments[0])}"
-                    )
-                return comments
-            except json.JSONDecodeError as e:
-                logger.warning(f"解析评论 JSON 失败: {e}")
-            except Exception as e:
-                logger.warning(f"获取评论失败: {e}")
-        else:
-            logger.warning(f"评论 API 返回无内容: {answer_id}")
+                root_comments = data.get("data", [])
+                paging = data.get("paging", {})
+                stats["root_comments"] = len(root_comments)
+                stats["total_expected"] = paging.get("totals", 0)
 
-        return []
+                logger.debug(f"根评论 API 返回: {len(root_comments)} 条，预期共 {stats['total_expected']} 条")
+
+                # 处理根评论并获取子评论
+                for item in root_comments:
+                    comment = item.get("comment", item)
+                    all_comments.append(comment)
+
+                    # 获取子评论
+                    child_comments = comment.get("child_comments", [])
+                    if child_comments:
+                        stats["child_comments"] += len(child_comments)
+                        all_comments.extend(child_comments)
+                        logger.debug(f"评论 {comment.get('id')} 有 {len(child_comments)} 条子评论")
+
+                    # 如果子评论过多，可能需要单独API获取
+                    child_comment_count = comment.get("child_comment_count", 0)
+                    if child_comment_count > len(child_comments):
+                        logger.debug(
+                            f"评论 {comment.get('id')} 有更多子评论: {child_comment_count} > {len(child_comments)}"
+                        )
+
+            else:
+                logger.warning(f"评论 API 返回无内容: {answer_id}")
+                stats["api_error"] = "Empty response"
+
+        except json.JSONDecodeError as e:
+            logger.warning(f"解析评论 JSON 失败: {e}")
+            stats["api_error"] = f"JSON decode error: {e}"
+        except Exception as e:
+            logger.warning(f"获取评论失败: {e}")
+            stats["api_error"] = f"Exception: {e}"
+
+        logger.info(
+            f"评论采集统计: 根评论 {stats['root_comments']}, 子评论 {stats['child_comments']}, 总计 {len(all_comments)}"
+        )
+        return all_comments, stats
 
     async def _scroll_page(self):
         """滚动页面加载内容"""
@@ -1405,6 +1888,10 @@ class ZhihuCrawler:
             - 全量采集时，如果404且本地未下载过 → 跳过不采集（节省空间）
             - 全量采集时，如果404但本地已下载 → 标记为删除并高亮标注，保留原内容
             - 普通采集时，404处理同上（保持数据完整性）
+
+        403处理策略:
+            - 自动重试3次，每次增加延迟
+            - 如果仍失败，记录到下载失败表，稍后统一重试
         """
         try:
             target = activity.get("target", {})
@@ -1429,9 +1916,9 @@ class ZhihuCrawler:
             # 检查是否已存在
             existing = self.db.get_answer_by_id(answer_id)
 
-            # 获取完整页面内容
+            # 获取完整页面内容（带重试）
             logger.info(f"获取回答: {question_title[:60]}...")
-            page_html = await self.fetch_answer_page(question_id, answer_id)
+            page_html, error_info = await self.fetch_answer_page(question_id, answer_id)
 
             # 处理404被删除的内容
             if page_html == "__DELETED__":
@@ -1443,6 +1930,7 @@ class ZhihuCrawler:
                         update_data = {
                             "id": answer_id,
                             "is_deleted": True,
+                            "download_status": "success",
                             "content_text": existing.content_text,  # 保留原内容预览
                             "extra_meta": {
                                 "deleted": True,
@@ -1491,6 +1979,7 @@ class ZhihuCrawler:
                         "original_url": f"{self.ZHIHU_BASE}/question/{question_id}/answer/{answer_id}",
                         "has_comments": False,
                         "is_deleted": True,
+                        "download_status": "skipped",
                         "extra_meta": {
                             "deleted": True,
                             "deleted_at": get_beijing_now().isoformat(),
@@ -1504,9 +1993,47 @@ class ZhihuCrawler:
                         logger.info(f"普通采集：保存删除状态记录: {question_title[:60]}...")
                     return True
 
-            # 其他获取失败的情况
-            if not page_html:
-                logger.warning(f"无法获取页面内容: {answer_id}")
+            # 处理下载失败（403等错误）- 不保存任何数据，直接暴露问题
+            if error_info:
+                error_type = error_info.get("error_type", "unknown")
+                http_status = error_info.get("http_status")
+                error_msg = error_info.get("error_message", "未知错误")
+
+                # 403错误特殊处理：明确提示Cookie过期问题
+                if http_status == 403 or error_type == "403_cookie_expired":
+                    logger.error(
+                        f"🚫 采集被阻止(403): {question_title[:60]}... | "
+                        f"原因: {error_msg} | "
+                        f"建议: 请更新知乎Cookie后重试"
+                    )
+                else:
+                    logger.error(f"下载失败: {question_title[:60]}..., 错误: {error_msg}")
+
+                # 【重要】不保存任何回答数据到数据库，直接记录失败
+                # 这样用户能看到问题而不是错误数据
+
+                # 记录到下载失败表（用于后续重试和统计）
+                failure_id = self.db.add_download_failure(
+                    answer_id=answer_id,
+                    user_id=self.user_id,
+                    question_title=question_title,
+                    question_id=question_id,
+                    error_type=error_type,
+                    error_message=error_msg,
+                    http_status=http_status,
+                )
+
+                # 记录提取错误（用于前端展示）
+                self.db.add_extraction_error(
+                    answer_id=answer_id,
+                    question_title=question_title,
+                    error_type=error_type if error_type != "403_cookie_expired" else "cookie_expired",
+                    error_message=f"【{error_type}】{error_msg}",
+                )
+
+                logger.warning(
+                    f"已记录下载失败 #{failure_id}: {question_title[:60]}... | " f"可在'明细'页面查看失败项并重新采集"
+                )
                 return False
 
             # 如果是已存在的记录且没有更新，跳过
@@ -1588,12 +2115,18 @@ class ZhihuCrawler:
                 "html_path": html_path,
                 "original_url": f"{self.ZHIHU_BASE}/question/{question_id}/answer/{answer_id}",
                 "has_comments": False,
+                "download_status": "success",  # 标记下载成功
+                "retry_count": 0,
+                "last_error": None,
                 "extra_meta": {
                     "author_headline": author_headline,
                 },
             }
 
             is_new = self.db.save_answer(answer_data)
+
+            # 如果之前有下载失败记录，标记为已解决
+            self.db.resolve_download_failure_by_answer(answer_id)
 
             if is_new:
                 self.new_items += 1
@@ -1603,50 +2136,144 @@ class ZhihuCrawler:
             # 如果有评论，立即获取
             if comment_count > 0:
                 logger.debug(f"回答有 {comment_count} 条评论，开始获取...")
-                await self.process_comments(answer_id)
+                comment_result = await self.process_comments(answer_id)
+
+                # 检查评论采集是否异常
+                if comment_result and comment_result.get("anomaly"):
+                    logger.warning(
+                        f"📊 评论采集异常记录 [{answer_id}]: "
+                        f"预期 {comment_result.get('expected_count')} 条, "
+                        f"实际 {comment_result.get('saved_count')} 条"
+                    )
 
             return True
 
         except Exception as e:
             logger.exception(f"处理回答失败: {e}")
+            # 记录提取错误
+            import traceback
+
+            question_title = activity.get("target", {}).get("question", {}).get("title", "未知")
+            answer_id = str(activity.get("target", {}).get("id", ""))
+            self.db.add_extraction_error(
+                answer_id=answer_id,
+                question_title=question_title,
+                error_type="parse_error",
+                error_message=str(e),
+                stack_trace=traceback.format_exc(),
+            )
             return False
 
-    async def process_comments(self, answer_id: str):
-        """处理评论"""
+    async def process_comments(self, answer_id: str) -> dict:
+        """处理评论 - 包含异常检测.
+
+        Returns:
+            处理结果: {
+                "success": bool,
+                "saved_count": int,
+                "expected_count": int,
+                "anomaly": bool,
+                "anomaly_reason": str | None,
+            }
+        """
+        result = {
+            "success": False,
+            "saved_count": 0,
+            "expected_count": 0,
+            "anomaly": False,
+            "anomaly_reason": None,
+        }
+
         try:
             answer = self.db.get_answer_by_id(answer_id)
             if not answer or answer.has_comments:
                 logger.debug(
                     f"跳过评论处理: answer_id={answer_id}, exists={bool(answer)}, has_comments={answer.has_comments if answer else 'N/A'}"
                 )
-                return
+                result["success"] = True
+                return result
 
-            # 计算评论获取上限，-1 表示使用较大默认值
+            expected_count = answer.comment_count or 0
+            result["expected_count"] = expected_count
+
+            # 计算评论获取上限
             comment_limit = 1000 if self.max_comments < 0 else self.max_comments
-            logger.info(f"获取评论: {answer_id} (预期 {answer.comment_count} 条, 上限 {comment_limit} 条)")
-            comments_data = await self.fetch_comments(answer_id, limit=comment_limit)
-            logger.info(f"评论 API 返回 {len(comments_data)} 条数据")
+            logger.info(f"获取评论: {answer_id} (预期 {expected_count} 条, 上限 {comment_limit} 条)")
+
+            comments_data, stats = await self.fetch_comments(answer_id, limit=comment_limit)
+            actual_count = len(comments_data)
+
+            logger.info(f"评论 API 返回 {actual_count} 条数据 (预期 {expected_count} 条)")
+
+            # 异常检测
+            if stats.get("api_error"):
+                # API 调用失败
+                result["anomaly"] = True
+                result["anomaly_reason"] = f"API错误: {stats['api_error']}"
+                logger.error(f"🚨 评论采集异常 [{answer_id}]: {result['anomaly_reason']}")
+
+                # 记录异常但不标记为已处理，允许重试
+                self.db.add_extraction_error(
+                    answer_id=answer_id,
+                    question_title=answer.question_title,
+                    error_type="comment_api_error",
+                    error_message=f"预期 {expected_count} 条评论，API错误: {stats['api_error']}",
+                )
+                return result
+
+            if expected_count > 0 and actual_count == 0:
+                # 严重异常：预期有评论但实际获取0条
+                result["anomaly"] = True
+                result["anomaly_reason"] = f"预期 {expected_count} 条但获取 0 条"
+                logger.error(f"🚨 评论采集严重异常 [{answer_id}]: {result['anomaly_reason']}")
+
+                # 记录异常
+                self.db.add_extraction_error(
+                    answer_id=answer_id,
+                    question_title=answer.question_title,
+                    error_type="comment_anomaly",
+                    error_message=f"预期 {expected_count} 条评论，实际获取 0 条，可能存在403限制",
+                )
+                # 不标记为已处理，允许后续重试
+                return result
+
+            if expected_count > 10 and actual_count < expected_count * 0.5:
+                # 轻度异常：获取数量远低于预期（少于50%）
+                result["anomaly"] = True
+                result["anomaly_reason"] = f"预期 {expected_count} 条但仅获取 {actual_count} 条"
+                logger.warning(f"⚠️ 评论数量异常 [{answer_id}]: {result['anomaly_reason']}")
+
+                # 记录异常但仍保存已获取的评论
+                self.db.add_extraction_error(
+                    answer_id=answer_id,
+                    question_title=answer.question_title,
+                    error_type="comment_partial",
+                    error_message=f"预期 {expected_count} 条，实际获取 {actual_count} 条",
+                )
 
             if not comments_data:
-                # 标记为已处理（即使没有评论）避免重复请求
+                # 确实没有评论
                 self.db.mark_answer_has_comments(answer_id)
-                logger.info(f"回答无评论: {answer_id}")
-                return
+                logger.info(f"回答确实无评论: {answer_id}")
+                result["success"] = True
+                return result
 
+            # 保存评论
             comments_to_save = []
-            for item in comments_data:
-                comment = item.get("comment", item)  # 处理不同格式
-                author_info = comment.get("author", {})
+            for comment in comments_data:
+                author_info = comment.get("author", {}) if isinstance(comment, dict) else {}
                 comment_info = {
-                    "id": str(comment.get("id", "")),
+                    "id": str(comment.get("id", "")) if isinstance(comment, dict) else str(comment),
                     "answer_id": answer_id,
-                    "author_id": author_info.get("id", ""),
-                    "author_name": author_info.get("name", "匿名用户"),
-                    "author_avatar_url": author_info.get("avatar_url", ""),
-                    "content": comment.get("content", ""),
-                    "like_count": comment.get("like_count", 0),
+                    "author_id": author_info.get("id", "") if isinstance(author_info, dict) else "",
+                    "author_name": author_info.get("name", "匿名用户") if isinstance(author_info, dict) else "匿名用户",
+                    "author_avatar_url": author_info.get("avatar_url", "") if isinstance(author_info, dict) else "",
+                    "content": comment.get("content", "") if isinstance(comment, dict) else str(comment),
+                    "like_count": comment.get("like_count", 0) if isinstance(comment, dict) else 0,
                     "created_time": (
-                        self._parse_timestamp(comment.get("created_time", 0)) if comment.get("created_time") else None
+                        self._parse_timestamp(comment.get("created_time", 0))
+                        if isinstance(comment, dict) and comment.get("created_time")
+                        else None
                     ),
                 }
                 self.db.save_comment(comment_info)
@@ -1659,8 +2286,14 @@ class ZhihuCrawler:
             self.db.mark_answer_has_comments(answer_id)
             logger.info(f"保存 {len(comments_to_save)} 条评论: {answer_id}")
 
+            result["success"] = True
+            result["saved_count"] = len(comments_to_save)
+            return result
+
         except Exception as e:
             logger.exception(f"处理评论失败: {e}")
+            result["anomaly_reason"] = f"Exception: {e}"
+            return result
 
     async def scan_likes(
         self,
@@ -1704,6 +2337,13 @@ class ZhihuCrawler:
         init_str = "（初始化）" if init_mode else ""
         logger.info(f"开始扫描用户 {self.user_id} 的点赞内容 ({mode_str}{init_str}, max={max_items})...")
 
+        # 🆕 采集前预检查
+        pre_check_result = await self.pre_check()
+        if not pre_check_result["success"]:
+            error_msg = pre_check_result["message"]
+            logger.error(f"❌ 预检查失败，终止采集: {error_msg}")
+            raise RuntimeError(f"预检查失败: {error_msg}")
+
         # 确保用户记录在数据库中存在
         user_created = self.db.add_user(self.user_id, self.user_id)
         logger.info(f"用户记录检查: user_id={self.user_id}, created={user_created}")
@@ -1713,6 +2353,7 @@ class ZhihuCrawler:
 
         self.new_items = 0
         self.updated_items = 0
+        self._stopped = False  # 重置停止标志
         scanned = 0
         processed_ids: set[str] = set()  # 防止重复处理
 
@@ -1732,6 +2373,11 @@ class ZhihuCrawler:
         async def process_single_activity(activity: dict, index: int) -> None:
             """处理单个activity的回调函数"""
             nonlocal scanned
+
+            # 🛑 检查是否需要停止
+            if self.check_should_stop():
+                logger.info(f"🛑 停止处理，已处理 {scanned} 条")
+                return
 
             # 只处理点赞回答
             if activity.get("verb") != "MEMBER_VOTEUP_ARTICLE" and activity.get("verb") != "MEMBER_VOTEUP_ANSWER":
@@ -1783,6 +2429,10 @@ class ZhihuCrawler:
         if scanned == 0 and activities:
             logger.info(f"通过批量模式处理 {len(activities)} 条记录")
             for activity in activities:
+                # 🛑 检查是否需要停止
+                if self.check_should_stop():
+                    logger.info(f"🛑 批量处理被停止，已处理 {scanned} 条")
+                    break
                 await process_single_activity(activity, scanned)
                 if not no_limit and scanned >= max_items:
                     break
@@ -1806,3 +2456,165 @@ class ZhihuCrawler:
         for answer in answers:
             await self.process_comments(answer.id)
             await asyncio.sleep(1)  # 避免请求过快
+
+    async def retry_failed_downloads(self, max_items: int = 50) -> dict:
+        """重试失败的下载.
+
+        Args:
+            max_items: 最大重试数量.
+
+        Returns:
+            Dict: 重试结果统计.
+        """
+        # 获取待重试的失败记录
+        failures = self.db.get_pending_retry_failures(max_retries=3)
+        if not failures:
+            logger.info("没有待重试的下载失败记录")
+            return {"success": 0, "failed": 0, "skipped": 0, "total": 0}
+
+        # 限制数量
+        failures = failures[:max_items]
+        logger.info(f"开始重试 {len(failures)} 个失败的下载...")
+
+        stats = {"success": 0, "failed": 0, "skipped": 0, "total": len(failures)}
+
+        for failure in failures:
+            try:
+                # 更新最后重试时间
+                failure.last_retry_at = get_beijing_now()
+                failure.retry_count += 1
+
+                logger.info(f"重试下载: {failure.question_title[:60]}... (第 {failure.retry_count} 次)")
+
+                # 构建活动数据
+                activity = {
+                    "verb": "MEMBER_VOTEUP_ANSWER",
+                    "target": {
+                        "id": failure.answer_id,
+                        "type": "answer",
+                        "question": {
+                            "id": failure.question_id or "",
+                            "title": failure.question_title or "",
+                        },
+                        "author": {},
+                    },
+                }
+
+                # 尝试重新下载
+                page_html, error_info = await self.fetch_answer_page(
+                    failure.question_id or "", failure.answer_id, max_retries=3
+                )
+
+                if page_html and page_html != "__DELETED__":
+                    # 下载成功，解析并保存
+                    soup = BeautifulSoup(page_html, "lxml")
+                    content_html, content_text = self._extract_content_from_page(soup, {})
+
+                    # 保存HTML文件
+                    metadata = {
+                        "question_id": failure.question_id or "",
+                        "author_name": "",
+                        "backup_time": get_beijing_now().isoformat(),
+                    }
+
+                    html_path = await self.storage.save_answer(
+                        answer_id=failure.answer_id,
+                        question_id=failure.question_id or "",
+                        question_title=failure.question_title or "",
+                        html_content=content_html,
+                        page_metadata=metadata,
+                    )
+
+                    # 更新数据库状态
+                    self.db.update_answer_download_status(answer_id=failure.answer_id, status="success")
+
+                    # 标记失败记录为已解决
+                    self.db.resolve_download_failure(failure.id)
+
+                    logger.info(f"重试成功: {failure.question_title[:60]}...")
+                    stats["success"] += 1
+
+                elif page_html == "__DELETED__":
+                    # 内容已被删除
+                    logger.warning(f"内容已被删除: {failure.question_title[:60]}...")
+                    self.db.update_answer_download_status(answer_id=failure.answer_id, status="skipped")
+                    self.db.resolve_download_failure(failure.id)
+                    stats["skipped"] += 1
+
+                else:
+                    # 仍然失败
+                    error_msg = error_info["error_message"] if error_info else "未知错误"
+                    logger.warning(f"重试仍然失败: {failure.question_title[:60]}... - {error_msg}")
+
+                    # 更新错误信息
+                    if error_info:
+                        failure.error_message = error_info["error_message"]
+                        failure.http_status = error_info.get("http_status")
+
+                    stats["failed"] += 1
+
+                await asyncio.sleep(self.request_delay)
+
+            except Exception as e:
+                logger.exception(f"重试下载时出错: {e}")
+                stats["failed"] += 1
+
+        logger.info(f"重试完成: 成功 {stats['success']}, 失败 {stats['failed']}, 跳过 {stats['skipped']}")
+        return stats
+
+    async def retry_specific_answer(self, answer_id: str) -> dict:
+        """重试特定回答的下载.
+
+        Args:
+            answer_id: 回答ID.
+
+        Returns:
+            Dict: 重试结果.
+        """
+        # 获取回答信息
+        answer = self.db.get_answer_by_id(answer_id)
+        if not answer:
+            return {"success": False, "message": "回答不存在"}
+
+        if answer.download_status == "success":
+            return {"success": True, "message": "回答已下载成功"}
+
+        logger.info(f"重试特定回答: {answer.question_title[:60]}...")
+
+        # 尝试重新下载
+        page_html, error_info = await self.fetch_answer_page(answer.question_id, answer_id, max_retries=3)
+
+        if page_html and page_html != "__DELETED__":
+            # 下载成功
+            soup = BeautifulSoup(page_html, "lxml")
+            content_html, content_text = self._extract_content_from_page(soup, {})
+
+            # 保存HTML文件
+            metadata = {
+                "question_id": answer.question_id,
+                "backup_time": get_beijing_now().isoformat(),
+            }
+
+            html_path = await self.storage.save_answer(
+                answer_id=answer_id,
+                question_id=answer.question_id,
+                question_title=answer.question_title,
+                html_content=content_html,
+                page_metadata=metadata,
+            )
+
+            # 更新数据库
+            self.db.update_answer_download_status(answer_id=answer_id, status="success")
+            self.db.resolve_download_failure_by_answer(answer_id)
+
+            return {"success": True, "message": "下载成功", "html_path": html_path}
+
+        elif page_html == "__DELETED__":
+            self.db.update_answer_download_status(answer_id=answer_id, status="skipped")
+            self.db.resolve_download_failure_by_answer(answer_id)
+            return {"success": False, "message": "内容已被删除"}
+
+        else:
+            error_msg = error_info["error_message"] if error_info else "未知错误"
+            self.db.update_answer_download_status(answer_id=answer_id, status="failed", error=error_msg)
+            return {"success": False, "message": error_msg}

@@ -149,6 +149,8 @@ document.addEventListener('keydown', function(e) {
     // ESC 关闭模态框
     if (e.key === 'Escape') {
         closeModal();
+        // ESC 也关闭侧边栏
+        closeSidebar();
     }
 
     // Ctrl/Cmd + R 刷新
@@ -163,6 +165,54 @@ document.addEventListener('keydown', function(e) {
     }
 });
 
+// ==================== 侧边栏悬停展开/点击关闭 ====================
+(function initSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    const mainContent = document.querySelector('.main-content');
+    
+    if (!sidebar || !mainContent) return;
+    
+    // 页面加载时：检查是否需要保持展开状态（从其他页面跳转过来）
+    if (sessionStorage.getItem('sidebarKeepOpen') === 'true') {
+        sidebar.classList.add('expanded');
+        // 清除标记，下次点击主内容区时才会收起
+    }
+    
+    // 鼠标进入侧边栏展开
+    sidebar.addEventListener('mouseenter', function() {
+        sidebar.classList.add('expanded');
+    });
+    
+    // 注意：不在 mouseleave 时收起，保持展开状态
+    
+    // 点击主内容区关闭
+    mainContent.addEventListener('click', function() {
+        if (sidebar.classList.contains('expanded')) {
+            sidebar.classList.remove('expanded');
+            // 清除保持展开的标记
+            sessionStorage.removeItem('sidebarKeepOpen');
+        }
+    });
+    
+    // 点击侧边栏内的链接时，设置标记保持展开状态
+    sidebar.addEventListener('click', function(e) {
+        const link = e.target.closest('a');
+        // 如果点击的是链接，设置标记让新页面保持展开
+        if (link) {
+            sessionStorage.setItem('sidebarKeepOpen', 'true');
+            // 链接点击正常执行，不阻止
+            return;
+        }
+        e.stopPropagation();
+    });
+})();
+
+function closeSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    if (sidebar && sidebar.classList.contains('expanded')) {
+        sidebar.classList.remove('expanded');
+    }
+}
 
 // ==================== 初始化采集 ====================
 
