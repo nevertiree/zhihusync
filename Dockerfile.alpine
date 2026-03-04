@@ -1,0 +1,46 @@
+# zhihusync - Alpine 轻量级镜像（约 1GB）
+# 使用 Alpine Linux 进一步减小体积
+
+FROM python:3.11-alpine
+
+WORKDIR /app
+
+# 更换 Alpine 镜像源并安装依赖
+RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories && \
+    apk add --no-cache \
+    chromium chromium-chromedriver ffmpeg \
+    font-noto-cjk font-wqy-zenhei \
+    curl wget unzip ca-certificates
+
+# 安装 Python 依赖
+COPY requirements.txt .
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt && \
+    rm -rf /root/.cache/pip/*
+
+# 复制应用代码
+COPY src/ /app/src/
+COPY config/ /app/config/
+COPY templates/ /app/templates/
+COPY static/ /app/static/
+COPY entrypoint.sh /app/
+
+# 创建数据目录
+RUN mkdir -p /app/data/html /app/data/meta /app/data/static/images && \
+    chmod +x /app/entrypoint.sh
+
+# 设置环境变量
+ENV PYTHONUNBUFFERED=1
+ENV ZHIHUSYNC_ENV=docker
+ENV PLAYWRIGHT_BROWSER=chromium
+ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+# Alpine 使用系统 Chromium
+ENV PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium-browser
+
+EXPOSE 6067
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:6067/api/stats')" || exit 1
+
+ENTRYPOINT ["/app/entrypoint.sh"]
+CMD ["python", "-m", "src.app", "--mode", "both"]

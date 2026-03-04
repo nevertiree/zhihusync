@@ -1,0 +1,55 @@
+# zhihusync - 最小镜像（约 500MB，首次启动时下载浏览器）
+# 适用于：网络良好、希望镜像体积最小的用户
+
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# 使用阿里云镜像源
+RUN rm -f /etc/apt/sources.list.d/*.list && \
+    echo "deb http://mirrors.aliyun.com/debian bookworm main contrib non-free" > /etc/apt/sources.list && \
+    echo "deb http://mirrors.aliyun.com/debian bookworm-updates main contrib non-free" >> /etc/apt/sources.list && \
+    echo "deb http://mirrors.aliyun.com/debian-security bookworm-security main contrib non-free" >> /etc/apt/sources.list && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends \
+    libglib2.0-0t64 libnss3 libnspr4 libatk1.0-0t64 libatk-bridge2.0-0t64 \
+    libcups2t64 libdrm2 libdbus-1-3 libxcb1 libxkbcommon0 libx11-6 \
+    libxcomposite1 libxdamage1 libxext6 libxfixes3 libxrandr2 libgbm1 \
+    libpango-1.0-0 libcairo2 libasound2t64 libatspi2.0-0t64 \
+    fonts-noto-cjk fonts-wqy-zenhei fonts-wqy-microhei \
+    libfontconfig1 libfreetype6 ca-certificates wget curl unzip \
+    && rm -rf /var/lib/apt/lists/* /var/cache/apt/*
+
+# 安装 Python 依赖（但不安装浏览器）
+COPY requirements.txt .
+RUN pip install --no-cache-dir -i https://pypi.tuna.tsinghua.edu.cn/simple --upgrade pip && \
+    pip install --no-cache-dir -i https://pypi.tuna.tsinghua.edu.cn/simple -r requirements.txt && \
+    rm -rf /root/.cache/pip/*
+
+# 复制应用代码
+COPY src/ /app/src/
+COPY config/ /app/config/
+COPY templates/ /app/templates/
+COPY static/ /app/static/
+COPY entrypoint.sh /app/
+
+# 创建数据目录
+RUN mkdir -p /app/data/html /app/data/meta /app/data/static/images /app/ms-playwright && \
+    chmod +x /app/entrypoint.sh
+
+# 复制浏览器安装脚本
+COPY scripts/install-browser.sh /app/scripts/
+RUN chmod +x /app/scripts/install-browser.sh
+
+# 设置环境变量
+ENV PYTHONUNBUFFERED=1
+ENV ZHIHUSYNC_ENV=docker
+ENV PLAYWRIGHT_BROWSER=chromium
+# 不跳过浏览器下载（首次启动时需要）
+ENV PLAYWRIGHT_BROWSERS_PATH=/app/ms-playwright
+
+EXPOSE 6067
+
+# 启动时检查并安装浏览器
+ENTRYPOINT ["/app/scripts/install-browser.sh"]
+CMD ["python", "-m", "src.app", "--mode", "both"]
