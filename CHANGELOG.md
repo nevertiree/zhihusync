@@ -14,6 +14,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Author information**: Display author avatar and headline in answer list
 - **Comment enhancement**: Store commenter avatar URL
 - **Improved scrolling**: Enhanced `_scroll_page_for_activities()` to load more content by scrolling multiple times
+- **Full sync mode**: Added full synchronization option to re-scan all historical likes
+  - `POST /api/sync/init` endpoint for full sync
+  - Independent stop conditions (continues until all likes are exhausted)
+  - 404 handling: Skips new 404 answers during full sync to save space
+  - Real-time processing with callback-based scrolling
+- **Deleted answer handling**: Detect and mark deleted (404) answers during sync
+  - Preserves existing downloaded content with deletion marker
+  - Red banner warning in HTML for deleted answers
+  - Statistics tracking for deleted answers count
+- **Dashboard enhancements**:
+  - Clickable stat cards for quick navigation (answers, deleted, users)
+  - Dual sync buttons (normal sync + full sync) with descriptions
+  - Combined comment statistics display
+- **Content page filtering and sorting**:
+  - Column header sorting (likes, comments, timestamps)
+  - Range filtering for likes and comments (via modal)
+  - Delete status filter (normal/deleted/all)
+  - Enhanced pagination with total count, page size selector, and jump-to-page
+- **Testing infrastructure**: Restructured test suite
+  - Organized into `tests/unit`, `tests/integration`, `tests/e2e`
+  - Centralized fixtures and reports
+  - `run_tests.py` script for automated test execution
+- **Swagger API documentation**: Added sidebar link to `/docs` endpoint
+
+### Changed
+- **UI improvements**:
+  - Moved sync mode documentation from dashboard to config page tabs
+  - Reorganized collection settings into dedicated "Collection" tab
+  - Cookie guide moved to "Cookie" tab in config page
+- **Crawler improvements**:
+  - Increased scroll distance (800px → 1500px) and scroll count (3 → 5)
+  - Added random delays (0.5-2s) between scrolls to avoid detection
+  - 200 max scroll rounds for thorough content loading
+- **Test module restructure**: Moved from flat `test/` to hierarchical `tests/` directory
 
 ### Fixed
 - Fixed `fetch_likes` method to parse activity data from user profile HTML
@@ -33,6 +67,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Fixed dashboard showing [-] for monitored users** by adding user creation in crawler
   - Added `db.add_user()` call at the start of `scan_likes()` to ensure user record exists
   - Added `db.update_user_sync_time()` call after sync completion to update sync info
+- **Fixed detail page loading issue**: Removed extra `}` causing JavaScript syntax error
+- **Fixed avatar sizing**: Used inline styles with `!important` to enforce consistent avatar dimensions
+- **Fixed sync history page**: Corrected field mapping and added sync type column
 
 ## [0.3.0] - 2026-03-03
 
