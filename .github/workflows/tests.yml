@@ -2,9 +2,9 @@ name: Tests
 
 on:
   push:
-    branches: [main, develop]
+    branches: [master, develop]
   pull_request:
-    branches: [main, develop]
+    branches: [master, develop]
 
 jobs:
   # ========== 单元测试 ==========
@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ['3.10', '3.11', '3.12']
+        python-version: ["3.10", "3.11", "3.12"]
 
     steps:
       - uses: actions/checkout@v4
@@ -57,7 +57,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: "3.11"
 
       - name: Cache pip dependencies
         uses: actions/cache@v4
@@ -89,7 +89,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: "3.11"
 
       - name: Install Chrome
         run: |
@@ -117,21 +117,21 @@ jobs:
       - name: Start test server
         run: |
           cd src && python -c "
-import threading
-import time
-from app import app
-import uvicorn
+          import threading
+          import time
+          from app import app
+          import uvicorn
 
-def run_server():
-    uvicorn.run(app, host='127.0.0.1', port=6067, log_level='error')
+          def run_server():
+              uvicorn.run(app, host='127.0.0.1', port=6067, log_level='error')
 
-server_thread = threading.Thread(target=run_server, daemon=True)
-server_thread.start()
-time.sleep(3)
-print('Server started')
-while True:
-    time.sleep(1)
-" &
+          server_thread = threading.Thread(target=run_server, daemon=True)
+          server_thread.start()
+          time.sleep(3)
+          print('Server started')
+          while True:
+              time.sleep(1)
+          " &
           sleep 5
 
       - name: Run E2E tests
@@ -152,7 +152,7 @@ while True:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: "3.11"
 
       - name: Install lint tools
         run: |
