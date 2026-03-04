@@ -11,6 +11,7 @@ __pycache__
 *.egg-info
 .pytest_cache
 .mypy_cache
+.ruff_cache
 .venv/
 venv/
 env/
@@ -44,3 +45,26 @@ Dockerfile*
 Makefile
 .dockerignore
 .gitignore
+
+# ==================== 敏感信息（IMPORTANT）====================
+# 环境变量文件
+.env
+.env.local
+.env.*.local
+
+# 配置文件（可能包含敏感信息）
+config/config.yaml
+config/*.yaml
+!config/config.example.yaml
+
+# 密钥和证书
+*.pem
+*.key
+*.crt
+secrets/
+credentials/
+
+# 备份文件
+*.backup
+*.bak
+*~
