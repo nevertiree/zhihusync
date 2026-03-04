@@ -47,7 +47,7 @@ class ImageGenerator:
 
     def __init__(
         self,
-        output_dir: str = "/app/data/static/images",
+        output_dir: str = "/app/data/images/screenshots",
         browser_type: str = "chromium",
         viewport_width: int = 694,
         device_scale_factor: int = 2,
@@ -458,7 +458,7 @@ class ImageGenerator:
 
 
 # 同步包装函数（方便非异步代码调用）
-def generate_image_sync(html_path: str, output_dir: str = "/app/data/static/images", **kwargs) -> str:
+def generate_image_sync(html_path: str, output_dir: str = "/app/data/images/screenshots", **kwargs) -> str:
     """同步方式生成图片（方便调用）.
 
     Args:
@@ -480,7 +480,7 @@ def generate_image_sync(html_path: str, output_dir: str = "/app/data/static/imag
 async def generate_answer_image(
     html_path: str,
     answer_id: str = "",
-    output_dir: str = "/app/data/static/images",
+    output_dir: str = "/app/data/images/screenshots",
 ) -> tuple[bool, str]:
     """生成回答图片的便捷函数.
 

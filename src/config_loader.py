@@ -61,7 +61,7 @@ class StorageConfig(BaseModel):
     db_path: str = "/app/data/meta/zhihusync.db"
     static_path: str = "/app/data/static"
     download_images: bool = True
-    images_path: str = "/app/data/static/images"
+    images_path: str = "/app/data/images"
     download_avatars: bool = True  # 下载头像
     compress_html: bool = False  # 压缩HTML
     backup_enabled: bool = False  # 启用备份

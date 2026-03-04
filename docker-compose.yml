@@ -17,6 +17,7 @@ services:
       # 数据持久化
       - ./data/html:/app/data/html
       - ./data/meta:/app/data/meta
+      - ./data/images:/app/data/images
       - ./data/static:/app/data/static
       # 配置文件（可选，首次启动会自动创建）
       - ./config:/app/config
@@ -60,6 +61,7 @@ services:
       - "6068:80"
     volumes:
       - ./data/html:/usr/share/nginx/html/answers:ro
+      - ./data/images:/usr/share/nginx/html/images:ro
       - ./data/static:/usr/share/nginx/html/static:ro
       - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
     depends_on:

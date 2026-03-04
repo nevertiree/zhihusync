@@ -77,6 +77,22 @@ class ZhihuCrawler:
         # 停止标志
         self._stopped = False
 
+    def check_should_stop(self) -> bool:
+        """检查是否应该停止处理.
+
+        Returns:
+            True 如果需要停止，False 继续处理
+        """
+        # 检查内部停止标志
+        if self._stopped:
+            return True
+
+        # 检查外部回调（如果设置了）
+        if self.stop_check_callback and self.stop_check_callback():
+            return True
+
+        return False
+
     async def __aenter__(self):
         """异步上下文管理器入口"""
         await self.init_browser()
@@ -1566,7 +1582,6 @@ class ZhihuCrawler:
 
         return str(soup)
 
-    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
     async def fetch_comments(self, answer_id: str, limit: int = 20) -> tuple[list[dict], dict]:
         """获取评论 - 包括根评论和子评论.
 
@@ -1588,72 +1603,206 @@ class ZhihuCrawler:
         }
         all_comments = []
 
-        # 1. 获取根评论
+        # 知乎 API limit 最大支持 20，超过会返回 400 错误
+        api_limit = min(limit, 20)
+
+        # 1. 获取根评论（支持分页）
         root_url = f"{self.API_BASE}/answers/{answer_id}/root_comments"
-        params = {"limit": limit, "offset": 0, "order": "normal", "status": "open"}
-        full_url = f"{root_url}?{'&'.join(f'{k}={v}' for k, v in params.items())}"
+        offset = 0
+        has_more = True
 
-        await self._delay()
-        logger.debug(f"请求根评论 API: {full_url}")
+        while has_more and len(all_comments) < limit:
+            params = {"limit": api_limit, "offset": offset, "order": "normal", "status": "open"}
+            full_url = f"{root_url}?{'&'.join(f'{k}={v}' for k, v in params.items())}"
 
-        try:
-            assert self.page is not None  # noqa: S101
-            response = await self.page.goto(full_url, wait_until="networkidle", timeout=15000)
+            await self._delay()
+            logger.info(f"请求根评论 API: {full_url}")
 
-            # 检查响应状态
-            if response and response.status == 403:
-                logger.warning(f"获取评论被403拒绝: {answer_id}")
-                stats["api_error"] = "403 Forbidden"
-                return [], stats
+            try:
+                assert self.page is not None  # noqa: S101
+                response = await self.page.goto(full_url, wait_until="networkidle", timeout=15000)
 
-            content = await self.page.content()
-            soup = BeautifulSoup(content, "lxml")
-            text_elem = soup.find("pre")
+                # 检查响应状态
+                if response:
+                    logger.info(f"评论 API 响应状态: {response.status} {response.status_text}")
 
-            if isinstance(text_elem, Tag):
-                raw_text = text_elem.get_text()
-                data = json.loads(raw_text)
-                root_comments = data.get("data", [])
-                paging = data.get("paging", {})
-                stats["root_comments"] = len(root_comments)
-                stats["total_expected"] = paging.get("totals", 0)
+                if response and response.status == 403:
+                    logger.warning(f"获取评论被403拒绝: {answer_id}")
+                    stats["api_error"] = "403 Forbidden"
+                    return [], stats
 
-                logger.debug(f"根评论 API 返回: {len(root_comments)} 条，预期共 {stats['total_expected']} 条")
+                if response and response.status != 200:
+                    logger.warning(f"评论 API 返回非200状态: {response.status}")
+                    stats["api_error"] = f"HTTP {response.status}"
 
-                # 处理根评论并获取子评论
-                for item in root_comments:
-                    comment = item.get("comment", item)
-                    all_comments.append(comment)
+                content = await self.page.content()
 
-                    # 获取子评论
-                    child_comments = comment.get("child_comments", [])
-                    if child_comments:
-                        stats["child_comments"] += len(child_comments)
-                        all_comments.extend(child_comments)
-                        logger.debug(f"评论 {comment.get('id')} 有 {len(child_comments)} 条子评论")
+                # 记录原始响应用于调试
+                content_preview = content[:500] if len(content) < 1000 else content[:500] + "..."
+                logger.debug(f"评论 API 原始响应: {content_preview}")
 
-                    # 如果子评论过多，可能需要单独API获取
-                    child_comment_count = comment.get("child_comment_count", 0)
-                    if child_comment_count > len(child_comments):
-                        logger.debug(
-                            f"评论 {comment.get('id')} 有更多子评论: {child_comment_count} > {len(child_comments)}"
-                        )
+                soup = BeautifulSoup(content, "lxml")
+                text_elem = soup.find("pre")
 
-            else:
-                logger.warning(f"评论 API 返回无内容: {answer_id}")
-                stats["api_error"] = "Empty response"
+                if isinstance(text_elem, Tag):
+                    raw_text = text_elem.get_text()
+                    logger.debug(f"评论 API JSON 文本: {raw_text[:500]}")
 
-        except json.JSONDecodeError as e:
-            logger.warning(f"解析评论 JSON 失败: {e}")
-            stats["api_error"] = f"JSON decode error: {e}"
-        except Exception as e:
-            logger.warning(f"获取评论失败: {e}")
-            stats["api_error"] = f"Exception: {e}"
+                    try:
+                        data = json.loads(raw_text)
+                    except json.JSONDecodeError as e:
+                        logger.error(f"解析评论 JSON 失败: {e}, 文本: {raw_text[:200]}")
+                        stats["api_error"] = f"JSON parse error: {e}"
+                        return [], stats
 
+                    # 检查 error 字段
+                    if data.get("error"):
+                        error_msg = data.get("error", {}).get("message", "Unknown error")
+                        logger.error(f"评论 API 返回错误: {error_msg}")
+                        stats["api_error"] = f"API error: {error_msg}"
+                        return [], stats
+
+                    root_comments = data.get("data", [])
+                    paging = data.get("paging", {})
+                    stats["root_comments"] = len(root_comments)
+                    stats["total_expected"] = paging.get("totals", 0)
+
+                    logger.info(f"根评论 API 返回: {len(root_comments)} 条，预期共 {stats['total_expected']} 条")
+
+                    # 处理根评论并获取子评论
+                    for item in root_comments:
+                        comment = item.get("comment", item)
+                        all_comments.append(comment)
+
+                        # 获取子评论
+                        child_comments = comment.get("child_comments", [])
+                        if child_comments:
+                            stats["child_comments"] += len(child_comments)
+                            all_comments.extend(child_comments)
+                            logger.debug(f"评论 {comment.get('id')} 有 {len(child_comments)} 条子评论")
+
+                        # 如果子评论过多，需要单独API获取剩余部分
+                        child_comment_count = comment.get("child_comment_count", 0)
+                        if child_comment_count > len(child_comments):
+                            logger.info(
+                                f"评论 {comment.get('id')} 有更多子评论: {child_comment_count} > {len(child_comments)}, "
+                                f"开始获取剩余子评论..."
+                            )
+                            remaining_child_comments = await self.fetch_child_comments(
+                                comment.get("id"), offset=len(child_comments)
+                            )
+                            if remaining_child_comments:
+                                stats["child_comments"] += len(remaining_child_comments)
+                                all_comments.extend(remaining_child_comments)
+                                logger.info(f"额外获取了 {len(remaining_child_comments)} 条子评论")
+
+                    # 检查是否还有更多评论
+                    is_end = paging.get("is_end", True)
+                    totals = paging.get("totals", 0)
+                    stats["total_expected"] = totals
+
+                    if is_end or len(root_comments) == 0:
+                        has_more = False
+                        logger.debug(f"评论分页结束: is_end={is_end}, 本页获取={len(root_comments)}")
+                    else:
+                        offset += len(root_comments)
+                        logger.debug(f"继续获取评论: offset={offset}, has_more={has_more}")
+
+                    # 更新统计
+                    stats["root_comments"] = len([c for c in all_comments if c.get("type") != "child"])
+
+                else:
+                    logger.warning(f"评论 API 返回无内容: {answer_id}")
+                    stats["api_error"] = "Empty response"
+                    break  # 退出分页循环
+
+            except json.JSONDecodeError as e:
+                logger.warning(f"解析评论 JSON 失败: {e}")
+                stats["api_error"] = f"JSON decode error: {e}"
+                break
+            except Exception as e:
+                logger.warning(f"获取评论失败: {e}")
+                stats["api_error"] = f"Exception: {e}"
+                break
+
+            # 如果已经获取足够，提前退出
+            if len(all_comments) >= limit:
+                logger.debug(f"已达到评论获取上限: {len(all_comments)} >= {limit}")
+                break
+
+        # 循环结束，返回结果
         logger.info(
-            f"评论采集统计: 根评论 {stats['root_comments']}, 子评论 {stats['child_comments']}, 总计 {len(all_comments)}"
+            f"评论采集完成: 根评论 {stats['root_comments']}, 子评论 {stats['child_comments']}, 总计 {len(all_comments)}"
         )
         return all_comments, stats
+
+    async def fetch_child_comments(self, comment_id: str, offset: int = 0) -> list[dict]:
+        """获取子评论（分页获取）.
+
+        Args:
+            comment_id: 父评论ID
+            offset: 起始偏移量
+
+        Returns:
+            子评论列表
+        """
+        all_child_comments = []
+        child_url = f"{self.API_BASE}/comments/{comment_id}/child_comments"
+        has_more = True
+        current_offset = offset
+
+        while has_more:
+            params = {"limit": 20, "offset": current_offset}
+            full_url = f"{child_url}?{'&'.join(f'{k}={v}' for k, v in params.items())}"
+
+            await self._delay()
+            logger.debug(f"请求子评论 API: {full_url}")
+
+            try:
+                assert self.page is not None  # noqa: S101
+                response = await self.page.goto(full_url, wait_until="networkidle", timeout=15000)
+
+                if response and response.status != 200:
+                    logger.warning(f"子评论 API 返回非200状态: {response.status}")
+                    break
+
+                content = await self.page.content()
+                soup = BeautifulSoup(content, "lxml")
+                text_elem = soup.find("pre")
+
+                if isinstance(text_elem, Tag):
+                    raw_text = text_elem.get_text()
+                    data = json.loads(raw_text)
+
+                    if data.get("error"):
+                        error_msg = data.get("error", {}).get("message", "Unknown error")
+                        logger.error(f"子评论 API 错误: {error_msg}")
+                        break
+
+                    child_comments = data.get("data", [])
+                    paging = data.get("paging", {})
+
+                    for item in child_comments:
+                        comment = item.get("comment", item)
+                        comment["type"] = "child"  # 标记为子评论
+                        all_child_comments.append(comment)
+
+                    # 检查是否还有更多
+                    is_end = paging.get("is_end", True)
+                    if is_end or len(child_comments) == 0:
+                        has_more = False
+                    else:
+                        current_offset += len(child_comments)
+                        logger.debug(f"继续获取子评论: offset={current_offset}")
+                else:
+                    logger.warning("子评论 API 返回无内容")
+                    break
+
+            except Exception as e:
+                logger.warning(f"获取子评论失败: {e}")
+                break
+
+        return all_child_comments
 
     async def _scroll_page(self):
         """滚动页面加载内容"""
