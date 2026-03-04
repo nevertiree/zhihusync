@@ -1,19 +1,17 @@
-# 开发构建配置 - 一次性构建（不依赖基础镜像）
-# 适用于：
-# 1. 首次尝试，不想构建基础镜像
-# 2. CI/CD 环境
-# 3. 需要简化构建流程的场景
-#
-# 注意：此方式每次构建都会重新下载浏览器，耗时较长（5-10分钟）
+# Docker Compose 构建配置 - 多种镜像方案选择
+# 根据需求选择不同的构建方式
 
 version: "3.8"
 
 services:
+  # ========== 方案 1: 轻量级 (推荐) - 仅 Chromium ==========
+  # 大小：约 1.8GB（比完整版节省 300MB）
+  # 适合：大多数用户，不需要 Firefox 的场景
   zhihusync:
     build:
       context: .
-      dockerfile: Dockerfile.full # 使用完整构建的 Dockerfile
-    image: zhihusync:latest
+      dockerfile: Dockerfile.chromium
+    image: zhihusync:chromium
     container_name: zhihusync
     restart: unless-stopped
 
@@ -23,12 +21,14 @@ services:
     volumes:
       - ./data/html:/app/data/html
       - ./data/meta:/app/data/meta
+      - ./data/images:/app/data/images
       - ./data/static:/app/data/static
       - ./config:/app/config
 
     environment:
-      - PLAYWRIGHT_BROWSER=${PLAYWRIGHT_BROWSER:-auto}
+      - PLAYWRIGHT_BROWSER=chromium
       - ZHIHUSYNC_ZHIHU_USER_ID=${ZHIHU_USER_ID:-}
+      - ZHIHUSYNC_LOGGING_LEVEL=${LOG_LEVEL:-INFO}
       - PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
 
     deploy:
@@ -36,3 +36,123 @@ services:
         limits:
           cpus: "2.0"
           memory: 2G
+
+  # ========== 方案 2: Alpine 精简版 ==========
+  # 大小：约 1.2GB（使用 Alpine Linux）
+  # 适合：追求极致体积，熟悉 Alpine 的用户
+  zhihusync-alpine:
+    build:
+      context: .
+      dockerfile: Dockerfile.alpine
+    image: zhihusync:alpine
+    container_name: zhihusync-alpine
+    restart: unless-stopped
+    profiles: ["alpine"]
+
+    ports:
+      - "6067:6067"
+
+    volumes:
+      - ./data/html:/app/data/html
+      - ./data/meta:/app/data/meta
+      - ./data/images:/app/data/images
+      - ./data/static:/app/data/static
+      - ./config:/app/config
+
+    environment:
+      - PLAYWRIGHT_BROWSER=chromium
+      - ZHIHUSYNC_ZHIHU_USER_ID=${ZHIHU_USER_ID:-}
+      - ZHIHUSYNC_LOGGING_LEVEL=${LOG_LEVEL:-INFO}
+
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 1.5G
+
+  # ========== 方案 3: 最小镜像（首次启动下载浏览器） ==========
+  # 大小：约 600MB（首次启动需下载 400MB 浏览器）
+  # 适合：网络良好、存储空间紧张的用户
+  zhihusync-minimal:
+    build:
+      context: .
+      dockerfile: Dockerfile.minimal
+    image: zhihusync:minimal
+    container_name: zhihusync-minimal
+    restart: unless-stopped
+    profiles: ["minimal"]
+
+    ports:
+      - "6067:6067"
+
+    volumes:
+      - ./data/html:/app/data/html
+      - ./data/meta:/app/data/meta
+      - ./data/images:/app/data/images
+      - ./data/static:/app/data/static
+      - ./config:/app/config
+      # 浏览器缓存目录（避免重复下载）
+      - browser-cache:/app/ms-playwright
+
+    environment:
+      - PLAYWRIGHT_BROWSER=chromium
+      - ZHIHUSYNC_ZHIHU_USER_ID=${ZHIHU_USER_ID:-}
+      - ZHIHUSYNC_LOGGING_LEVEL=${LOG_LEVEL:-INFO}
+      - PLAYWRIGHT_DOWNLOAD_HOST=https://npmmirror.com/mirrors/playwright
+
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2G
+
+  # ========== 方案 4: 完整版（Chromium + Firefox） ==========
+  # 大小：约 2.3GB
+  # 适合：需要 Firefox 作为备选浏览器的用户
+  zhihusync-full:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: zhihusync:full
+    container_name: zhihusync-full
+    restart: unless-stopped
+    profiles: ["full"]
+
+    ports:
+      - "6067:6067"
+
+    volumes:
+      - ./data/html:/app/data/html
+      - ./data/meta:/app/data/meta
+      - ./data/images:/app/data/images
+      - ./data/static:/app/data/static
+      - ./config:/app/config
+
+    environment:
+      - PLAYWRIGHT_BROWSER=${PLAYWRIGHT_BROWSER:-auto}
+      - ZHIHUSYNC_ZHIHU_USER_ID=${ZHIHU_USER_ID:-}
+      - ZHIHUSYNC_LOGGING_LEVEL=${LOG_LEVEL:-INFO}
+      - PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2G
+
+  # ========== 可选：Nginx 静态文件服务 ==========
+  nginx:
+    image: nginx:alpine
+    container_name: zhihusync-web
+    restart: unless-stopped
+    ports:
+      - "6068:80"
+    volumes:
+      - ./data/html:/usr/share/nginx/html/answers:ro
+      - ./data/images:/usr/share/nginx/html/images:ro
+      - ./data/static:/usr/share/nginx/html/static:ro
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    profiles: ["nginx"]
+
+volumes:
+  browser-cache:

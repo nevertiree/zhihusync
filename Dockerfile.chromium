@@ -1,0 +1,64 @@
+# zhihusync - 轻量级镜像（仅 Chromium）
+# 相比完整版节省约 300MB，只保留 Chromium 浏览器
+
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# 使用阿里云镜像源加速
+RUN rm -f /etc/apt/sources.list.d/*.list && \
+    echo "deb http://mirrors.aliyun.com/debian bookworm main contrib non-free" > /etc/apt/sources.list && \
+    echo "deb http://mirrors.aliyun.com/debian bookworm-updates main contrib non-free" >> /etc/apt/sources.list && \
+    echo "deb http://mirrors.aliyun.com/debian-security bookworm-security main contrib non-free" >> /etc/apt/sources.list && \
+    apt-get update
+
+# 安装系统依赖（精简版，仅支持 Chromium）
+RUN apt-get install -y --no-install-recommends \
+    libglib2.0-0t64 libnss3 libnspr4 libatk1.0-0t64 libatk-bridge2.0-0t64 \
+    libcups2t64 libdrm2 libdbus-1-3 libxcb1 libxkbcommon0 libx11-6 \
+    libxcomposite1 libxdamage1 libxext6 libxfixes3 libxrandr2 libgbm1 \
+    libpango-1.0-0 libcairo2 libasound2t64 libatspi2.0-0t64 \
+    fonts-noto-cjk fonts-wqy-zenhei fonts-wqy-microhei \
+    libfontconfig1 libfreetype6 ca-certificates wget curl unzip \
+    && rm -rf /var/lib/apt/lists/* /var/cache/apt/*
+
+# 安装 Python 依赖
+COPY requirements.txt .
+RUN pip install --no-cache-dir -i https://pypi.tuna.tsinghua.edu.cn/simple --upgrade pip && \
+    pip install --no-cache-dir -i https://pypi.tuna.tsinghua.edu.cn/simple -r requirements.txt
+
+# 设置 Playwright 国内镜像源
+ENV PLAYWRIGHT_DOWNLOAD_HOST=https://npmmirror.com/mirrors/playwright
+ENV PLAYWRIGHT_BROWSERS_PATH=/app/ms-playwright
+
+# 只安装 Chromium（不装 Firefox，节省空间）
+RUN playwright install chromium && \
+    playwright install ffmpeg && \
+    rm -rf /root/.cache/pip/* && \
+    echo "✅ Chromium installed"
+
+# 复制应用代码
+COPY src/ /app/src/
+COPY config/ /app/config/
+COPY templates/ /app/templates/
+COPY static/ /app/static/
+COPY entrypoint.sh /app/
+
+# 创建数据目录并设置权限
+RUN mkdir -p /app/data/html /app/data/meta /app/data/static/images && \
+    chmod +x /app/entrypoint.sh && \
+    rm -rf /var/cache/apt/*
+
+# 设置环境变量
+ENV PYTHONUNBUFFERED=1
+ENV ZHIHUSYNC_ENV=docker
+ENV PLAYWRIGHT_BROWSER=chromium
+ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+
+EXPOSE 6067
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:6067/api/stats')" || exit 1
+
+ENTRYPOINT ["/app/entrypoint.sh"]
+CMD ["python", "-m", "src.app", "--mode", "both"]

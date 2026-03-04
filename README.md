@@ -77,21 +77,30 @@ docker-compose -f docker-compose.hub.yml up -d
 # http://localhost:6067
 ```
 
-### 方式二：本地构建部署
+### 方式二：本地构建部署（多种镜像方案）
 
-克隆项目并本地构建镜像：
+克隆项目并选择合适的镜像方案本地构建：
 
 ```bash
 # 克隆项目
 git clone https://github.com/nevertiree/zhihusync.git
 cd zhihusync
 
-# 启动服务
-docker-compose -f docker-compose.quick.yml up -d
+# 使用轻量级镜像构建（推荐）
+docker-compose -f docker-compose.build.yml up -d
 
 # 访问 Web 界面
 # http://localhost:6067
 ```
+
+#### 📦 镜像方案对比
+
+| 方案 | 大小 | 构建命令 | 适用场景 |
+|------|------|----------|----------|
+| **Chromium 轻量版** | ~1.8GB | `docker-compose -f docker-compose.build.yml up -d` | 推荐大多数用户使用 |
+| **Alpine 精简版** | ~1.2GB | `docker-compose -f docker-compose.build.yml --profile alpine up -d` | 追求极致小体积 |
+| **最小镜像** | ~600MB | `docker-compose -f docker-compose.build.yml --profile minimal up -d` | 首次启动下载浏览器 |
+| **完整版** | ~2.3GB | `docker-compose -f docker-compose.build.yml --profile full up -d` | 需要 Firefox 备选 |
 
 ### 方式三：本地运行
 
