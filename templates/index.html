@@ -53,14 +53,20 @@
 <div class="page-header">
     <h2>📊 仪表盘</h2>
     <div class="sync-actions">
-        <button class="btn btn-primary" id="sync-btn" onclick="startSync()" title="增量同步：只同步新增的点赞">
-            <span class="icon">🔄</span>
-            <span id="sync-btn-text">立即同步</span>
-        </button>
-        <button class="btn btn-warning" id="full-sync-btn" onclick="startFullSyncWithFeedback(this)" title="全量同步：重新爬取全部历史点赞">
-            <span class="icon">🚀</span>
-            <span id="full-sync-btn-text">全量同步</span>
-        </button>
+        <div class="sync-btn-group">
+            <button class="btn btn-primary" id="sync-btn" onclick="startSync()" title="增量同步：只同步新增的点赞">
+                <span class="icon">🔄</span>
+                <span id="sync-btn-text">立即同步</span>
+            </button>
+            <div class="sync-btn-desc">只同步新增点赞，适合日常使用</div>
+        </div>
+        <div class="sync-btn-group">
+            <button class="btn btn-warning" id="full-sync-btn" onclick="startFullSyncWithFeedback(this)" title="全量同步：重新爬取全部历史点赞">
+                <span class="icon">🚀</span>
+                <span id="full-sync-btn-text">全量同步</span>
+            </button>
+            <div class="sync-btn-desc" style="color: #d48806;">穷尽所有点赞，适合首次使用</div>
+        </div>
     </div>
 </div>
 
@@ -425,7 +431,22 @@
 /* Sync Actions */
 .sync-actions {
     display: flex;
-    gap: 12px;
+    gap: 20px;
+}
+
+.sync-btn-group {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+}
+
+.sync-btn-desc {
+    font-size: 12px;
+    color: var(--text-muted);
+    text-align: center;
+    max-width: 120px;
+    line-height: 1.4;
 }
 
 .sync-actions .btn {
@@ -503,6 +524,7 @@
     background: rgba(250, 173, 20, 0.1);
     color: var(--warning);
 }
+
 </style>
 
 <script>
@@ -711,6 +733,7 @@ async function startSync() {
         showToast('启动失败: ' + e.message, 'error');
     }
 }
+
 
 // 开始全量同步（带点击反馈）
 async function startFullSyncWithFeedback(btn) {
