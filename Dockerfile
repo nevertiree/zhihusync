@@ -1,12 +1,46 @@
 # zhihusync - 知乎点赞内容备份服务
-# 生产版本：基于预构建的基础镜像
+# 生产版本：完整镜像（Chromium + Firefox）
 
-FROM zhihusync-base:latest
+FROM python:3.11-slim
 
-# 设置工作目录
 WORKDIR /app
 
-# 复制应用代码（这一层会在代码变更时重新构建，但浏览器环境已存在）
+# 使用阿里云镜像源加速
+RUN rm -f /etc/apt/sources.list.d/*.list && \
+    echo "deb http://mirrors.aliyun.com/debian bookworm main contrib non-free" > /etc/apt/sources.list && \
+    echo "deb http://mirrors.aliyun.com/debian bookworm-updates main contrib non-free" >> /etc/apt/sources.list && \
+    echo "deb http://mirrors.aliyun.com/debian-security bookworm-security main contrib non-free" >> /etc/apt/sources.list && \
+    apt-get update
+
+# 安装系统依赖（完整版，支持 Chromium 和 Firefox）
+RUN apt-get install -y --no-install-recommends \
+    libglib2.0-0t64 libnss3 libnspr4 libatk1.0-0t64 libatk-bridge2.0-0t64 \
+    libcups2t64 libdrm2 libdbus-1-3 libxcb1 libxkbcommon0 libx11-6 \
+    libxcomposite1 libxdamage1 libxext6 libxfixes3 libxrandr2 libgbm1 \
+    libpango-1.0-0 libcairo2 libasound2t64 libatspi2.0-0t64 \
+    fonts-noto-cjk fonts-wqy-zenhei fonts-wqy-microhei \
+    libfontconfig1 libfreetype6 ca-certificates wget curl unzip \
+    libdbus-glib-1-2 libgtk-3-0 libx11-xcb1 libpci3 libegl1 \
+    && rm -rf /var/lib/apt/lists/* /var/cache/apt/*
+
+# 安装 Python 依赖
+COPY requirements.txt .
+RUN pip install --no-cache-dir -i https://pypi.tuna.tsinghua.edu.cn/simple --upgrade pip && \
+    pip install --no-cache-dir -i https://pypi.tuna.tsinghua.edu.cn/simple -r requirements.txt
+
+# 设置 Playwright 国内镜像源
+ENV PLAYWRIGHT_DOWNLOAD_HOST=https://npmmirror.com/mirrors/playwright
+ENV PLAYWRIGHT_BROWSERS_PATH=/app/ms-playwright
+
+# 安装 Chromium（体积小，首选）
+RUN playwright install chromium && \
+    playwright install ffmpeg && \
+    echo "✅ Chromium installed"
+
+# 安装 Firefox（可选备选）
+RUN playwright install firefox || echo "⚠️ Firefox installation skipped"
+
+# 复制应用代码
 COPY src/ /app/src/
 COPY config/ /app/config/
 COPY templates/ /app/templates/
@@ -15,23 +49,19 @@ COPY entrypoint.sh /app/
 
 # 创建数据目录并设置权限
 RUN mkdir -p /app/data/html /app/data/meta /app/data/static/images && \
-    chmod +x /app/entrypoint.sh
+    chmod +x /app/entrypoint.sh && \
+    rm -rf /var/cache/apt/* /root/.cache/pip/*
 
 # 设置环境变量
 ENV PYTHONUNBUFFERED=1
 ENV ZHIHUSYNC_ENV=docker
-# 默认浏览器类型：auto（自动检测）
 ENV PLAYWRIGHT_BROWSER=auto
-# 禁用运行时浏览器下载（已打包在基础镜像中）
 ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
 
-# 暴露端口
 EXPOSE 6067
 
-# 健康检查
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:6067/api/stats')" || exit 1
 
-# 启动命令
 ENTRYPOINT ["/app/entrypoint.sh"]
 CMD ["python", "-m", "src.app", "--mode", "both"]
