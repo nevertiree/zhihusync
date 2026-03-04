@@ -114,11 +114,11 @@ class TestDatabaseOperations:
     def test_add_user(self, temp_db):
         """测试添加用户"""
         result = temp_db.add_user("test_user_123", "Test User")
-        assert result == True
+        assert result is True
 
         # 重复添加应该返回False
         result = temp_db.add_user("test_user_123", "Test User")
-        assert result == False
+        assert result is False
 
     def test_get_user(self, temp_db):
         """测试获取用户"""
@@ -154,12 +154,12 @@ class TestDatabaseOperations:
 
         # 新记录应该返回True
         result = temp_db.save_answer(answer_data)
-        assert result == True
+        assert result is True
 
         # 更新应该返回False
         answer_data["content_text"] = "Updated content"
         result = temp_db.save_answer(answer_data)
-        assert result == False
+        assert result is False
 
     def test_get_answer_by_id(self, temp_db):
         """测试根据ID获取回答"""
@@ -206,11 +206,11 @@ class TestConfigLoader:
         assert zhihu.max_items_per_scan == -1
 
         storage = StorageConfig()
-        assert storage.download_images == True
-        assert storage.compress_html == False
+        assert storage.download_images is True
+        assert storage.compress_html is False
 
         browser = BrowserConfig()
-        assert browser.headless == True
+        assert browser.headless is True
         assert browser.browser_type == "chromium"
 
     def test_config_from_dict(self):

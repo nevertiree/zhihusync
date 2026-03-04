@@ -13,6 +13,7 @@ import asyncio
 import hashlib
 import re
 from pathlib import Path
+from typing import Any
 from urllib.parse import urlparse
 
 import aiofiles
@@ -892,7 +893,7 @@ body {{
         Returns:
             dict: 删除结果统计.
         """
-        result = {
+        result: dict[str, Any] = {
             "html_deleted": 0,
             "images_deleted": 0,
             "errors": [],

@@ -76,7 +76,6 @@ class TestSidebar:
         # 检查文字是否隐藏
         try:
             logo_text = driver.find_element(By.CLASS_NAME, "logo-text")
-            nav_texts = driver.find_elements(By.CLASS_NAME, "nav-text")
 
             # 检查 logo-text 的透明度
             logo_opacity = driver.execute_script("return window.getComputedStyle(arguments[0]).opacity;", logo_text)

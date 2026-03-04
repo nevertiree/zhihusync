@@ -39,7 +39,7 @@ def check_service_running():
     try:
         response = requests.get("http://localhost:6067/api/stats", timeout=5)
         return response.status_code == 200
-    except:
+    except Exception:
         return False
 
 
@@ -68,7 +68,7 @@ def run_e2e_tests():
 
     # 检查selenium是否安装
     try:
-        import selenium
+        import selenium  # noqa: F401
     except ImportError:
         print("⚠️ Selenium未安装，尝试安装...")
         subprocess.run([sys.executable, "-m", "pip", "install", "selenium", "webdriver-manager"])

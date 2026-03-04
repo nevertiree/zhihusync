@@ -536,13 +536,11 @@ async def update_cookies(cookie_update: CookieUpdate):
         cookie_count = len(storage_state.get("cookies", []))
 
         # 构建响应消息
-        if is_valid:
-            if missing:
-                message = f"Cookie 已保存 ({cookie_count} 条) - {msg}"
-            else:
-                message = f"Cookie 已保存 ({cookie_count} 条)"
-        else:
-            message = f"Cookie 已保存 ({cookie_count} 条) - ⚠️ {msg}"
+        message = (
+            f"Cookie 已保存 ({cookie_count} 条) - {msg}"
+            if is_valid and missing
+            else f"Cookie 已保存 ({cookie_count} 条)" if is_valid else f"Cookie 已保存 ({cookie_count} 条) - ⚠️ {msg}"
+        )
 
         return {
             "status": "success",
@@ -889,7 +887,7 @@ async def get_answers(
 
         # 评论异常筛选（预期有评论但实际未获取的）
         if comment_anomaly:
-            query = query.filter(Answer.comment_count > 0, Answer.has_comments == False)
+            query = query.filter(Answer.comment_count > 0, Answer.has_comments.is_(False))
 
         # 点赞数范围筛选
         if voteup_min is not None:
@@ -1531,7 +1529,7 @@ async def retry_comment_anomaly():
             session = db.get_session()
             try:
                 anomaly_answers = (
-                    session.query(Answer).filter(Answer.comment_count > 0, Answer.has_comments == False).all()
+                    session.query(Answer).filter(Answer.comment_count > 0, Answer.has_comments.is_(False)).all()
                 )
             finally:
                 session.close()
