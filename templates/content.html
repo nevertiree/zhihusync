@@ -163,16 +163,17 @@
         </div>
         <div class="modal-body">
             <p id="batch-confirm-message">确认要执行此操作吗？</p>
-            <div class="form-group" style="margin-top: 16px;">
-                <label class="checkbox-label" style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-                    <input type="checkbox" id="batch-confirm-checkbox" style="width: 18px; height: 18px;">
-                    <span id="batch-confirm-checkbox-label">我已了解此操作的后果并确认执行</span>
+            <div class="form-group confirm-checkbox-wrapper" style="margin-top: 20px; padding: 12px; background: var(--bg-secondary); border-radius: 8px; border: 2px solid var(--border-color);">
+                <label class="checkbox-label" style="display: flex; align-items: flex-start; gap: 10px; cursor: pointer;">
+                    <input type="checkbox" id="batch-confirm-checkbox" style="width: 20px; height: 20px; margin-top: 2px; accent-color: var(--danger);" onchange="updateConfirmButton()">
+                    <span id="batch-confirm-checkbox-label" style="font-size: 14px; line-height: 1.5; color: var(--text-primary);">我已了解此操作的后果并确认执行</span>
                 </label>
             </div>
+            <p id="confirm-hint" style="margin-top: 8px; font-size: 12px; color: var(--warning); text-align: center; display: none;">⚠️ 请勾选上方复选框以确认执行</p>
         </div>
         <div class="modal-footer">
             <button class="btn btn-secondary" onclick="closeBatchConfirmModal()">取消</button>
-            <button class="btn btn-primary" id="batch-confirm-btn" onclick="executeBatchAction()" disabled>确认执行</button>
+            <button class="btn btn-danger" id="batch-confirm-btn" onclick="executeBatchAction()" disabled style="opacity: 0.5;">确认执行</button>
         </div>
     </div>
 </div>
@@ -1271,6 +1272,8 @@ function clearSelection() {
 // ==================== 批量删除 ====================
 
 function batchDelete() {
+    console.log('批量删除被点击, 已选中:', selectedAnswers.size, '项');
+    
     if (selectedAnswers.size === 0) {
         showToast('请先选择要删除的项目', 'warning');
         return;
@@ -1279,7 +1282,7 @@ function batchDelete() {
     currentBatchAction = 'delete';
     openBatchConfirmModal(
         '确认批量删除',
-        `您确定要删除 <strong>${selectedAnswers.size}</strong> 条回答吗？<br><br>此操作<strong style="color: var(--danger);">不可恢复</strong>，请谨慎操作！`,
+        `您确定要删除 <strong style="color: var(--danger); font-size: 18px;">${selectedAnswers.size}</strong> 条回答吗？<br><br>此操作<strong style="color: var(--danger);">不可恢复</strong>，请谨慎操作！`,
         '我已了解删除后果并确认删除'
     );
 }
@@ -1306,10 +1309,23 @@ function openBatchConfirmModal(title, message, checkboxLabel) {
     document.getElementById('batch-confirm-title').textContent = title;
     document.getElementById('batch-confirm-message').innerHTML = message;
     document.getElementById('batch-confirm-checkbox-label').textContent = checkboxLabel;
-    document.getElementById('batch-confirm-checkbox').checked = false;
-    document.getElementById('batch-confirm-btn').disabled = true;
+    
+    // 重置复选框和按钮状态
+    const checkbox = document.getElementById('batch-confirm-checkbox');
+    checkbox.checked = false;
+    checkbox.disabled = false;
+    
+    const btn = document.getElementById('batch-confirm-btn');
+    btn.disabled = true;
+    btn.style.opacity = '0.5';
+    btn.textContent = '确认执行';
+    
+    const hint = document.getElementById('confirm-hint');
+    if (hint) hint.style.display = 'block';
     
     document.getElementById('batch-confirm-modal').classList.add('active');
+    
+    console.log('确认模态框已打开:', title);
 }
 
 function closeBatchConfirmModal() {
@@ -1317,15 +1333,34 @@ function closeBatchConfirmModal() {
     currentBatchAction = null;
 }
 
-// 监听确认复选框
-document.addEventListener('change', function(e) {
-    if (e.target.id === 'batch-confirm-checkbox') {
-        document.getElementById('batch-confirm-btn').disabled = !e.target.checked;
+// 更新确认按钮状态
+function updateConfirmButton() {
+    const checkbox = document.getElementById('batch-confirm-checkbox');
+    const btn = document.getElementById('batch-confirm-btn');
+    const hint = document.getElementById('confirm-hint');
+    
+    btn.disabled = !checkbox.checked;
+    btn.style.opacity = checkbox.checked ? '1' : '0.5';
+    
+    if (hint) {
+        hint.style.display = checkbox.checked ? 'none' : 'block';
     }
-});
+}
 
 // 执行批量操作
 async function executeBatchAction() {
+    console.log('执行批量操作:', currentBatchAction);
+    
+    if (!currentBatchAction) {
+        console.error('没有设置批量操作类型');
+        return;
+    }
+    
+    // 禁用确认按钮防止重复点击
+    const btn = document.getElementById('batch-confirm-btn');
+    btn.disabled = true;
+    btn.textContent = '执行中...';
+    
     closeBatchConfirmModal();
     
     if (currentBatchAction === 'delete') {
@@ -1333,11 +1368,20 @@ async function executeBatchAction() {
     } else if (currentBatchAction === 'export') {
         await executeBatchExport();
     }
+    
+    currentBatchAction = null;
 }
 
 // 执行批量删除
 async function executeBatchDelete() {
     const ids = Array.from(selectedAnswers);
+    console.log('开始批量删除:', ids);
+    
+    if (ids.length === 0) {
+        showToast('没有选中的项目', 'warning');
+        return;
+    }
+    
     let successCount = 0;
     let failCount = 0;
     
@@ -1345,17 +1389,23 @@ async function executeBatchDelete() {
     
     for (const answerId of ids) {
         try {
+            console.log(`删除: ${answerId}`);
             const res = await fetch(`/api/answers/${answerId}`, { method: 'DELETE' });
             if (res.ok) {
                 successCount++;
                 selectedAnswers.delete(answerId);
+                console.log(`删除成功: ${answerId}`);
             } else {
                 failCount++;
+                console.error(`删除失败: ${answerId}, 状态: ${res.status}`);
             }
         } catch (e) {
             failCount++;
+            console.error(`删除异常: ${answerId}, 错误:`, e);
         }
     }
+    
+    console.log(`删除完成: 成功 ${successCount}, 失败 ${failCount}`);
     
     if (successCount > 0) {
         showToast(`成功删除 ${successCount} 条回答`, 'success');
