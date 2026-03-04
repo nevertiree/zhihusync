@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import random
 import re
 from collections.abc import Callable
 from datetime import datetime
@@ -514,8 +515,13 @@ class ZhihuCrawler:
             logger.warning(f"获取用户资料失败: {e}")
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
-    async def fetch_likes(self, limit: int = 20, offset: int = 0) -> list[dict]:
-        """获取用户点赞列表 - 增量滚动模式，边滚动边解析避免长时间等待"""
+    async def fetch_likes(
+        self,
+        limit: int = 20,
+        offset: int = 0,
+        item_callback: Callable[[dict, int], None] | None = None,
+    ) -> list[dict]:
+        """获取用户点赞列表 - 增量滚动模式，边滚动边解析边保存"""
         # 访问用户主页
         url = f"{self.ZHIHU_BASE}/people/{self.user_id}"
         logger.info(f"访问用户主页: {url}")
@@ -538,26 +544,47 @@ class ZhihuCrawler:
         target_count = "无限制" if no_limit else limit
         logger.info(f"开始增量滚动，目标数量: {target_count}...")
         all_activities: list[dict] = []
+        processed_ids: set[str] = set()  # 跟踪已处理的activity ID
         last_count = 0
         no_new_content_count = 0
-        max_no_new_content = 3
-        max_scroll_rounds = 50 if no_limit else 20  # 无限制时增加滚动轮数
+        max_no_new_content = 8 if no_limit else 5  # 全量模式下更多容错
+        max_scroll_rounds = 1000 if no_limit else 50  # 全量模式下大幅增加滚动轮数
         scroll_round = 0
+        total_processed = 0  # 实际处理计数
+
+        # 全量模式下，先滚动到底部多次以加载更多历史内容
+        if no_limit:
+            logger.info("全量模式：先进行深度滚动加载历史内容...")
+            for deep_scroll in range(10):
+                await self.page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                await asyncio.sleep(2)
+                current_height = await self.page.evaluate("document.body.scrollHeight")
+                logger.debug(f"深度滚动 {deep_scroll + 1}/10，页面高度: {current_height}px")
 
         # 循环条件：无限制时只检查滚动次数，有限制时检查目标数量
-        while (no_limit or len(all_activities) < limit + offset) and scroll_round < max_scroll_rounds:
+        last_height = 0
+        while (no_limit or total_processed < limit) and scroll_round < max_scroll_rounds:
             scroll_round += 1
-            logger.debug(f"第 {scroll_round} 轮滚动...")
+            logger.info(f"第 {scroll_round} 轮滚动...")
 
-            # 每次滚动3次
+            # 每次滚动更多次，更激进的滚动策略
             assert self.page is not None  # noqa: S101
-            for _ in range(3):
+            for i in range(5):  # 增加滚动次数到5次
                 await self.page.evaluate(
                     """() => {
-                        window.scrollBy(0, 800);
+                        window.scrollBy(0, 1500);
                     }"""
                 )
-                await asyncio.sleep(0.8)
+                # 随机延迟 1-3 秒，给页面足够时间加载
+                sleep_time = random.uniform(1.0, 3.0)
+                await asyncio.sleep(sleep_time)
+
+            # 额外等待，确保内容加载完成
+            await asyncio.sleep(2)
+
+            # 获取当前页面高度，检查是否有新内容加载
+            current_height = await self.page.evaluate("document.body.scrollHeight")
+            logger.info(f"页面高度: {current_height}px (上次: {last_height}px)")
 
             # 获取当前页面内容并解析
             assert self.page is not None  # noqa: S101
@@ -572,49 +599,109 @@ class ZhihuCrawler:
                 continue
 
             # 检查是否有新内容
-            if len(activities) > last_count:
-                new_count = len(activities) - last_count
+            has_new_activity = len(activities) > last_count
+            has_new_height = current_height > last_height
+
+            if has_new_activity:
+                new_activities = activities[last_count:]  # 只获取新增的部分
+                new_count = len(new_activities)
                 logger.info(f"第 {scroll_round} 轮滚动后: 共 {len(activities)} 条 (+{new_count})")
+
+                # 立即处理新增的activities（边滚动边保存）
+                if item_callback:
+                    for activity in new_activities:
+                        activity_id = activity.get("id", "")
+                        if activity_id and activity_id not in processed_ids:
+                            try:
+                                await item_callback(activity, total_processed)
+                                processed_ids.add(activity_id)
+                                total_processed += 1
+
+                                # 检查是否已达到限制
+                                if not no_limit and total_processed >= limit:
+                                    logger.info(f"已达到目标数量 {limit}，停止滚动")
+                                    break
+                            except Exception as e:
+                                logger.warning(f"处理activity失败: {e}")
+
                 all_activities = activities
                 last_count = len(activities)
                 no_new_content_count = 0
+
+                # 检查是否已达到限制
+                if not no_limit and total_processed >= limit:
+                    break
+            elif has_new_height:
+                # 页面高度增加了但没有新activity，可能是其他内容（如广告）
+                logger.info(f"页面高度增加 ({last_height} -> {current_height}) 但没有新activity")
+                no_new_content_count = 0  # 重置计数器，继续尝试
             else:
                 no_new_content_count += 1
-                logger.debug(f"没有新内容，连续 {no_new_content_count} 次")
+                logger.info(f"没有新内容，连续 {no_new_content_count} 次")
 
-                # 尝试点击"查看更多"按钮
+                # 尝试点击"查看更多"或"加载更多"按钮
                 try:
                     assert self.page is not None  # noqa: S101
                     has_more = await self.page.evaluate(
                         """() => {
-                            const btn = document.querySelector(
-                                '.ActivityItem-more, .ContentItem-more, '
-                                + '.FeedItem-more, [data-za-detail-view-element_name="ViewMore"]'
-                            );
-                            if (btn) { btn.click(); return true; }
+                            const selectors = [
+                                '.ActivityItem-more',
+                                '.ContentItem-more',
+                                '.FeedItem-more',
+                                '[data-za-detail-view-element_name="ViewMore"]',
+                                '.Button:contains("查看更多")',
+                                '.Button:contains("加载更多")',
+                                'button:contains("查看更多")',
+                                'button:contains("加载更多")'
+                            ];
+                            for (const sel of selectors) {
+                                const btn = document.querySelector(sel);
+                                if (btn && btn.offsetParent !== null) {
+                                    btn.click();
+                                    return true;
+                                }
+                            }
                             return false;
                         }"""
                     )
                     if has_more:
-                        logger.debug("点击了'查看更多'按钮")
-                        await asyncio.sleep(1)
+                        logger.info("点击了'查看更多'按钮")
+                        await asyncio.sleep(random.uniform(2.0, 4.0))
                         continue
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug(f"点击'查看更多'失败: {e}")
+
+            # 更新页面高度记录
+            last_height = current_height
 
             # 如果已经获取足够内容，提前退出
-            if len(all_activities) >= limit + offset:
-                logger.info(f"已获取足够内容 ({len(all_activities)} 条)，停止滚动")
+            if not no_limit and total_processed >= limit:
+                logger.info(f"已获取足够内容 ({total_processed} 条)，停止滚动")
                 break
 
             # 连续多次没有新内容，停止滚动
             if no_new_content_count >= max_no_new_content:
                 logger.info(f"连续 {max_no_new_content} 次没有新内容，停止滚动")
+                # 全量模式下尝试点击更多按钮后继续
+                if no_limit and scroll_round < max_scroll_rounds:
+                    logger.info("全量模式下继续尝试...")
+                    try:
+                        await self.page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                        await asyncio.sleep(3)
+                        # 检查是否有新内容
+                        content = await self.page.content()
+                        activities = self._parse_activities_from_html(content)
+                        if len(activities) > last_count:
+                            no_new_content_count = 0
+                            continue
+                    except Exception:
+                        pass
                 break
 
         if all_activities:
-            logger.info(f"共解析到 {len(all_activities)} 条，返回 [{offset}:{offset + limit}]")
-            return all_activities[offset : offset + limit]
+            logger.info(f"共解析到 {len(all_activities)} 条，实际处理 {total_processed} 条")
+            # 返回所有activities（已通过回调处理过）
+            return all_activities
 
         # 如果页面解析失败，尝试直接访问 API
         logger.info("页面解析失败，尝试直接访问 API...")
@@ -1241,8 +1328,84 @@ class ZhihuCrawler:
 
         return author_avatar_url, author_name_from_page, author_headline
 
-    async def process_answer(self, activity: dict, liked_time: datetime) -> bool:
-        """处理单个回答"""
+    async def _mark_html_as_deleted(self, html_path: str, question_title: str) -> None:
+        """在HTML文件中标注原回答已被删除.
+
+        Args:
+            html_path: HTML文件路径
+            question_title: 问题标题
+        """
+        try:
+
+            import aiofiles
+
+            path = Path(html_path)
+            if not path.exists():
+                return
+
+            # 读取现有HTML
+            async with aiofiles.open(path, "r", encoding="utf-8") as f:
+                content = await f.read()
+
+            # 检查是否已添加删除标注
+            if 'class="deleted-notice"' in content:
+                return
+
+            # 构建删除标注HTML
+            beijing_time = get_beijing_now()
+            deleted_notice = f"""
+    <div class="deleted-notice" style="
+        background: linear-gradient(135deg, #ff6b6b 0%, #ee5a5a 100%);
+        color: white;
+        padding: 16px 20px;
+        margin: 0;
+        font-weight: 600;
+        font-size: 15px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    ">
+        <span style="font-size: 20px;">⚠️</span>
+        <div>
+            <div style="font-size: 16px; margin-bottom: 4px;">原回答已被删除</div>
+            <div style="font-size: 13px; opacity: 0.9;">
+                该回答在知乎上已被作者删除或不存在 ·
+                检测时间: {beijing_time.strftime("%Y-%m-%d %H:%M:%S")}
+            </div>
+        </div>
+    </div>
+    """
+
+            # 在 zhihu-card div 开头插入删除标注
+            if '<div class="zhihu-card">' in content:
+                content = content.replace('<div class="zhihu-card">', f'<div class="zhihu-card">\n{deleted_notice}')
+            else:
+                # 在 body 标签后插入
+                content = content.replace("<body>", f"<body>\n{deleted_notice}")
+
+            # 写回文件
+            async with aiofiles.open(path, "w", encoding="utf-8") as f:
+                await f.write(content)
+
+            logger.info(f"已在HTML中添加删除标注: {question_title[:50]}...")
+        except Exception as e:
+            logger.warning(f"添加删除标注失败: {e}")
+
+    async def process_answer(self, activity: dict, liked_time: datetime, scan_mode: str = "normal") -> bool:
+        """处理单个回答
+
+        Args:
+            activity: 活动数据
+            liked_time: 点赞时间
+            scan_mode: 扫描模式
+                - "normal": 普通采集（定时/手工触发），遇到重复停止
+                - "full": 全量采集（手工触发），穷尽所有点赞
+
+        404处理策略:
+            - 全量采集时，如果404且本地未下载过 → 跳过不采集（节省空间）
+            - 全量采集时，如果404但本地已下载 → 标记为删除并高亮标注，保留原内容
+            - 普通采集时，404处理同上（保持数据完整性）
+        """
         try:
             target = activity.get("target", {})
 
@@ -1275,52 +1438,71 @@ class ZhihuCrawler:
                 logger.warning(f"回答已被删除: {question_title[:60]}...")
 
                 if existing:
-                    # 更新现有记录为删除状态
+                    # 【核心逻辑】本地已下载过，需要标记为删除但保留原内容
                     if not existing.is_deleted:
-                        self.db.save_answer(
-                            {
-                                "id": answer_id,
-                                "is_deleted": True,
-                                "content_text": "[此回答已被删除或不存在]",
-                            }
-                        )
+                        update_data = {
+                            "id": answer_id,
+                            "is_deleted": True,
+                            "content_text": existing.content_text,  # 保留原内容预览
+                            "extra_meta": {
+                                "deleted": True,
+                                "deleted_at": get_beijing_now().isoformat(),
+                                "author_headline": author_headline,
+                                "note": "该回答已被原作者删除或知乎删除，此处保留备份",
+                            },
+                        }
+                        # 【核心逻辑】如果已有HTML备份，保留路径并在文件中添加删除标注
+                        if existing.html_path:
+                            update_data["html_path"] = existing.html_path
+                            # 在HTML文件中添加删除标注（高亮提示）
+                            await self._mark_html_as_deleted(existing.html_path, question_title)
+                            logger.info(f"已高亮标注删除状态（保留原内容）: {question_title[:60]}...")
+
+                        self.db.save_answer(update_data)
                         self.updated_items += 1
-                        logger.info(f"已标记为删除状态: {question_title[:60]}...")
+                        logger.info(f"已标记为删除状态（保留备份）: {question_title[:60]}...")
                     return True
 
-                # 保存删除状态的新记录
-                answer_data = {
-                    "id": answer_id,
-                    "user_id": self.user_id,
-                    "question_id": question_id,
-                    "question_title": question_title,
-                    "author_id": author_id,
-                    "author_name": author_name,
-                    "author_avatar_url": None,
-                    "author_headline": author_headline,
-                    "author_url": author_url,
-                    "content_text": "[此回答已被删除或不存在]",
-                    "content_length": 0,
-                    "voteup_count": voteup_count,
-                    "comment_count": comment_count,
-                    "created_time": (self._parse_timestamp(created_time) if created_time else None),
-                    "updated_time": (self._parse_timestamp(updated_time) if updated_time else None),
-                    "liked_time": liked_time,
-                    "html_path": None,
-                    "original_url": f"{self.ZHIHU_BASE}/question/{question_id}/answer/{answer_id}",
-                    "has_comments": False,
-                    "is_deleted": True,  # 标记为已删除
-                    "extra_meta": {
-                        "deleted": True,
+                # 【核心逻辑】本地未下载过且是404
+                if scan_mode == "full":
+                    # 全量采集模式：跳过不采集，节省存储空间
+                    logger.info(f"全量采集：跳过404且未备份的回答: {question_title[:60]}...")
+                    return True  # 返回True表示已处理（跳过），不计入新条目
+                else:
+                    # 普通采集模式：保存删除状态记录（用于完整性）
+                    answer_data = {
+                        "id": answer_id,
+                        "user_id": self.user_id,
+                        "question_id": question_id,
+                        "question_title": question_title,
+                        "author_id": author_id,
+                        "author_name": author_name,
+                        "author_avatar_url": None,
                         "author_headline": author_headline,
-                    },
-                }
-
-                is_new = self.db.save_answer(answer_data)
-                if is_new:
-                    self.new_items += 1
-                    logger.info(f"已保存删除状态回答: {question_title[:60]}...")
-                return True
+                        "author_url": author_url,
+                        "content_text": "[此回答已被删除或不存在]",
+                        "content_length": 0,
+                        "voteup_count": voteup_count,
+                        "comment_count": comment_count,
+                        "created_time": (self._parse_timestamp(created_time) if created_time else None),
+                        "updated_time": (self._parse_timestamp(updated_time) if updated_time else None),
+                        "liked_time": liked_time,
+                        "html_path": None,
+                        "original_url": f"{self.ZHIHU_BASE}/question/{question_id}/answer/{answer_id}",
+                        "has_comments": False,
+                        "is_deleted": True,
+                        "extra_meta": {
+                            "deleted": True,
+                            "deleted_at": get_beijing_now().isoformat(),
+                            "author_headline": author_headline,
+                            "note": "首次发现时已被删除",
+                        },
+                    }
+                    is_new = self.db.save_answer(answer_data)
+                    if is_new:
+                        self.new_items += 1
+                        logger.info(f"普通采集：保存删除状态记录: {question_title[:60]}...")
+                    return True
 
             # 其他获取失败的情况
             if not page_html:
@@ -1485,16 +1667,42 @@ class ZhihuCrawler:
         max_items: int = 50,
         progress_callback: Callable | None = None,
         init_mode: bool = False,
+        scan_mode: str = "normal",
     ):
-        """扫描用户点赞内容 - 支持断点续传和初始化模式.
+        """扫描用户点赞内容 - 支持断点续传和初始化模式，边滚动边保存.
+
+        采集模式说明:
+            normal (普通采集):
+                - 触发方式: 定时触发或手工触发
+                - 停止条件: 遇到已存在的重复数据时停止
+                - 适用场景: 日常增量同步
+                - 404处理: 本地未下载过的404回答会保存为删除状态记录
+
+            full (全量采集):
+                - 触发方式: 仅手工触发（点击"全量同步"按钮）
+                - 停止条件: 穷尽用户的所有点赞记录
+                - 适用场景: 初次使用或需要完整备份时
+                - 404处理: 本地未下载过的404回答直接跳过（节省空间）
+
+        特殊情况说明:
+            初次使用时:
+                - 数据库为空，普通采集等同于全量采集
+                - 建议直接使用"全量同步"以获得最佳效果
+
+            404回答处理:
+                - 本地已下载过: 高亮标注删除状态，保留原内容，不会被404页面覆盖
+                - 本地未下载过（全量）: 跳过不采集，节省存储空间
+                - 本地未下载过（普通）: 保存删除状态记录（用于完整性）
 
         Args:
             max_items: 最大扫描数量，-1 表示无限制
             progress_callback: 进度回调函数
             init_mode: 初始化模式，True 时会重新爬取所有历史数据（无视已存在）
+            scan_mode: 扫描模式，"normal" 或 "full"
         """
-        mode_str = "初始化模式" if init_mode else "增量模式"
-        logger.info(f"开始扫描用户 {self.user_id} 的点赞内容 ({mode_str}, max={max_items})...")
+        mode_str = "全量采集模式" if scan_mode == "full" else "普通采集模式"
+        init_str = "（初始化）" if init_mode else ""
+        logger.info(f"开始扫描用户 {self.user_id} 的点赞内容 ({mode_str}{init_str}, max={max_items})...")
 
         # 确保用户记录在数据库中存在
         user_created = self.db.add_user(self.user_id, self.user_id)
@@ -1506,9 +1714,7 @@ class ZhihuCrawler:
         self.new_items = 0
         self.updated_items = 0
         scanned = 0
-        offset = 0
-        limit = 10  # 减少每批数量，更频繁保存
-        processed_ids = set()  # 防止重复处理（仅当前批次内）
+        processed_ids: set[str] = set()  # 防止重复处理
 
         # 获取已处理的回答ID
         existing_answers = self.db.get_user_answer_ids(self.user_id)
@@ -1523,67 +1729,63 @@ class ZhihuCrawler:
         # -1 表示无限制
         no_limit = max_items < 0
 
-        while no_limit or scanned < max_items:
-            # 无限制时一次性获取更多，减少页面刷新次数
-            batch_size = 100 if no_limit else min(limit, max_items - scanned)
-            activities = await self.fetch_likes(limit=batch_size, offset=offset)
+        async def process_single_activity(activity: dict, index: int) -> None:
+            """处理单个activity的回调函数"""
+            nonlocal scanned
 
-            if not activities:
-                logger.info("没有更多活动数据")
-                break
+            # 只处理点赞回答
+            if activity.get("verb") != "MEMBER_VOTEUP_ARTICLE" and activity.get("verb") != "MEMBER_VOTEUP_ANSWER":
+                return
 
-            batch_new = 0
-            for activity in activities:
-                # 只处理点赞回答
-                if activity.get("verb") != "MEMBER_VOTEUP_ARTICLE" and activity.get("verb") != "MEMBER_VOTEUP_ANSWER":
-                    continue
+            # 获取回答ID用于去重
+            target = activity.get("target", {})
+            answer_id = str(target.get("id", ""))
 
-                # 获取回答ID用于去重
-                target = activity.get("target", {})
-                answer_id = str(target.get("id", ""))
-
-                # 如果已经处理过，跳过（初始化模式除外）
-                if answer_id and answer_id in processed_ids and not init_mode:
-                    logger.debug(f"跳过已处理的回答: {answer_id}")
-                    scanned += 1
-                    if not no_limit and scanned >= max_items:
-                        break
-                    continue
-
-                # 初始化模式下，已存在的回答强制更新
-                if init_mode and answer_id and answer_id in existing_answers:
-                    logger.debug(f"初始化模式：强制更新已存在的回答: {answer_id}")
-
-                # 解析点赞时间
-                created_time = activity.get("created_time", 0)
-                liked_time = self._parse_timestamp(created_time) if created_time else get_beijing_now()
-
-                # 处理回答（会立即保存到数据库和文件）
-                success = await self.process_answer(activity, liked_time)
-                if success and answer_id:
-                    processed_ids.add(answer_id)
-                    batch_new += 1
-
+            # 如果已经处理过，跳过（初始化模式除外）
+            if answer_id and answer_id in processed_ids and not init_mode:
+                logger.debug(f"跳过已处理的回答: {answer_id}")
                 scanned += 1
-
                 if progress_callback:
                     progress_callback(scanned, max_items if not no_limit else -1)
+                return
 
-                if not no_limit and scanned >= max_items:
-                    break
+            # 初始化模式下，已存在的回答强制更新
+            if init_mode and answer_id and answer_id in existing_answers:
+                logger.debug(f"初始化模式：强制更新已存在的回答: {answer_id}")
 
-            logger.info(f"本批处理: {len(activities)} 条，新增: {batch_new} 条，累计: {scanned}")
+            # 解析点赞时间
+            created_time = activity.get("created_time", 0)
+            liked_time = self._parse_timestamp(created_time) if created_time else get_beijing_now()
 
-            # 每批处理完后立即更新同步时间（断点续传）
-            if batch_new > 0:
+            # 处理回答（会立即保存到数据库和文件）
+            # 传递 scan_mode 以支持不同的404处理策略
+            success = await self.process_answer(activity, liked_time, scan_mode=scan_mode)
+            if success and answer_id:
+                processed_ids.add(answer_id)
+
+            scanned += 1
+
+            if progress_callback:
+                progress_callback(scanned, max_items if not no_limit else -1)
+
+            # 每处理5条更新一次同步时间（断点续传）
+            if scanned % 5 == 0:
                 self.db.update_user_sync_time(self.user_id)
 
-            offset += len(activities)
+        # 调用fetch_likes，使用回调函数实现边滚动边处理
+        activities = await self.fetch_likes(
+            limit=max_items,
+            offset=0,
+            item_callback=process_single_activity,
+        )
 
-            # 如果没有更多数据，退出
-            if len(activities) < batch_size:
-                logger.info("活动数据不足，结束扫描")
-                break
+        # 如果没有通过回调处理（兼容旧逻辑），则批量处理
+        if scanned == 0 and activities:
+            logger.info(f"通过批量模式处理 {len(activities)} 条记录")
+            for activity in activities:
+                await process_single_activity(activity, scanned)
+                if not no_limit and scanned >= max_items:
+                    break
 
         logger.info(f"扫描完成: 处理 {scanned} 条，新增 {self.new_items} 条，更新 {self.updated_items} 条")
 
