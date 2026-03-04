@@ -14,7 +14,6 @@ from pathlib import Path
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.common.by import By
 from webdriver_manager.chrome import ChromeDriverManager
 
 
@@ -29,19 +28,14 @@ def get_zhihu_cookies_manual():
     chrome_options.add_argument("--start-maximized")
     chrome_options.add_argument("--disable-blink-features=AutomationControlled")
     chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
-    chrome_options.add_experimental_option('useAutomationExtension', False)
+    chrome_options.add_experimental_option("useAutomationExtension", False)
 
     # 启动浏览器
     print("\n正在启动 Chrome...")
-    driver = webdriver.Chrome(
-        service=Service(ChromeDriverManager().install()),
-        options=chrome_options
-    )
+    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
 
     # 隐藏 webdriver 标志
-    driver.execute_script(
-        "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})"
-    )
+    driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
 
     try:
         # 打开知乎
@@ -64,10 +58,10 @@ def get_zhihu_cookies_manual():
         print(f"\n获取到 {len(cookies)} 个 Cookie")
 
         # 检查关键 cookie
-        cookie_names = [c['name'] for c in cookies]
+        cookie_names = [c["name"] for c in cookies]
         print(f"Cookie 列表: {cookie_names}")
 
-        if 'z_c0' not in cookie_names:
+        if "z_c0" not in cookie_names:
             print("\n❌ 警告: 未找到关键 Cookie (z_c0)")
             print("请确保已成功登录知乎")
             return None
@@ -87,7 +81,7 @@ def get_zhihu_cookies_manual():
                 }
                 for c in cookies
             ],
-            "origins": []
+            "origins": [],
         }
 
         print("\n✅ 成功获取 Cookie!")
@@ -124,12 +118,7 @@ def send_cookie_to_server(storage_state: dict, server_url: str = "http://localho
         import requests
 
         response = requests.post(
-            f"{server_url}/api/cookies",
-            json={
-                "cookies": json.dumps(storage_state),
-                "format": "json"
-            },
-            timeout=10
+            f"{server_url}/api/cookies", json={"cookies": json.dumps(storage_state), "format": "json"}, timeout=10
         )
 
         if response.status_code == 200:

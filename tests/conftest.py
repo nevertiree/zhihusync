@@ -1,15 +1,15 @@
 """Pytest configuration and shared fixtures."""
 
 import json
-import pytest
 import sys
 from pathlib import Path
+
+import pytest
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from fastapi.testclient import TestClient
-
 
 # Get fixtures directory
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
@@ -41,6 +41,7 @@ def base_url():
 def client():
     """Create FastAPI test client."""
     from web import app
+
     return TestClient(app)
 
 

@@ -5,7 +5,6 @@ Integration tests for Extraction Errors API - 测试内容提取错误 API
 """
 
 import pytest
-from fastapi.testclient import TestClient
 
 # Mark all tests as integration tests
 pytestmark = [pytest.mark.integration, pytest.mark.api]

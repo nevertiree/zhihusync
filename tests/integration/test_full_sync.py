@@ -2,11 +2,12 @@
 全量同步功能测试 - 测试实际同步流程
 """
 
-import pytest
-import time
 import json
-import requests
+import time
 from pathlib import Path
+
+import pytest
+import requests
 
 
 class TestFullSyncProcess:
@@ -35,11 +36,7 @@ class TestFullSyncProcess:
         """测试前置设置"""
         # 添加测试用户
         user_id = test_users[0]["user_id"]
-        requests.post(
-            f"{base_url}/api/users",
-            json={"user_id": user_id, "name": "测试用户"},
-            timeout=10
-        )
+        requests.post(f"{base_url}/api/users", json={"user_id": user_id, "name": "测试用户"}, timeout=10)
 
         # 更新配置
         config_data = {
@@ -73,11 +70,7 @@ class TestFullSyncProcess:
         requests.post(f"{base_url}/api/config", json=config_data, timeout=10)
 
         # 上传Cookie
-        requests.post(
-            f"{base_url}/api/cookies",
-            json={"cookies": json.dumps(test_cookies)},
-            timeout=10
-        )
+        requests.post(f"{base_url}/api/cookies", json={"cookies": json.dumps(test_cookies)}, timeout=10)
 
     def test_cookie_validation(self, base_url):
         """测试Cookie验证"""
@@ -154,7 +147,7 @@ class TestFullSyncProcess:
         stats_resp = requests.get(f"{base_url}/api/stats", timeout=10)
         if stats_resp.status_code == 200:
             stats = stats_resp.json()
-            print(f"\n全量同步完成统计:")
+            print("\n全量同步完成统计:")
             print(f"  - 总回答数: {stats.get('total_answers', 0)}")
             print(f"  - 总评论数: {stats.get('total_comments', 0)}")
             print(f"  - 已删除回答: {stats.get('deleted_answers', 0)}")
@@ -166,11 +159,7 @@ class TestFullSyncProcess:
 
         # 添加第二个用户
         user_id = test_users[1]["user_id"]
-        requests.post(
-            f"{base_url}/api/users",
-            json={"user_id": user_id, "name": "测试用户2"},
-            timeout=10
-        )
+        requests.post(f"{base_url}/api/users", json={"user_id": user_id, "name": "测试用户2"}, timeout=10)
 
         # 获取用户列表
         response = requests.get(f"{base_url}/api/users", timeout=10)
@@ -239,11 +228,7 @@ class TestErrorHandling:
 
     def test_invalid_cookie_format(self, base_url):
         """测试无效Cookie格式"""
-        response = requests.post(
-            f"{base_url}/api/cookies",
-            json={"cookies": "invalid json {{"},
-            timeout=10
-        )
+        response = requests.post(f"{base_url}/api/cookies", json={"cookies": "invalid json {{"}, timeout=10)
 
         # 应该返回400错误
         assert response.status_code in [400, 422]

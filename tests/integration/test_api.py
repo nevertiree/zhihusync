@@ -3,10 +3,9 @@ API Integration Tests - 测试所有API端点的完整功能
 包括：用户管理、配置管理、同步控制、数据查询
 """
 
+import json
 import pytest
-import time
 import requests
-from datetime import datetime
 
 
 class TestUserManagement:
@@ -15,11 +14,7 @@ class TestUserManagement:
     def test_create_user_success(self, base_url, test_user_ids):
         """测试成功创建用户"""
         user_id = test_user_ids[0]
-        response = requests.post(
-            f"{base_url}/api/users",
-            json={"user_id": user_id, "name": "测试用户"},
-            timeout=10
-        )
+        response = requests.post(f"{base_url}/api/users", json={"user_id": user_id, "name": "测试用户"}, timeout=10)
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "success"
@@ -29,21 +24,13 @@ class TestUserManagement:
         """测试重复创建用户"""
         user_id = test_user_ids[0]
         # 第二次创建应该失败或重新激活
-        response = requests.post(
-            f"{base_url}/api/users",
-            json={"user_id": user_id, "name": "测试用户2"},
-            timeout=10
-        )
+        response = requests.post(f"{base_url}/api/users", json={"user_id": user_id, "name": "测试用户2"}, timeout=10)
         # 应该返回200（重新激活）或400（已存在）
         assert response.status_code in [200, 400]
 
     def test_create_user_empty_id(self, base_url):
         """测试创建空ID用户"""
-        response = requests.post(
-            f"{base_url}/api/users",
-            json={"user_id": "", "name": "无效用户"},
-            timeout=10
-        )
+        response = requests.post(f"{base_url}/api/users", json={"user_id": "", "name": "无效用户"}, timeout=10)
         assert response.status_code == 400
 
     def test_get_users_list(self, base_url):
@@ -59,11 +46,7 @@ class TestUserManagement:
         # 先创建第二个测试用户用于删除
         if len(test_user_ids) > 1:
             user_id = test_user_ids[1]
-            requests.post(
-                f"{base_url}/api/users",
-                json={"user_id": user_id, "name": "待删除用户"},
-                timeout=10
-            )
+            requests.post(f"{base_url}/api/users", json={"user_id": user_id, "name": "待删除用户"}, timeout=10)
 
             # 删除用户
             response = requests.delete(f"{base_url}/api/users/{user_id}", timeout=10)
@@ -119,11 +102,7 @@ class TestConfigManagement:
             "console_output": True,
             "log_sql": False,
         }
-        response = requests.post(
-            f"{base_url}/api/config",
-            json=config_data,
-            timeout=10
-        )
+        response = requests.post(f"{base_url}/api/config", json=config_data, timeout=10)
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "success"
@@ -151,11 +130,7 @@ class TestCookieManagement:
 
     def test_update_cookies(self, base_url, test_cookies):
         """测试更新Cookie"""
-        response = requests.post(
-            f"{base_url}/api/cookies",
-            json={"cookies": json.dumps(test_cookies)},
-            timeout=10
-        )
+        response = requests.post(f"{base_url}/api/cookies", json={"cookies": json.dumps(test_cookies)}, timeout=10)
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "success"
@@ -216,10 +191,7 @@ class TestDataQuery:
 
     def test_get_answers_with_pagination(self, base_url):
         """测试分页获取回答"""
-        response = requests.get(
-            f"{base_url}/api/answers?page=1&page_size=10",
-            timeout=10
-        )
+        response = requests.get(f"{base_url}/api/answers?page=1&page_size=10", timeout=10)
         assert response.status_code == 200
         data = response.json()
         assert data["page"] == 1
@@ -227,10 +199,7 @@ class TestDataQuery:
 
     def test_get_answers_with_search(self, base_url):
         """测试搜索回答"""
-        response = requests.get(
-            f"{base_url}/api/answers?search=test",
-            timeout=10
-        )
+        response = requests.get(f"{base_url}/api/answers?search=test", timeout=10)
         assert response.status_code == 200
 
     def test_get_sync_history(self, base_url):
@@ -289,11 +258,7 @@ class TestFullWorkflow:
 
         # 2. 添加用户
         user_id = test_user_ids[0]
-        response = requests.post(
-            f"{base_url}/api/users",
-            json={"user_id": user_id, "name": "测试用户"},
-            timeout=10
-        )
+        response = requests.post(f"{base_url}/api/users", json={"user_id": user_id, "name": "测试用户"}, timeout=10)
         assert response.status_code == 200
 
         # 3. 更新配置
@@ -325,19 +290,11 @@ class TestFullWorkflow:
             "console_output": True,
             "log_sql": False,
         }
-        response = requests.post(
-            f"{base_url}/api/config",
-            json=config_data,
-            timeout=10
-        )
+        response = requests.post(f"{base_url}/api/config", json=config_data, timeout=10)
         assert response.status_code == 200
 
         # 4. 上传Cookie
-        response = requests.post(
-            f"{base_url}/api/cookies",
-            json={"cookies": json.dumps(test_cookies)},
-            timeout=10
-        )
+        response = requests.post(f"{base_url}/api/cookies", json={"cookies": json.dumps(test_cookies)}, timeout=10)
         assert response.status_code == 200
 
         # 5. 验证设置完成
@@ -346,6 +303,6 @@ class TestFullWorkflow:
         assert final_status["has_user_id"] == True
         assert final_status["has_cookie"] == True
 
-        print(f"\n✅ 完整设置流程测试通过")
+        print("\n✅ 完整设置流程测试通过")
         print(f"   初始状态: {initial_status}")
         print(f"   最终状态: {final_status}")

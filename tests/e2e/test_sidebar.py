@@ -2,18 +2,17 @@
 侧边栏动态伸缩功能 E2E 测试
 """
 
-import pytest
 import time
+
+import pytest
 
 selenium = pytest.importorskip("selenium", reason="selenium not installed")
 
 from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.common.action_chains import ActionChains
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.common.action_chains import ActionChains
+from selenium.webdriver.common.by import By
 
 
 class TestSidebar:
@@ -31,6 +30,7 @@ class TestSidebar:
 
         try:
             from webdriver_manager.chrome import ChromeDriverManager
+
             service = Service(ChromeDriverManager().install())
             driver = webdriver.Chrome(service=service, options=chrome_options)
         except Exception:
@@ -52,8 +52,8 @@ class TestSidebar:
 
         # 清除所有缓存
         driver.get(f"{base_url}/content")
-        driver.execute_cdp_cmd('Network.clearBrowserCache', {})
-        driver.execute_cdp_cmd('Network.clearBrowserCookies', {})
+        driver.execute_cdp_cmd("Network.clearBrowserCache", {})
+        driver.execute_cdp_cmd("Network.clearBrowserCookies", {})
 
         # 强制刷新
         driver.refresh()
@@ -64,7 +64,7 @@ class TestSidebar:
 
         # 获取侧边栏宽度
         sidebar = driver.find_element(By.ID, "sidebar")
-        sidebar_width = sidebar.size['width']
+        sidebar_width = sidebar.size["width"]
         print(f"侧边栏默认宽度: {sidebar_width}px")
 
         # 检查是否应该是收缩状态 (约64px)
@@ -96,13 +96,13 @@ class TestSidebar:
         """
         print("\n=== 测试侧边栏悬停展开 ===")
         driver.get(f"{base_url}/content")
-        driver.execute_cdp_cmd('Network.clearBrowserCache', {})
+        driver.execute_cdp_cmd("Network.clearBrowserCache", {})
         time.sleep(2)
 
         sidebar = driver.find_element(By.ID, "sidebar")
 
         # 记录悬停前的宽度
-        width_before = sidebar.size['width']
+        width_before = sidebar.size["width"]
         print(f"悬停前宽度: {width_before}px")
 
         # 鼠标悬停在侧边栏上
@@ -116,13 +116,13 @@ class TestSidebar:
         driver.save_screenshot("tests/e2e/screenshots/sidebar_hover.png")
 
         # 记录悬停后的宽度
-        width_after = sidebar.size['width']
+        width_after = sidebar.size["width"]
         print(f"悬停后宽度: {width_after}px")
 
         if width_after > width_before + 50:
             print("✅ 侧边栏悬停后展开")
         else:
-            print(f"❌ 侧边栏悬停后没有明显展开")
+            print("❌ 侧边栏悬停后没有明显展开")
 
         # 检查文字是否显示
         try:
@@ -145,7 +145,7 @@ class TestSidebar:
 
         # 先访问内容页面
         driver.get(f"{base_url}/content")
-        driver.execute_cdp_cmd('Network.clearBrowserCache', {})
+        driver.execute_cdp_cmd("Network.clearBrowserCache", {})
         time.sleep(2)
 
         print(f"当前页面: {driver.current_url}")
@@ -168,7 +168,7 @@ class TestSidebar:
             # 检查是否跳转到了首页
             print(f"点击后页面: {driver.current_url}")
 
-            if driver.current_url.rstrip('/') == base_url or driver.current_url == f"{base_url}/":
+            if driver.current_url.rstrip("/") == base_url or driver.current_url == f"{base_url}/":
                 print("✅ 点击 Logo 成功跳转到仪表盘")
             else:
                 print("❌ 点击 Logo 没有跳转到仪表盘")
@@ -183,7 +183,7 @@ class TestSidebar:
         """
         print("\n=== 测试导航图标可见性 ===")
         driver.get(f"{base_url}/content")
-        driver.execute_cdp_cmd('Network.clearBrowserCache', {})
+        driver.execute_cdp_cmd("Network.clearBrowserCache", {})
         time.sleep(2)
 
         # 获取所有导航项
@@ -205,7 +205,7 @@ class TestSidebar:
         """
         print("\n=== 测试主内容区边距 ===")
         driver.get(f"{base_url}/content")
-        driver.execute_cdp_cmd('Network.clearBrowserCache', {})
+        driver.execute_cdp_cmd("Network.clearBrowserCache", {})
         time.sleep(2)
 
         main_content = driver.find_element(By.CLASS_NAME, "main-content")

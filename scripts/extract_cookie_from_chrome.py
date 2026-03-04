@@ -64,8 +64,9 @@ def decrypt_cookie_value(encrypted_value: bytes) -> str:
     """解密 Chrome Cookie 值 (Windows)."""
     try:
         import win32crypt
+
         decrypted = win32crypt.CryptUnprotectData(encrypted_value, None, None, None, 0)
-        return decrypted[1].decode('utf-8')
+        return decrypted[1].decode("utf-8")
     except Exception:
         # 如果解密失败，返回空字符串
         return ""
@@ -75,7 +76,7 @@ def extract_zhihu_cookies(cookie_db_path: Path) -> list:
     """从 Chrome Cookie 数据库提取知乎 Cookie."""
 
     # 复制到临时文件（避免锁定）
-    temp_fd, temp_path = tempfile.mkstemp(suffix='.db')
+    temp_fd, temp_path = tempfile.mkstemp(suffix=".db")
     os.close(temp_fd)
 
     try:
@@ -120,6 +121,7 @@ def extract_zhihu_cookies(cookie_db_path: Path) -> list:
             if expires_utc and expires_utc > 0:
                 # Chrome 使用的是从 1601-01-01 开始的微秒数
                 import datetime
+
                 epoch = datetime.datetime(1601, 1, 1)
                 expires = epoch + datetime.timedelta(microseconds=expires_utc)
                 cookie["expires"] = int(expires.timestamp())
@@ -175,7 +177,7 @@ def main():
     found_keys = [c["name"] for c in cookies if c["name"] in key_cookies]
     missing_keys = [k for k in key_cookies if k not in found_keys]
 
-    print(f"\n关键 Cookie:")
+    print("\n关键 Cookie:")
     print(f"   ✅ 已找到: {found_keys}")
     if missing_keys:
         print(f"   ⚠️ 缺失: {missing_keys}")
@@ -186,10 +188,7 @@ def main():
         sys.exit(1)
 
     # 构建 storage_state
-    storage_state = {
-        "cookies": cookies,
-        "origins": []
-    }
+    storage_state = {"cookies": cookies, "origins": []}
 
     # 保存到文件
     output_path = Path("data/meta/cookies.json")
@@ -207,11 +206,8 @@ def main():
 
         response = requests.post(
             "http://localhost:6067/api/cookies",
-            json={
-                "cookies": json.dumps(storage_state),
-                "format": "json"
-            },
-            timeout=10
+            json={"cookies": json.dumps(storage_state), "format": "json"},
+            timeout=10,
         )
 
         if response.status_code == 200:
