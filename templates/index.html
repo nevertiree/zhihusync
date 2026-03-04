@@ -72,28 +72,28 @@
 
 <!-- 统计卡片 -->
 <div class="stats-grid">
-    <div class="stat-card">
+    <div class="stat-card clickable" onclick="location.href='/content'" title="点击查看明细">
         <div class="stat-icon">📄</div>
         <div class="stat-content">
             <div class="stat-value" id="stat-answers">-</div>
             <div class="stat-label">已备份回答</div>
         </div>
     </div>
-    <div class="stat-card">
+    <div class="stat-card clickable" onclick="location.href='/content'" title="点击查看明细">
         <div class="stat-icon">💬</div>
         <div class="stat-content">
             <div class="stat-value"><span id="stat-with-comments">-</span><span class="stat-separator">/</span><span id="stat-total-with-comments">-</span></div>
             <div class="stat-label">含评论/总回答</div>
         </div>
     </div>
-    <div class="stat-card">
+    <div class="stat-card clickable" onclick="location.href='/content?filter=deleted'" title="点击查看已删除">
         <div class="stat-icon">⚠️</div>
         <div class="stat-content">
             <div class="stat-value" id="stat-deleted">-</div>
             <div class="stat-label">已删除(404)</div>
         </div>
     </div>
-    <div class="stat-card">
+    <div class="stat-card clickable" onclick="location.href='/config'" title="点击管理用户">
         <div class="stat-icon">👥</div>
         <div class="stat-content">
             <div class="stat-value" id="stat-users">-</div>

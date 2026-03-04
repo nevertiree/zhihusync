@@ -14,6 +14,56 @@
     </div>
 </div>
 
+<!-- 筛选栏 -->
+<div class="card filter-card">
+    <div class="card-body">
+        <div class="filter-row">
+            <div class="filter-group">
+                <label>删除状态</label>
+                <select id="filter-deleted" onchange="loadAnswers(1)">
+                    <option value="">全部</option>
+                    <option value="false">正常</option>
+                    <option value="true">已删除</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>点赞数</label>
+                <div class="range-inputs">
+                    <input type="number" id="filter-vote-min" placeholder="最小" min="0" onchange="loadAnswers(1)">
+                    <span>-</span>
+                    <input type="number" id="filter-vote-max" placeholder="最大" min="0" onchange="loadAnswers(1)">
+                </div>
+            </div>
+            <div class="filter-group">
+                <label>评论数</label>
+                <div class="range-inputs">
+                    <input type="number" id="filter-comment-min" placeholder="最小" min="0" onchange="loadAnswers(1)">
+                    <span>-</span>
+                    <input type="number" id="filter-comment-max" placeholder="最大" min="0" onchange="loadAnswers(1)">
+                </div>
+            </div>
+            <div class="filter-group">
+                <label>排序</label>
+                <select id="filter-sort" onchange="loadAnswers(1)">
+                    <option value="liked_time">点赞时间</option>
+                    <option value="voteup_count">点赞数</option>
+                    <option value="comment_count">评论数</option>
+                    <option value="created_time">回答时间</option>
+                    <option value="synced_at">备份时间</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>顺序</label>
+                <select id="filter-order" onchange="loadAnswers(1)">
+                    <option value="desc">降序</option>
+                    <option value="asc">升序</option>
+                </select>
+            </div>
+            <button class="btn btn-secondary btn-sm" onclick="resetFilters()">重置筛选</button>
+        </div>
+    </div>
+</div>
+
 <!-- 内容列表 -->
 <div class="card">
     <div class="card-body">
@@ -42,8 +92,28 @@
         </div>
 
         <!-- 分页 -->
-        <div class="pagination" id="pagination">
-            <!-- 动态生成分页 -->
+        <div class="pagination-container">
+            <div class="pagination-info">
+                <span>共 <strong id="total-count">0</strong> 条</span>
+                <span class="pagination-size">
+                    每页
+                    <select id="page-size" onchange="changePageSize()">
+                        <option value="10">10</option>
+                        <option value="20" selected>20</option>
+                        <option value="50">50</option>
+                        <option value="100">100</option>
+                    </select>
+                    条
+                </span>
+            </div>
+            <div class="pagination" id="pagination">
+                <!-- 动态生成分页 -->
+            </div>
+            <div class="pagination-jump">
+                <span>跳到</span>
+                <input type="number" id="page-input" min="1" placeholder="页码" onkeypress="if(event.key==='Enter')jumpToPage()">
+                <button class="btn btn-sm" onclick="jumpToPage()">确定</button>
+            </div>
         </div>
     </div>
 </div>
@@ -298,6 +368,122 @@
     background: #cf1322;
 }
 
+/* 筛选卡片 */
+.filter-card {
+    margin-bottom: 16px;
+}
+
+.filter-card .card-body {
+    padding: 16px 20px;
+}
+
+.filter-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    align-items: flex-end;
+}
+
+.filter-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.filter-group label {
+    font-size: 12px;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.filter-group select,
+.filter-group input {
+    padding: 6px 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    font-size: 13px;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+}
+
+.filter-group select {
+    min-width: 100px;
+    cursor: pointer;
+}
+
+.range-inputs {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.range-inputs input {
+    width: 70px;
+    text-align: center;
+}
+
+.range-inputs span {
+    color: var(--text-muted);
+}
+
+/* 分页容器 */
+.pagination-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border-color);
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.pagination-info {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+
+.pagination-info strong {
+    color: var(--primary);
+    font-weight: 600;
+}
+
+.pagination-size {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.pagination-size select {
+    padding: 4px 8px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    font-size: 13px;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    cursor: pointer;
+}
+
+.pagination-jump {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+
+.pagination-jump input {
+    width: 60px;
+    padding: 4px 8px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    font-size: 13px;
+    text-align: center;
+}
+
 /* 响应式 */
 @media (max-width: 1400px) {
     .detail-table {
@@ -307,6 +493,35 @@
     .detail-table th,
     .detail-table td {
         padding: 6px 4px;
+    }
+}
+
+@media (max-width: 768px) {
+    .filter-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .filter-group {
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
+    }
+    
+    .filter-group select,
+    .filter-group .range-inputs {
+        flex: 1;
+        max-width: 200px;
+    }
+    
+    .pagination-container {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .pagination-info,
+    .pagination-jump {
+        justify-content: center;
     }
 }
 </style>
@@ -348,16 +563,36 @@ function formatDate(isoString) {
 async function loadAnswers(page = 1) {
     currentPage = page;
     const search = document.getElementById('search-input').value.trim();
+    const pageSize = document.getElementById('page-size').value;
+    
+    // 获取筛选参数
+    const deleted = document.getElementById('filter-deleted').value;
+    const voteMin = document.getElementById('filter-vote-min').value;
+    const voteMax = document.getElementById('filter-vote-max').value;
+    const commentMin = document.getElementById('filter-comment-min').value;
+    const commentMax = document.getElementById('filter-comment-max').value;
+    const sort = document.getElementById('filter-sort').value;
+    const order = document.getElementById('filter-order').value;
 
     try {
         const tbody = document.getElementById('answers-body');
         tbody.innerHTML = '<tr><td colspan="10" class="text-center">加载中...</td></tr>';
 
-        const url = `/api/answers?page=${page}&page_size=20${search ? '&search=' + encodeURIComponent(search) : ''}`;
+        let url = `/api/answers?page=${page}&page_size=${pageSize}`;
+        if (search) url += `&search=${encodeURIComponent(search)}`;
+        if (deleted) url += `&is_deleted=${deleted}`;
+        if (voteMin) url += `&voteup_min=${voteMin}`;
+        if (voteMax) url += `&voteup_max=${voteMax}`;
+        if (commentMin) url += `&comment_min=${commentMin}`;
+        if (commentMax) url += `&comment_max=${commentMax}`;
+        if (sort) url += `&sort=${sort}`;
+        if (order) url += `&order=${order}`;
+        
         const res = await fetch(url);
         const data = await res.json();
 
         totalPages = data.total_pages;
+        document.getElementById('total-count').textContent = data.total.toLocaleString();
 
         if (data.items.length === 0) {
             tbody.innerHTML = '<tr><td colspan="10" class="text-center text-muted">暂无数据</td></tr>';
@@ -557,8 +792,50 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
+// 更改每页条数
+function changePageSize() {
+    loadAnswers(1);
+}
+
+// 跳转到指定页
+function jumpToPage() {
+    const input = document.getElementById('page-input');
+    const page = parseInt(input.value);
+    if (page && page >= 1 && page <= totalPages) {
+        loadAnswers(page);
+        input.value = '';
+    } else {
+        showToast(`请输入有效的页码 (1-${totalPages})`, 'warning');
+    }
+}
+
+// 重置筛选器
+function resetFilters() {
+    document.getElementById('filter-deleted').value = '';
+    document.getElementById('filter-vote-min').value = '';
+    document.getElementById('filter-vote-max').value = '';
+    document.getElementById('filter-comment-min').value = '';
+    document.getElementById('filter-comment-max').value = '';
+    document.getElementById('filter-sort').value = 'liked_time';
+    document.getElementById('filter-order').value = 'desc';
+    document.getElementById('search-input').value = '';
+    loadAnswers(1);
+}
+
+// 解析 URL 参数
+function parseUrlParams() {
+    const params = new URLSearchParams(window.location.search);
+    
+    // 处理删除状态筛选
+    const filter = params.get('filter');
+    if (filter === 'deleted') {
+        document.getElementById('filter-deleted').value = 'true';
+    }
+}
+
 // 初始化
 document.addEventListener('DOMContentLoaded', function() {
+    parseUrlParams();
     loadAnswers();
 });
 </script>
