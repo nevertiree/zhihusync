@@ -801,9 +801,15 @@ async function loadAnswers(page = 1) {
                 : '<span class="user-avatar-placeholder">👤</span>';
             
             const htmlFileName = item.html_path ? item.html_path.split('/').pop() : '';
+            const isSelected = selectedAnswers.has(item.id);
 
             return `
-                <tr>
+                <tr class="${isSelected ? 'selected-row' : ''}" data-answer-id="${item.id}">
+                    <td>
+                        <input type="checkbox" ${isSelected ? 'checked' : ''} 
+                               onchange="toggleSelectAnswer('${item.id}', this.checked)"
+                               title="选择">
+                    </td>
                     <td>
                         <div class="user-cell" title="用户: ${escapeHtml(item.user_name || '')} (${escapeHtml(item.user_id || '')})">
                             ${userAvatar}
@@ -839,11 +845,15 @@ async function loadAnswers(page = 1) {
             `;
         }).join('');
 
+        // 更新全选复选框状态
+        updateSelectAllCheckbox();
+        updateBatchToolbar();
+        
         renderPagination();
     } catch (e) {
         console.error('加载失败:', e);
         document.getElementById('answers-body').innerHTML =
-            `<tr><td colspan="10" class="text-center text-danger">加载失败: ${e.message}</td></tr>`;
+            `<tr><td colspan="11" class="text-center text-danger">加载失败: ${e.message}</td></tr>`;
     }
 }
 
