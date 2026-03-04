@@ -38,9 +38,16 @@ data/
 *.db
 *.log
 
+# 测试报告（可能包含个人信息）
+tests/reports/
+
 # 配置文件（包含敏感信息）
+config/config.yaml
 config/config.local.yaml
 .env
+
+# Cookie 文件
+cookies.json
 
 # OS
 .DS_Store

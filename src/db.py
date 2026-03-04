@@ -33,7 +33,7 @@ class DatabaseManager:
 
     Examples:
         >>> db = DatabaseManager("/app/data/meta/zhihusync.db")
-        >>> db.add_user("mo-ri-jing-tan-zhu-jie-chong", "用户名")
+        >>> db.add_user("your-user-id", "用户名")
         >>> answer = db.get_answer_by_id("123456")
     """
 

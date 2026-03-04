@@ -1,0 +1,111 @@
+# zhihusync 示例配置文件
+# 复制此文件为 config.yaml 并修改为你的配置
+
+zhihu:
+  # 知乎用户ID（必填）
+  # 访问你的知乎主页，URL 中的就是用户ID
+  # 例如: https://www.zhihu.com/people/zhang-san-123
+  # 用户ID就是: zhang-san-123
+  user_id: "your-user-id-here"
+
+  # 扫描间隔（分钟）
+  scan_interval: 30
+
+  # 每次扫描最大条目数，-1 表示无限制
+  max_items_per_scan: 50
+
+  # 是否保存评论
+  save_comments: true
+
+  # 每篇回答最大评论数，-1 表示无限制
+  max_comments: 100
+
+  # 是否同步点赞内容
+  sync_likes: true
+
+  # 是否同步创作内容
+  sync_created: false
+
+  # 是否跳过视频内容
+  skip_video: true
+
+  # 最小赞同数过滤
+  min_voteup: 0
+
+storage:
+  # HTML 文件保存路径
+  html_path: /app/data/html
+
+  # 数据库路径
+  db_path: /app/data/meta/zhihusync.db
+
+  # 静态资源路径
+  static_path: /app/data/static
+
+  # 是否下载图片
+  download_images: true
+
+  # 图片保存路径
+  images_path: /app/data/images
+
+  # 是否下载头像
+  download_avatars: true
+
+  # 是否压缩 HTML
+  compress_html: false
+
+  # 是否启用备份
+  backup_enabled: false
+
+  # 备份间隔（天）
+  backup_interval_days: 7
+
+browser:
+  # 是否使用无头模式
+  headless: true
+
+  # 浏览器类型: chromium, firefox, webkit
+  browser_type: chromium
+
+  # 超时时间（秒）
+  timeout: 30
+
+  # 请求间隔（秒）
+  request_delay: 2.0
+
+  # 代理设置，为空表示不使用代理
+  proxy: ""
+
+  # 窗口宽度
+  window_width: 1920
+
+  # 窗口高度
+  window_height: 1080
+
+  # 滚动延迟（毫秒）
+  scroll_delay: 800
+
+  # 最大滚动轮数
+  max_scroll_rounds: 20
+
+logging:
+  # 日志级别: DEBUG, INFO, WARNING, ERROR
+  level: INFO
+
+  # 日志格式
+  format: "{time:YYYY-MM-DD HH:mm:ss} | {level} | {name} | {message}"
+
+  # 日志文件路径
+  file: /app/data/meta/zhihusync.log
+
+  # 日志轮转大小
+  rotation: 10 MB
+
+  # 日志保留时间
+  retention: 30 days
+
+  # 是否输出到控制台
+  console_output: true
+
+  # 是否记录 SQL
+  log_sql: false

@@ -1,0 +1,44 @@
+[
+  {
+    "name": "__zse_ck",
+    "value": "your_cookie_value_here",
+    "domain": ".zhihu.com",
+    "hostOnly": false,
+    "path": "/",
+    "secure": true,
+    "httpOnly": false,
+    "sameSite": "no_restriction",
+    "session": false,
+    "expirationDate": 1806893602.346,
+    "storeId": "firefox-default",
+    "id": 1
+  },
+  {
+    "name": "_xsrf",
+    "value": "your_xsrf_token_here",
+    "domain": ".zhihu.com",
+    "hostOnly": false,
+    "path": "/",
+    "secure": false,
+    "httpOnly": false,
+    "sameSite": "unspecified",
+    "session": false,
+    "expirationDate": 1802440657.22,
+    "storeId": "firefox-default",
+    "id": 2
+  },
+  {
+    "name": "z_c0",
+    "value": "your_auth_token_here",
+    "domain": ".zhihu.com",
+    "hostOnly": false,
+    "path": "/",
+    "secure": true,
+    "httpOnly": true,
+    "sameSite": "no_restriction",
+    "session": false,
+    "expirationDate": 1770905602.346,
+    "storeId": "firefox-default",
+    "id": 3
+  }
+]
