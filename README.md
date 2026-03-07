@@ -14,6 +14,42 @@
 
 </div>
 
+## 🚀 一键安装
+
+**只需一条命令，快速部署 zhihusync：**
+
+### Linux / macOS
+```bash
+curl -fsSL https://raw.githubusercontent.com/nevertiree/zhihusync/master/install.sh | bash
+```
+
+### Windows (PowerShell)
+```powershell
+powershell -Command "& { Invoke-Expression (Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/nevertiree/zhihusync/master/install.ps1').Content }"
+```
+
+**安装完成后：**
+1. 编辑 `.env` 文件配置知乎用户 ID
+2. 访问 http://localhost:6067 配置 Cookie
+3. 开始自动备份！
+
+---
+
+<details>
+<summary>📋 手动安装（如果一键安装失败）</summary>
+
+```bash
+# 1. 克隆项目
+git clone https://github.com/nevertiree/zhihusync.git
+cd zhihusync
+
+# 2. 使用 Docker 启动
+docker-compose up -d
+
+# 3. 访问 http://localhost:6067
+```
+</details>
+
 ---
 
 ## 📖 简介
