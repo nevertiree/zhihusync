@@ -8,7 +8,7 @@ help:
 	@echo ""
 	@echo "🚀 快速开始:"
 	@echo "  make setup    - 设置开发环境（首次）"
-	@echo "  make lint     - 运行代码检查（提交前必须）"
+	@echo "  make lint     - 运行代码检查（Ruff，提交前必须）"
 	@echo ""
 	@echo "🐳 Docker 命令:"
 	@echo "  make build    - 构建 Docker 镜像"
@@ -121,17 +121,18 @@ setup:
 	@echo ""
 	@echo "现在可以运行: make lint"
 
-# 运行所有代码检查
+# 运行所有代码检查（只用 Ruff，替代 flake8 + black）
 lint:
 	@echo "🔍 运行代码检查..."
-	pre-commit run --all-files
+	ruff check src/ tests/
+	ruff format --check src/ tests/
 	@echo "✅ 代码检查完成"
 
 # 自动修复代码问题
 lint-fix:
 	@echo "🔧 自动修复代码问题..."
 	ruff check src/ tests/ --fix
-	black src/ tests/
+	ruff format src/ tests/
 	@echo "✅ 代码修复完成"
 
 # ========== 测试命令 ==========

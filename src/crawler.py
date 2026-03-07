@@ -841,8 +841,7 @@ class ZhihuCrawler:
                     headline=user_info.get("headline"),
                 )
                 logger.info(
-                    f"获取到用户信息: name={user_info.get('name')}, "
-                    f"headline={user_info.get('headline', '')[:30]}..."
+                    f"获取到用户信息: name={user_info.get('name')}, headline={user_info.get('headline', '')[:30]}..."
                 )
             else:
                 logger.warning("未能获取到用户详细信息")
@@ -1511,7 +1510,7 @@ class ZhihuCrawler:
             # 查找所有展开按钮
             assert self.page is not None  # noqa: S101
             expand_buttons = await self.page.query_selector_all(
-                'button.ContentItem-more, button.Button:has-text("阅读全文"), ' 'button.Button:has-text("展开全文")'
+                'button.ContentItem-more, button.Button:has-text("阅读全文"), button.Button:has-text("展开全文")'
             )
 
             for button in expand_buttons[:5]:  # 限制最多点击5个
@@ -1956,7 +1955,6 @@ class ZhihuCrawler:
             question_title: 问题标题
         """
         try:
-
             import aiofiles
 
             path = Path(html_path)
@@ -2171,7 +2169,7 @@ class ZhihuCrawler:
                 )
 
                 logger.warning(
-                    f"已记录下载失败 #{failure_id}: {question_title[:60]}... | " f"可在'明细'页面查看失败项并重新采集"
+                    f"已记录下载失败 #{failure_id}: {question_title[:60]}... | 可在'明细'页面查看失败项并重新采集"
                 )
                 return False
 
