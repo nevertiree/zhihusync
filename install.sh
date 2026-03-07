@@ -1,8 +1,9 @@
 #!/bin/bash
-# zhihusync 全自动安装脚本 (Linux/macOS)
+# zhihusync 全自动安装脚本 (Linux/macOS/WSL2)
 # 使用方法: curl -fsSL https://raw.githubusercontent.com/nevertiree/zhihusync/master/install.sh | bash
 
-set -e
+# 不要在管道执行时退出
+[[ -t 0 ]] && set -e
 
 # 颜色输出
 RED='\033[0;31m'
@@ -16,9 +17,18 @@ print_color() {
     echo -e "${1}${2}${NC}"
 }
 
+# 检查是否在 WSL 环境
+is_wsl() {
+    if grep -qE "(Microsoft|WSL)" /proc/version 2>/dev/null; then
+        return 0
+    fi
+    return 1
+}
+
 # 显示欢迎信息
 show_welcome() {
-    clear
+    # 使用 printf 替代 clear，兼容性更好
+    printf '\033[2J\033[H' 2>/dev/null || echo ""
     print_color "$CYAN" "
 ╔═══════════════════════════════════════════════════════════╗
 ║                                                           ║
@@ -30,62 +40,63 @@ show_welcome() {
 "
 }
 
-# 检查并安装 Docker
-check_and_install_docker() {
+# 检查 Docker
+check_docker() {
     print_color "$YELLOW" "🔍 检查 Docker 环境..."
 
     if command -v docker &> /dev/null; then
-        print_color "$GREEN" "✅ Docker 已安装: $(docker --version)"
-        return 0
+        # 检查 Docker 是否可用
+        if docker info &> /dev/null; then
+            print_color "$GREEN" "✅ Docker 已安装: $(docker --version)"
+            return 0
+        else
+            print_color "$YELLOW" "⚠️  Docker 已安装但无法连接，可能需要启动 Docker Desktop"
+            return 1
+        fi
     fi
 
-    print_color "$YELLOW" "⚠️  Docker 未安装，准备自动安装..."
+    return 1
+}
+
+# 安装 Docker 指引
+install_docker_guide() {
+    print_color "$YELLOW" "⚠️  Docker 未安装或无法连接"
     echo ""
 
-    # 检测操作系统
-    if [[ "$OSTYPE" == "linux-gnu"* ]]; then
-        # Linux
-        print_color "$CYAN" "📥 正在安装 Docker..."
-        curl -fsSL https://get.docker.com | sh
-
-        # 启动 Docker 服务
-        sudo systemctl start docker
-        sudo systemctl enable docker
-
-        # 将当前用户加入 docker 组
-        sudo usermod -aG docker $USER
-
-        print_color "$GREEN" "✅ Docker 安装完成！"
-        print_color "$YELLOW" "⚠️  请重新登录或执行 'newgrp docker' 使权限生效"
-
-    elif [[ "$OSTYPE" == "darwin"* ]]; then
-        # macOS
-        if command -v brew &> /dev/null; then
-            print_color "$CYAN" "📥 正在通过 Homebrew 安装 Docker..."
-            brew install --cask docker
-            print_color "$YELLOW" "⚠️  请手动启动 Docker Desktop 应用"
-            read -p "按回车键继续..."
-        else
-            print_color "$RED" "❌ 请先安装 Homebrew: https://brew.sh"
-            exit 1
-        fi
+    if is_wsl; then
+        print_color "$CYAN" "📥 WSL2 环境 Docker 安装指南:"
+        echo ""
+        echo "   方法 1 (推荐): 使用 Docker Desktop"
+        echo "     1. Windows 安装 Docker Desktop: https://docs.docker.com/desktop/install/windows-install/"
+        echo "     2. Docker Desktop → Settings → Resources → WSL Integration"
+        echo "     3. 启用 WSL 集成并重启 Docker Desktop"
+        echo ""
+        echo "   方法 2: WSL2 内安装 Docker"
+        echo "     curl -fsSL https://get.docker.com | sh"
+        echo "     sudo service docker start"
+        echo ""
     else
-        print_color "$RED" "❌ 不支持的操作系统: $OSTYPE"
-        print_color "$YELLOW" "请手动安装 Docker: https://docs.docker.com/get-docker/"
+        print_color "$CYAN" "📥 Linux Docker 安装:"
+        echo "   curl -fsSL https://get.docker.com | sh"
+        echo "   sudo systemctl start docker"
+        echo "   sudo usermod -aG docker \$USER"
+        echo ""
+    fi
+
+    # 询问是否继续
+    read -p "Docker 安装完成后，按回车键继续..."
+
+    # 重新检查
+    if ! docker info &> /dev/null; then
+        print_color "$RED" "❌ Docker 仍然不可用，请检查安装"
         exit 1
     fi
 
-    # 验证安装
-    if ! docker --version &> /dev/null; then
-        print_color "$RED" "❌ Docker 安装失败或需要重新登录"
-        exit 1
-    fi
-
-    print_color "$GREEN" "✅ Docker 就绪: $(docker --version)"
+    print_color "$GREEN" "✅ Docker 就绪"
     echo ""
 }
 
-# 配置数据目录（核心配置）
+# 配置数据目录
 configure_data_dir() {
     print_color "$YELLOW" "💾 配置数据保存目录（重要！）"
     echo ""
@@ -99,14 +110,16 @@ configure_data_dir() {
 
     # 显示参考示例
     print_color "$BLUE" "📋 路径参考示例："
+    if is_wsl; then
+        echo "   WSL2 (推荐):"
+        echo "     • $HOME/zhihusync/data       (WSL 内部目录)"
+        echo "     • /mnt/d/zhihusync/data      (Windows D盘)"
+        echo "     • /mnt/c/Users/\$USER/zhihusync  (Windows C盘用户目录)"
+        echo ""
+    fi
     echo "   Linux/macOS:"
-    echo "     • $HOME/zhihusync/data    (推荐，用户目录)"
-    echo "     • /mnt/data/zhihusync     (独立数据盘)"
-    echo "     • /opt/zhihusync/data     (系统目录)"
-    echo ""
-    echo "   NAS/服务器:"
-    echo "     • /volume1/docker/zhihusync    (群晖)"
-    echo "     • /share/Container/zhihusync   (威联通)"
+    echo "     • $HOME/zhihusync/data       (用户目录)"
+    echo "     • /opt/zhihusync/data        (系统目录)"
     echo ""
 
     # 默认路径
@@ -183,8 +196,8 @@ start_service() {
     # 停止可能存在的旧容器
     docker rm -f zhihusync 2>/dev/null || true
 
-    # 使用 docker run 直接启动（无需下载任何文件）
-    docker run -d \
+    # 使用 docker run 直接启动
+    if ! docker run -d \
         --name zhihusync \
         --restart unless-stopped \
         -p 6067:6067 \
@@ -199,15 +212,12 @@ start_service() {
         -e ZHIHUSYNC_LOGGING_LEVEL=INFO \
         -e PLAYWRIGHT_BROWSER=chromium \
         -e PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 \
-        nevertiree26/zhihusync:latest
-
-    if [ $? -eq 0 ]; then
-        print_color "$GREEN" "✅ 服务启动成功！"
-    else
+        nevertiree26/zhihusync:latest; then
         print_color "$RED" "❌ 服务启动失败"
         exit 1
     fi
 
+    print_color "$GREEN" "✅ 服务启动成功！"
     echo ""
 }
 
@@ -226,12 +236,9 @@ show_completion() {
     echo "   $DATA_DIR"
     echo ""
     print_color "$YELLOW" "📝 下一步操作:"
-
+    echo "   1. 访问 http://localhost:6067"
     if [ -z "$ZHIHU_USER_ID" ]; then
-        echo "   1. 访问 http://localhost:6067"
         echo "   2. 在网页中配置知乎用户 ID"
-    else
-        echo "   1. 访问 http://localhost:6067"
     fi
     echo "   2. 配置知乎 Cookie（按页面指引操作）"
     echo "   3. 开始自动备份！"
@@ -240,7 +247,6 @@ show_completion() {
     echo "   查看日志: docker logs -f zhihusync"
     echo "   停止服务: docker stop zhihusync"
     echo "   启动服务: docker start zhihusync"
-    echo "   重启服务: docker restart zhihusync"
     echo ""
     print_color "$RED" "⚠️  重要提醒:"
     echo "   数据保存在: $DATA_DIR"
@@ -251,7 +257,11 @@ show_completion() {
 # 主流程
 main() {
     show_welcome
-    check_and_install_docker
+
+    if ! check_docker; then
+        install_docker_guide
+    fi
+
     configure_data_dir
     configure_zhihu
     start_service
