@@ -158,7 +158,7 @@ function Initialize-Directory {
 function Download-Config {
     Write-Color "⬇️  下载配置文件..." "Yellow"
 
-    $baseUrl = "https://raw.githubusercontent.com/nevertiree/zhihusync/master"
+    $baseUrl = "https://raw.githubusercontent.com/nevertiree/zhihusync/feature/install-script"
     $files = @{
         "docker-compose.yml" = "$script:InstallPath/docker-compose.yml"
         ".env.example" = "$script:InstallPath/.env.example"

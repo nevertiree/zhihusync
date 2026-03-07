@@ -16,7 +16,6 @@ services:
       context: .
       dockerfile: Dockerfile
     image: zhihusync:local
-    container_name: zhihusync
     restart: unless-stopped
     ports:
       - "6067:6067"
