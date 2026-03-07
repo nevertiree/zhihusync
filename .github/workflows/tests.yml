@@ -67,7 +67,7 @@ jobs:
 
       - name: Run Black check
         run: |
-          black --check src/ tests/
+          black --check --line-length=120 src/ tests/
 
       - name: Run MyPy
         run: |
