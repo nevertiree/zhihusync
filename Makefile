@@ -136,20 +136,22 @@ lint-fix:
 
 # ========== 测试命令 ==========
 
-# 运行所有测试
+# 运行所有测试（本地完整测试）
 test:
 	pytest tests/ -v --tb=short
 
-# 运行单元测试
+# 运行单元测试（GitHub Actions 会运行）
 test-unit:
 	pytest tests/unit/ -v --tb=short -m unit
 
-# 运行集成测试（需要服务运行）
+# 运行集成测试（本地运行，GitHub Actions 不运行）
 test-integration:
+	@echo "⚠️  集成测试需要在本地运行，确保服务已启动"
 	pytest tests/integration/ -v --tb=short -m integration
 
-# 运行 E2E 测试（需要浏览器和服务）
+# 运行 E2E 测试（本地运行，需要浏览器）
 test-e2e:
+	@echo "⚠️  E2E 测试需要在本地运行，确保浏览器和服务已就绪"
 	pytest tests/e2e/ -v --tb=short -m e2e --headed
 
 # 运行 E2E 测试（无头模式，适合 CI）

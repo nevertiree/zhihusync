@@ -36,11 +36,20 @@ ruff check src/ tests/
 black --check src/ tests/
 mypy src/ --ignore-missing-imports
 
-# 3. 运行测试
-pytest tests/ -v
+# 3. 运行测试（分层测试）
+# 单元测试（快速，GitHub Actions 会运行）
+pytest tests/unit/ -v -m unit
+
+# 集成测试（本地运行，GitHub Actions 不运行）
+pytest tests/integration/ -v -m integration
+
+# E2E 测试（本地运行，需要浏览器）
+pytest tests/e2e/ -v -m e2e
 ```
 
-> ⚠️ **重要**：如果没有安装 pre-commit，代码检查将不会运行，可能导致提交不符合规范的代码！
+> ⚠️ **重要**：
+> - 如果没有安装 pre-commit，代码检查将不会运行，可能导致提交不符合规范的代码！
+> - 集成测试和 E2E 测试需要在本地完成后再提交（GitHub Actions 不运行这些测试）
 
 #### pre-commit 钩子说明
 
