@@ -6,8 +6,11 @@
 help:
 	@echo "zhihusync - 知乎点赞内容备份工具"
 	@echo ""
-	@echo "可用命令:"
-	@echo "  make init     - 初始化项目"
+	@echo "🚀 快速开始:"
+	@echo "  make setup    - 设置开发环境（首次）"
+	@echo "  make lint     - 运行代码检查（提交前必须）"
+	@echo ""
+	@echo "🐳 Docker 命令:"
 	@echo "  make build    - 构建 Docker 镜像"
 	@echo "  make up       - 启动服务 (Web + 定时任务)"
 	@echo "  make web      - 仅启动 Web 界面"
@@ -17,6 +20,11 @@ help:
 	@echo "  make stats    - 查看备份统计"
 	@echo "  make backup   - 备份数据"
 	@echo "  make clean    - 清理数据"
+	@echo ""
+	@echo "🧪 开发与测试:"
+	@echo "  make lint-fix - 自动修复代码问题"
+	@echo "  make test     - 运行所有测试"
+	@echo "  make dev      - 本地开发模式"
 
 # 初始化
 init:
@@ -101,6 +109,30 @@ dev:
 install:
 	pip install -r requirements.txt
 	playwright install chromium
+
+# ========== 代码质量检查 ==========
+
+# 设置开发环境（安装 pre-commit）
+setup:
+	@echo "🔧 设置开发环境..."
+	pip install pre-commit ruff black mypy
+	pre-commit install
+	@echo "✅ 开发环境设置完成"
+	@echo ""
+	@echo "现在可以运行: make lint"
+
+# 运行所有代码检查
+lint:
+	@echo "🔍 运行代码检查..."
+	pre-commit run --all-files
+	@echo "✅ 代码检查完成"
+
+# 自动修复代码问题
+lint-fix:
+	@echo "🔧 自动修复代码问题..."
+	ruff check src/ tests/ --fix
+	black src/ tests/
+	@echo "✅ 代码修复完成"
 
 # ========== 测试命令 ==========
 
