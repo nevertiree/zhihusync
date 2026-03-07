@@ -66,7 +66,13 @@ pytest tests/e2e/ -v -m e2e
 | `mypy` | Python 类型检查 | Python |
 | `prettier` | 前端代码格式化 | JS/JSON/YAML/CSS/HTML |
 
-**注意**：如果 pre-commit 显示 `Skipped`，说明没有相关文件被修改。但对于 Python 项目，提交前**必须**手动运行 ruff/black/mypy 检查。
+**注意**：
+- 如果 pre-commit 显示 `Skipped`，说明没有相关文件被修改。但对于 Python 项目，提交前**必须**手动运行 ruff/black/mypy 检查。
+- **版本一致性**：`.pre-commit-config.yaml` 中的工具版本必须与 GitHub Actions 保持一致，否则检查规则可能不同！
+  ```bash
+  # 定期更新 pre-commit 版本
+  pre-commit autoupdate
+  ```
 
 ---
 
