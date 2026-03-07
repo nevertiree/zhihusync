@@ -129,7 +129,7 @@ init_directory() {
 download_config() {
     print_color "$YELLOW" "⬇️  下载配置文件..."
 
-    local base_url="https://raw.githubusercontent.com/nevertiree/zhihusync/feature/install-script"
+    local base_url="https://raw.githubusercontent.com/nevertiree/zhihusync/master"
 
     # 下载 docker-compose.yml
     if curl -fsSL "$base_url/docker-compose.yml" -o "$INSTALL_PATH/docker-compose.yml"; then
