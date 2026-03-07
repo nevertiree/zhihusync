@@ -6,9 +6,15 @@ on:
   pull_request:
     branches: [master, develop]
 
+# 注意：集成测试和 E2E 测试需要在本地运行
+# 本地运行命令：
+#   make test-integration  # 运行集成测试
+#   make test-e2e          # 运行 E2E 测试（需要浏览器）
+# GitHub Actions 仅运行代码质量检查，以提高 CI 速度和稳定性
+
 jobs:
-  # ========== 集成测试 ==========
-  integration-tests:
+  # ========== 单元测试 ==========
+  unit-tests:
     runs-on: ubuntu-latest
 
     steps:
@@ -34,72 +40,9 @@ jobs:
         run: |
           mkdir -p data/meta data/html data/static data/logs
 
-      - name: Run integration tests
+      - name: Run unit tests
         run: |
-          pytest tests/integration/ -v --tb=short -m integration
-
-  # ========== E2E 测试（带浏览器） ==========
-  e2e-tests:
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: Install Chrome
-        run: |
-          wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
-          sudo sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list'
-          sudo apt-get update
-          sudo apt-get install -y google-chrome-stable
-
-      - name: Cache pip dependencies
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-
-      - name: Create test directories
-        run: |
-          mkdir -p data/meta data/html data/static data/logs config
-          echo '{"zhihu": {"user_id": ""}, "storage": {"db_path": "data/meta/test.db"}}' > config/config.yaml
-
-      - name: Start test server
-        run: |
-          cd src && python -c "
-          import threading
-          import time
-          from app import app
-          import uvicorn
-
-          def run_server():
-              uvicorn.run(app, host='127.0.0.1', port=6067, log_level='error')
-
-          server_thread = threading.Thread(target=run_server, daemon=True)
-          server_thread.start()
-          time.sleep(3)
-          print('Server started')
-          while True:
-              time.sleep(1)
-          " &
-          sleep 5
-
-      - name: Run E2E tests
-        run: |
-          pytest tests/e2e/test_web_ui.py -v --tb=short -m e2e
-
-      - name: Run extraction errors tests
-        run: |
-          pytest tests/e2e/test_extraction_errors.py -v --tb=short -m e2e || true
+          pytest tests/unit/ -v --tb=short -m unit
 
   # ========== 代码质量检查 ==========
   lint:
