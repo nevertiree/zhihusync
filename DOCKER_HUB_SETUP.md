@@ -23,15 +23,36 @@ GitHub Actions 已配置自动构建和推送 Docker 镜像到 Docker Hub。
 
 | 触发条件 | 构建标签 |
 |----------|----------|
-| 推送代码到 `master` 分支 | `latest` |
-| 推送 tag `v0.7.1` | `v0.7.1`, `v0.7` |
+| 推送代码到 `master` 分支 | `latest`, `full`, `minimal` |
+| 推送 tag `v0.7.1` | `v0.7.1`, `full-v0.7.1`, `minimal-v0.7.1` |
 | 手动触发 (workflow_dispatch) | 自定义版本号 |
 
-## 📦 构建的镜像标签
+## 📦 镜像标签说明
 
-- `nevertiree26/zhihusync:latest` - 默认最新版（完整版）
-- `nevertiree26/zhihusync:slim` - 轻量级版本（仅 Chromium）
-- `nevertiree26/zhihusync:v0.7.1` - 版本标签
+| 标签 | Dockerfile | 大小 | 说明 |
+|------|------------|------|------|
+| `nevertiree26/zhihusync:latest` | Dockerfile | ~1.8GB | 标准版，仅 Chromium，推荐 |
+| `nevertiree26/zhihusync:full` | Dockerfile.full | ~2.3GB | 完整版，Chromium + Firefox |
+| `nevertiree26/zhihusync:minimal` | Dockerfile.minimal | ~600MB | 精简版，首次启动下载浏览器 |
+| `nevertiree26/zhihusync:v0.7.1` | Dockerfile | ~1.8GB | 版本标签（标准版） |
+| `nevertiree26/zhihusync:full-v0.7.1` | Dockerfile.full | ~2.3GB | 版本标签（完整版） |
+| `nevertiree26/zhihusync:minimal-v0.7.1` | Dockerfile.minimal | ~600MB | 版本标签（精简版） |
+
+## 🚀 使用方式
+
+```bash
+# 标准版（推荐，约 1.8GB）
+docker pull nevertiree26/zhihusync:latest
+docker-compose -f docker-compose.hub.yml up -d
+
+# 完整版（需要 Firefox 备选，约 2.3GB）
+docker pull nevertiree26/zhihusync:full
+docker run -d -p 6067:6067 nevertiree26/zhihusync:full
+
+# 精简版（存储紧张，约 600MB，首次启动下载浏览器）
+docker pull nevertiree26/zhihusync:minimal
+docker run -d -p 6067:6067 nevertiree26/zhihusync:minimal
+```
 
 ## 🔧 手动触发构建
 
@@ -44,3 +65,22 @@ GitHub Actions 已配置自动构建和推送 Docker 镜像到 Docker Hub。
 
 - GitHub: https://github.com/nevertiree/zhihusync/actions
 - Docker Hub: https://hub.docker.com/r/nevertiree26/zhihusync
+
+## ⚠️ 镜像拉取超时解决
+
+如果镜像太大导致拉取超时：
+
+1. **使用精简版**（约 600MB）：
+   ```bash
+   docker pull nevertiree26/zhihusync:minimal
+   ```
+
+2. **配置镜像加速**（Docker Desktop → Settings）：
+   ```json
+   {
+     "registry-mirrors": [
+       "https://docker.mirrors.ustc.edu.cn",
+       "https://hub-mirror.c.163.com"
+     ]
+   }
+   ```

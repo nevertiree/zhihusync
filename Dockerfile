@@ -1,24 +1,26 @@
 # zhihusync - 知乎点赞内容备份服务
-# 生产版本：完整镜像（Chromium + Firefox）
+# 标准版：仅 Chromium（推荐，约 1.8GB）
+# 如需 Firefox 备选，请使用 Dockerfile.full
 
 FROM python:3.11-slim
 
 WORKDIR /app
 
-# 使用阿里云镜像源加速并安装系统依赖
+# 使用阿里云镜像源加速
 RUN rm -f /etc/apt/sources.list.d/*.list && \
-    echo "deb http://mirrors.aliyun.com/debian trixie main contrib non-free" > /etc/apt/sources.list && \
-    echo "deb http://mirrors.aliyun.com/debian trixie-updates main contrib non-free" >> /etc/apt/sources.list && \
-    echo "deb http://mirrors.aliyun.com/debian-security trixie-security main contrib non-free" >> /etc/apt/sources.list && \
-    apt-get update && \
-    apt-get install -y --no-install-recommends \
+    echo "deb http://mirrors.aliyun.com/debian bookworm main contrib non-free" > /etc/apt/sources.list && \
+    echo "deb http://mirrors.aliyun.com/debian bookworm-updates main contrib non-free" >> /etc/apt/sources.list && \
+    echo "deb http://mirrors.aliyun.com/debian-security bookworm-security main contrib non-free" >> /etc/apt/sources.list && \
+    apt-get update
+
+# 安装系统依赖（精简版，仅支持 Chromium）
+RUN apt-get install -y --no-install-recommends \
     libglib2.0-0t64 libnss3 libnspr4 libatk1.0-0t64 libatk-bridge2.0-0t64 \
     libcups2t64 libdrm2 libdbus-1-3 libxcb1 libxkbcommon0 libx11-6 \
     libxcomposite1 libxdamage1 libxext6 libxfixes3 libxrandr2 libgbm1 \
     libpango-1.0-0 libcairo2 libasound2t64 libatspi2.0-0t64 \
     fonts-noto-cjk fonts-wqy-zenhei fonts-wqy-microhei \
     libfontconfig1 libfreetype6 ca-certificates wget curl unzip \
-    libdbus-glib-1-2 libgtk-3-0 libx11-xcb1 libpci3 libegl1 \
     && rm -rf /var/lib/apt/lists/* /var/cache/apt/*
 
 # 安装 Python 依赖
@@ -30,13 +32,11 @@ RUN pip install --no-cache-dir -i https://pypi.tuna.tsinghua.edu.cn/simple --upg
 ENV PLAYWRIGHT_DOWNLOAD_HOST=https://npmmirror.com/mirrors/playwright
 ENV PLAYWRIGHT_BROWSERS_PATH=/app/ms-playwright
 
-# 安装 Chromium（体积小，首选）
+# 只安装 Chromium（体积小，首选）
 RUN playwright install chromium && \
     playwright install ffmpeg && \
+    rm -rf /root/.cache/pip/* && \
     echo "✅ Chromium installed"
-
-# 安装 Firefox（可选备选）
-RUN playwright install firefox || echo "⚠️ Firefox installation skipped"
 
 # 复制应用代码
 COPY src/ /app/src/
@@ -48,12 +48,12 @@ COPY entrypoint.sh /app/
 # 创建数据目录并设置权限
 RUN mkdir -p /app/data/html /app/data/meta /app/data/static/images && \
     chmod +x /app/entrypoint.sh && \
-    rm -rf /var/cache/apt/* /root/.cache/pip/*
+    rm -rf /var/cache/apt/*
 
 # 设置环境变量
 ENV PYTHONUNBUFFERED=1
 ENV ZHIHUSYNC_ENV=docker
-ENV PLAYWRIGHT_BROWSER=auto
+ENV PLAYWRIGHT_BROWSER=chromium
 ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
 
 EXPOSE 6067
