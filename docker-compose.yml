@@ -13,7 +13,6 @@ services:
     image: nevertiree26/zhihusync:latest
     container_name: zhihusync
     restart: unless-stopped
-    profiles: ["hub"]
     ports:
       - "6067:6067"
     volumes:
