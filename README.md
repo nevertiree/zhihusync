@@ -14,9 +14,9 @@
 
 </div>
 
-## 🚀 一键安装
+## 🚀 一键安装（全自动）
 
-**只需一条命令，快速部署 zhihusync：**
+**只需一条命令，全自动安装 zhihusync：**
 
 ### Linux / macOS
 ```bash
@@ -28,41 +28,55 @@ curl -fsSL https://raw.githubusercontent.com/nevertiree/zhihusync/master/install
 powershell -Command "& { Invoke-Expression (Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/nevertiree/zhihusync/master/install.ps1').Content }"
 ```
 
-**安装完成后：**
-1. 编辑 `.env` 文件配置知乎用户 ID
-2. 访问 http://localhost:6067 配置 Cookie
-3. 开始自动备份！
+### 安装过程
+✅ **自动检查并安装 Docker**（如未安装）
+✅ **交互式配置数据保存位置**（提供路径示例）
+✅ **可选配置知乎用户 ID**（也可稍后在网页配置）
+✅ **自动拉取镜像并启动服务**
+
+**安装完成后访问：** http://localhost:6067
+
+---
+
+### 💾 关于数据目录
+
+**数据目录是你唯一需要关注的内容！** 所有备份数据都保存在这里：
+
+| 路径 | 说明 |
+|------|------|
+| `data/html/` | 备份的知乎回答 HTML 文件 |
+| `data/meta/` | 数据库（备份记录、元数据） |
+| `data/images/` | 下载的图片 |
+
+**建议路径：**
+- **Windows**: `D:ackupackup` 或 `E:ackup`
+- **Linux**: `$HOME/backup/data` 或 `/mnt/data/backup`
+- **NAS**: 挂载的共享文件夹
+
+⚠️ **请务必确保数据目录安全，定期备份！**
 
 ---
 
 <details>
-<summary>📋 手动安装（如果一键安装失败）</summary>
+<summary>📋 手动安装（高级用户）</summary>
 
 ```bash
-# 1. 创建目录
-mkdir zhihusync && cd zhihusync
+# 1. 创建数据目录
+mkdir -p ~/backup/data
 
-# 2. 下载配置
-curl -O https://raw.githubusercontent.com/nevertiree/zhihusync/master/docker-compose.yml
-curl -O https://raw.githubusercontent.com/nevertiree/zhihusync/master/.env.example
-cp .env.example .env
+# 2. 直接运行（无需下载任何文件）
+docker run -d \
+  --name zhihusync \
+  --restart unless-stopped \
+  -p 6067:6067 \
+  -v ~/backup/data/html:/app/data/html \
+  -v ~/backup/data/meta:/app/data/meta \
+  -v ~/backup/data/images:/app/data/images \
+  -v ~/backup/data/static:/app/data/static \
+  -v ~/backup/config:/app/config \
+  nevertiree26/zhihusync:latest
 
-# 3. 使用 Docker Hub 预构建镜像启动（无需本地构建）
-docker compose --profile hub up -d
-
-# 4. 访问 http://localhost:6067
-```
-
-**其他部署方式：**
-```bash
-# 本地构建标准版
-docker compose up -d
-
-# 完整版(Chromium+Firefox)
-docker compose --profile full up -d
-
-# 精简版(~600MB，首次启动下载浏览器)
-docker compose --profile minimal up -d
+# 3. 访问 http://localhost:6067
 ```
 </details>
 

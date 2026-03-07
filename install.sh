@@ -1,7 +1,6 @@
 #!/bin/bash
-# zhihusync 一键安装脚本 (Linux/macOS)
+# zhihusync 全自动安装脚本 (Linux/macOS)
 # 使用方法: curl -fsSL https://raw.githubusercontent.com/nevertiree/zhihusync/master/install.sh | bash
-# 或本地运行: ./install.sh
 
 set -e
 
@@ -10,33 +9,11 @@ RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 CYAN='\033[0;36m'
-NC='\033[0m' # No Color
+BLUE='\033[0;34m'
+NC='\033[0m'
 
-# 打印带颜色的文本
 print_color() {
-    local color=$1
-    local text=$2
-    echo -e "${color}${text}${NC}"
-}
-
-# 检查 Docker
-check_docker() {
-    if command -v docker &> /dev/null; then
-        local version=$(docker --version)
-        echo "true|$version"
-    else
-        echo "false|Docker 未安装"
-    fi
-}
-
-# 检查 Docker Compose
-check_docker_compose() {
-    if docker compose version &> /dev/null || docker-compose --version &> /dev/null; then
-        local version=$(docker compose version 2>/dev/null || docker-compose --version 2>/dev/null)
-        echo "true|$version"
-    else
-        echo "false|Docker Compose 未安装"
-    fi
+    echo -e "${1}${2}${NC}"
 }
 
 # 显示欢迎信息
@@ -47,141 +24,184 @@ show_welcome() {
 ║                                                           ║
 ║   🔄 zhihusync - 知乎点赞内容自动备份工具                    ║
 ║                                                           ║
-║   一键安装，自动备份你的知乎点赞内容                         ║
+║   全自动安装，只需配置数据保存位置                          ║
 ║                                                           ║
 ╚═══════════════════════════════════════════════════════════╝
 "
-    echo ""
 }
 
-# 显示系统信息
-show_system_info() {
-    print_color "$YELLOW" "📋 系统信息:"
-    echo "   操作系统: $(uname -s)"
-    echo "   架构: $(uname -m)"
-    echo ""
-}
+# 检查并安装 Docker
+check_and_install_docker() {
+    print_color "$YELLOW" "🔍 检查 Docker 环境..."
 
-# 检查环境
-check_environment() {
-    print_color "$YELLOW" "🔍 检查环境依赖..."
-
-    IFS='|' read -r docker_ok docker_info <<< "$(check_docker)"
-    IFS='|' read -r compose_ok compose_info <<< "$(check_docker_compose)"
-
-    if [ "$docker_ok" = "false" ]; then
-        print_color "$RED" "❌ Docker 未安装"
-        echo ""
-        print_color "$YELLOW" "请按以下步骤安装 Docker:"
-        echo "   curl -fsSL https://get.docker.com | sh"
-        echo ""
-        echo "安装完成后，请重新运行此脚本。"
-        exit 1
+    if command -v docker &> /dev/null; then
+        print_color "$GREEN" "✅ Docker 已安装: $(docker --version)"
+        return 0
     fi
-    print_color "$GREEN" "✅ $docker_info"
 
-    if [ "$compose_ok" = "false" ]; then
-        print_color "$YELLOW" "⚠️  Docker Compose 未安装"
-    else
-        print_color "$GREEN" "✅ $compose_info"
-    fi
+    print_color "$YELLOW" "⚠️  Docker 未安装，准备自动安装..."
     echo ""
-}
 
-# 配置安装
-configure_install() {
-    local default_dir="$HOME/zhihusync"
+    # 检测操作系统
+    if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+        # Linux
+        print_color "$CYAN" "📥 正在安装 Docker..."
+        curl -fsSL https://get.docker.com | sh
 
-    print_color "$YELLOW" "⚙️  配置安装选项"
+        # 启动 Docker 服务
+        sudo systemctl start docker
+        sudo systemctl enable docker
 
-    # 检查是否有命令行参数
-    if [ -n "$INSTALL_DIR" ]; then
-        INSTALL_PATH="$INSTALL_DIR"
-    else
-        echo "默认安装目录: $default_dir"
-        read -p "请输入安装目录 (直接回车使用默认): " custom_dir
+        # 将当前用户加入 docker 组
+        sudo usermod -aG docker $USER
 
-        if [ -n "$custom_dir" ]; then
-            INSTALL_PATH="$custom_dir"
+        print_color "$GREEN" "✅ Docker 安装完成！"
+        print_color "$YELLOW" "⚠️  请重新登录或执行 'newgrp docker' 使权限生效"
+
+    elif [[ "$OSTYPE" == "darwin"* ]]; then
+        # macOS
+        if command -v brew &> /dev/null; then
+            print_color "$CYAN" "📥 正在通过 Homebrew 安装 Docker..."
+            brew install --cask docker
+            print_color "$YELLOW" "⚠️  请手动启动 Docker Desktop 应用"
+            read -p "按回车键继续..."
         else
-            INSTALL_PATH="$default_dir"
+            print_color "$RED" "❌ 请先安装 Homebrew: https://brew.sh"
+            exit 1
         fi
-    fi
-
-    # 展开路径
-    INSTALL_PATH="${INSTALL_PATH/#\~/$HOME}"
-
-    print_color "$GREEN" "📁 安装目录: $INSTALL_PATH"
-    echo ""
-}
-
-# 创建目录结构
-init_directory() {
-    print_color "$YELLOW" "📂 创建目录结构..."
-
-    mkdir -p "$INSTALL_PATH"/{data/{html,meta,images,static},config}
-
-    print_color "$GREEN" "✅ 目录创建完成"
-    echo ""
-}
-
-# 下载配置文件
-download_config() {
-    print_color "$YELLOW" "⬇️  下载配置文件..."
-
-    local base_url="https://raw.githubusercontent.com/nevertiree/zhihusync/master"
-
-    # 下载 docker-compose.yml
-    if curl -fsSL "$base_url/docker-compose.yml" -o "$INSTALL_PATH/docker-compose.yml"; then
-        echo "   ✅ docker-compose.yml"
     else
-        print_color "$RED" "   ❌ 下载失败: docker-compose.yml"
+        print_color "$RED" "❌ 不支持的操作系统: $OSTYPE"
+        print_color "$YELLOW" "请手动安装 Docker: https://docs.docker.com/get-docker/"
         exit 1
     fi
 
-    # 下载 .env.example
-    if curl -fsSL "$base_url/.env.example" -o "$INSTALL_PATH/.env.example"; then
-        echo "   ✅ .env.example"
-    else
-        print_color "$YELLOW" "   ⚠️  下载失败: .env.example (非关键文件)"
+    # 验证安装
+    if ! docker --version &> /dev/null; then
+        print_color "$RED" "❌ Docker 安装失败或需要重新登录"
+        exit 1
     fi
 
-    # 创建 .env 文件
-    cat > "$INSTALL_PATH/.env" << 'EOF'
-# zhihusync 配置文件
-# 知乎用户 ID (必填，在浏览器中登录知乎后，访问个人主页 URL 中的用户 ID)
-ZHIHU_USER_ID=
+    print_color "$GREEN" "✅ Docker 就绪: $(docker --version)"
+    echo ""
+}
 
-# 扫描间隔（分钟）
-SCAN_INTERVAL=60
+# 配置数据目录（核心配置）
+configure_data_dir() {
+    print_color "$YELLOW" "💾 配置数据保存目录（重要！）"
+    echo ""
+    print_color "$CYAN" "📌 数据目录用于保存："
+    echo "   • 备份的知乎回答 HTML 文件"
+    echo "   • 数据库（备份记录、元数据）"
+    echo "   • 下载的图片"
+    echo ""
+    print_color "$RED" "⚠️  请选择一个安全的位置，数据丢失无法恢复！"
+    echo ""
 
-# 是否无头模式运行浏览器
-HEADLESS=true
+    # 显示参考示例
+    print_color "$BLUE" "📋 路径参考示例："
+    echo "   Linux/macOS:"
+    echo "     • $HOME/zhihusync/data    (推荐，用户目录)"
+    echo "     • /mnt/data/zhihusync     (独立数据盘)"
+    echo "     • /opt/zhihusync/data     (系统目录)"
+    echo ""
+    echo "   NAS/服务器:"
+    echo "     • /volume1/docker/zhihusync    (群晖)"
+    echo "     • /share/Container/zhihusync   (威联通)"
+    echo ""
 
-# 日志级别 (DEBUG/INFO/WARNING/ERROR)
-LOG_LEVEL=INFO
+    # 默认路径
+    default_dir="$HOME/zhihusync/data"
 
-# 浏览器类型 (chromium/firefox/auto)
-PLAYWRIGHT_BROWSER=chromium
-EOF
+    while true; do
+        read -p "请输入数据保存目录 [默认: $default_dir]: " data_dir
 
-    echo "   ✅ .env"
+        # 使用默认值
+        if [ -z "$data_dir" ]; then
+            data_dir="$default_dir"
+        fi
 
-    print_color "$GREEN" "✅ 配置文件下载完成"
+        # 展开 ~ 符号
+        data_dir="${data_dir/#\~/$HOME}"
+
+        # 检查目录是否存在
+        if [ -d "$data_dir" ]; then
+            echo ""
+            print_color "$YELLOW" "⚠️  目录已存在: $data_dir"
+            read -p "是否继续使用此目录? [Y/n]: " confirm
+            if [[ ! "$confirm" =~ ^[Nn]$ ]]; then
+                break
+            fi
+        else
+            # 尝试创建目录
+            if mkdir -p "$data_dir" 2>/dev/null; then
+                print_color "$GREEN" "✅ 目录创建成功"
+                break
+            else
+                print_color "$RED" "❌ 无法创建目录: $data_dir"
+                echo "   请检查权限或选择其他位置"
+                echo ""
+            fi
+        fi
+    done
+
+    DATA_DIR="$data_dir"
+    CONFIG_DIR="$(dirname "$data_dir")/config"
+    mkdir -p "$CONFIG_DIR"
+
+    echo ""
+    print_color "$GREEN" "✅ 数据目录: $DATA_DIR"
+    print_color "$GREEN" "✅ 配置目录: $CONFIG_DIR"
+    echo ""
+}
+
+# 配置知乎用户 ID
+configure_zhihu() {
+    print_color "$YELLOW" "⚙️  配置知乎账号"
+    echo ""
+    print_color "$CYAN" "📋 如何获取知乎用户 ID:"
+    echo "   1. 浏览器登录知乎 https://www.zhihu.com"
+    echo "   2. 点击头像 → 我的主页"
+    echo "   3. 地址栏 URL 格式: https://www.zhihu.com/people/xxxxx"
+    echo "   4. xxxxx 就是你的用户 ID"
+    echo ""
+    print_color "$BLUE" "   示例:"
+    echo "     • https://www.zhihu.com/people/zhang-san-123 → zhang-san-123"
+    echo "     • https://www.zhihu.com/people/wang-wu → wang-wu"
+    echo ""
+
+    read -p "请输入知乎用户 ID (可直接回车稍后在网页配置): " zhihu_id
+
+    ZHIHU_USER_ID="$zhihu_id"
     echo ""
 }
 
 # 启动服务
 start_service() {
     print_color "$YELLOW" "🚀 启动 zhihusync 服务..."
+    echo ""
 
-    cd "$INSTALL_PATH"
+    # 停止可能存在的旧容器
+    docker rm -f zhihusync 2>/dev/null || true
 
-    # 先停止可能存在的旧容器
-    docker compose --profile hub down 2>/dev/null || docker-compose --profile hub down 2>/dev/null || true
+    # 使用 docker run 直接启动（无需下载任何文件）
+    docker run -d \
+        --name zhihusync \
+        --restart unless-stopped \
+        -p 6067:6067 \
+        -v "$DATA_DIR/html:/app/data/html" \
+        -v "$DATA_DIR/meta:/app/data/meta" \
+        -v "$DATA_DIR/images:/app/data/images" \
+        -v "$DATA_DIR/static:/app/data/static" \
+        -v "$CONFIG_DIR:/app/config" \
+        -e ZHIHUSYNC_ZHIHU_USER_ID="$ZHIHU_USER_ID" \
+        -e ZHIHUSYNC_ZHIHU_SCAN_INTERVAL=60 \
+        -e ZHIHUSYNC_BROWSER_HEADLESS=true \
+        -e ZHIHUSYNC_LOGGING_LEVEL=INFO \
+        -e PLAYWRIGHT_BROWSER=chromium \
+        -e PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 \
+        nevertiree26/zhihusync:latest
 
-    # 使用 docker compose 启动 (Hub 版本)
-    if docker compose --profile hub up -d 2>/dev/null || docker-compose --profile hub up -d; then
+    if [ $? -eq 0 ]; then
         print_color "$GREEN" "✅ 服务启动成功！"
     else
         print_color "$RED" "❌ 服务启动失败"
@@ -199,69 +219,44 @@ show_completion() {
 ╚═══════════════════════════════════════════════════════════╝
 "
     echo ""
-    print_color "$YELLOW" "📱 访问 Web 界面:"
+    print_color "$CYAN" "📱 访问 Web 界面:"
     echo "   http://localhost:6067"
     echo ""
-    print_color "$YELLOW" "📁 安装目录:"
-    echo "   $INSTALL_PATH"
+    print_color "$YELLOW" "💾 数据保存位置（重要！）:"
+    echo "   $DATA_DIR"
     echo ""
-    print_color "$YELLOW" "⚙️  配置文件:"
-    echo "   $INSTALL_PATH/.env"
-    echo ""
-    print_color "$YELLOW" "📝 下一步:"
-    echo "   1. 编辑 .env 文件，配置你的知乎用户 ID"
-    echo "      nano $INSTALL_PATH/.env"
-    echo ""
-    echo "   2. 访问 http://localhost:6067 配置 Cookie"
-    echo ""
+    print_color "$YELLOW" "📝 下一步操作:"
+
+    if [ -z "$ZHIHU_USER_ID" ]; then
+        echo "   1. 访问 http://localhost:6067"
+        echo "   2. 在网页中配置知乎用户 ID"
+    else
+        echo "   1. 访问 http://localhost:6067"
+    fi
+    echo "   2. 配置知乎 Cookie（按页面指引操作）"
     echo "   3. 开始自动备份！"
     echo ""
-    print_color "$YELLOW" "🔧 常用命令:"
-    echo "   启动: cd $INSTALL_PATH && docker compose up -d"
-    echo "   停止: cd $INSTALL_PATH && docker compose down"
-    echo "   日志: cd $INSTALL_PATH && docker compose logs -f"
-    echo "   更新: cd $INSTALL_PATH && docker compose pull && docker compose up -d"
+    print_color "$BLUE" "🔧 常用命令:"
+    echo "   查看日志: docker logs -f zhihusync"
+    echo "   停止服务: docker stop zhihusync"
+    echo "   启动服务: docker start zhihusync"
+    echo "   重启服务: docker restart zhihusync"
+    echo ""
+    print_color "$RED" "⚠️  重要提醒:"
+    echo "   数据保存在: $DATA_DIR"
+    echo "   请确保此目录安全，定期备份！"
     echo ""
 }
 
 # 主流程
 main() {
     show_welcome
-    show_system_info
-    check_environment
-    configure_install
-    init_directory
-    download_config
+    check_and_install_docker
+    configure_data_dir
+    configure_zhihu
     start_service
     show_completion
 }
 
-# 解析命令行参数
-while [[ $# -gt 0 ]]; do
-    case $1 in
-        --dir|-d)
-            INSTALL_DIR="$2"
-            shift 2
-            ;;
-        --help|-h)
-            echo "使用方法: $0 [选项]"
-            echo ""
-            echo "选项:"
-            echo "  -d, --dir <目录>    指定安装目录"
-            echo "  -h, --help          显示帮助信息"
-            echo ""
-            echo "示例:"
-            echo "  $0                                    # 使用默认目录"
-            echo "  $0 -d /opt/zhihusync                  # 指定安装目录"
-            exit 0
-            ;;
-        *)
-            echo "未知选项: $1"
-            echo "使用 --help 查看帮助"
-            exit 1
-            ;;
-    esac
-done
-
-# 执行主流程
+# 执行
 main
