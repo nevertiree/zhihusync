@@ -540,7 +540,9 @@ async def update_cookies(cookie_update: CookieUpdate):
         message = (
             f"Cookie 已保存 ({cookie_count} 条) - {msg}"
             if is_valid and missing
-            else f"Cookie 已保存 ({cookie_count} 条)" if is_valid else f"Cookie 已保存 ({cookie_count} 条) - ⚠️ {msg}"
+            else f"Cookie 已保存 ({cookie_count} 条)"
+            if is_valid
+            else f"Cookie 已保存 ({cookie_count} 条) - ⚠️ {msg}"
         )
 
         return {
@@ -1550,7 +1552,7 @@ async def retry_comment_anomaly():
                 request_delay=config.browser.request_delay,
             ) as crawler:
                 for i, answer in enumerate(anomaly_answers):
-                    app_state["sync_message"] = f"正在采集评论 ({i+1}/{total}): {answer.question_title[:30]}..."
+                    app_state["sync_message"] = f"正在采集评论 ({i + 1}/{total}): {answer.question_title[:30]}..."
 
                     try:
                         result = await crawler.process_comments(answer.id)

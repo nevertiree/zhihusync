@@ -33,7 +33,7 @@ pre-commit run --all-files
 
 # 2. 手动运行代码质量检查（如果 pre-commit 跳过）
 ruff check src/ tests/
-black --check src/ tests/
+ruff format --check src/ tests/
 mypy src/ --ignore-missing-imports
 
 # 3. 运行测试（分层测试）
@@ -61,8 +61,7 @@ pytest tests/e2e/ -v -m e2e
 | `end-of-file-fixer` | 确保文件末尾有空行 | 所有 |
 | `check-yaml` | 验证 YAML 语法 | YAML |
 | `check-added-large-files` | 禁止大文件 | 所有 |
-| `ruff` | Python 代码检查 | Python |
-| `black` | Python 代码格式化 | Python |
+| `ruff` | Python 代码检查和格式化（替代 flake8 + black）| Python |
 | `mypy` | Python 类型检查 | Python |
 | `prettier` | 前端代码格式化 | JS/JSON/YAML/CSS/HTML |
 

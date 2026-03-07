@@ -158,7 +158,7 @@ class ZhihuSyncService:
 
                 # 输出统计
                 stats = self.db.get_stats()
-                logger.info(f"当前总计: {stats['total_answers']} 回答, " f"{stats['total_comments']} 评论")
+                logger.info(f"当前总计: {stats['total_answers']} 回答, {stats['total_comments']} 评论")
 
         except Exception as e:
             logger.exception(f"同步任务失败: {e}")

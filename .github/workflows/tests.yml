@@ -59,15 +59,15 @@ jobs:
       - name: Install lint tools
         run: |
           python -m pip install --upgrade pip
-          pip install ruff black mypy==1.19.1 types-PyYAML types-aiofiles
+          pip install ruff mypy types-PyYAML types-aiofiles
 
-      - name: Run Ruff
+      - name: Run Ruff check (替代 flake8)
         run: |
           ruff check src/ tests/
 
-      - name: Run Black check
+      - name: Run Ruff format check (替代 black)
         run: |
-          black --check --line-length=120 src/ tests/
+          ruff format --check src/ tests/
 
       - name: Run MyPy
         run: |

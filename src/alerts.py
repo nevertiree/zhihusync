@@ -223,7 +223,7 @@ class AlertManager:
                 <p>{message}</p>
                 <hr>
                 <p style="font-size: 12px; color: #666;">
-                    发送时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}<br>
+                    发送时间: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}<br>
                     告警类型: {alert_type}<br>
                     来源: zhihusync
                 </p>
