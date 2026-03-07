@@ -14,7 +14,7 @@ repos:
       - id: check-case-conflict
       - id: detect-private-key
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.3.0
+    rev: v0.15.5
     hooks:
       - id: ruff
         args:
@@ -22,7 +22,7 @@ repos:
           - --exit-non-zero-on-fix
         files: .*\.py$
   - repo: https://github.com/psf/black
-    rev: 24.2.0
+    rev: 25.1.0
     hooks:
       - id: black
         language_version: python3
@@ -30,7 +30,7 @@ repos:
           - --line-length=120
         files: .*\.py$
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.9.0
+    rev: v1.15.0
     hooks:
       - id: mypy
         additional_dependencies:

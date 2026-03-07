@@ -11,11 +11,12 @@ from pathlib import Path
 from typing import Any
 
 from bs4 import BeautifulSoup, Tag
-from db import DatabaseManager
 from loguru import logger
 from playwright.async_api import Browser, BrowserContext, Page, async_playwright
-from storage import StorageManager
 from tenacity import retry, stop_after_attempt, wait_exponential
+
+from db import DatabaseManager
+from storage import StorageManager
 from timezone_utils import get_beijing_now
 
 # 随机 User-Agent 列表
