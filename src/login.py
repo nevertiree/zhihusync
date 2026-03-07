@@ -57,7 +57,8 @@ async def login_zhihu():
             logger.info(f"Cookie 已保存到: {cookie_file}")
 
             # 获取用户信息
-            user_info = await page.evaluate("""
+            user_info = await page.evaluate(
+                """
                 () => {
                     // 尝试从页面获取用户信息
                     const meta = document.querySelector('meta[name="user-info"]');
@@ -70,7 +71,8 @@ async def login_zhihu():
                     }
                     return null;
                 }
-            """)
+            """
+            )
 
             if user_info:
                 logger.info(f"用户信息: {json.dumps(user_info, indent=2, ensure_ascii=False)}")

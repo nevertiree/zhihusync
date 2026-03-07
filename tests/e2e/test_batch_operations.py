@@ -326,14 +326,16 @@ class TestBatchOperations:
                 return
 
             # 使用 JavaScript 模拟选择
-            driver.execute_script(f"""
+            driver.execute_script(
+                f"""
                 // 模拟选择
                 selectedAnswers.add('{first_answer_id}');
                 updateBatchToolbar();
                 updateRowStyle('{first_answer_id}', true);
                 updateSelectAllCheckbox();
                 console.log('通过 JS 模拟选择完成，selectedAnswers:', Array.from(selectedAnswers));
-            """)
+            """
+            )
 
             time.sleep(1)
             driver.save_screenshot("tests/e2e/screenshots/batch_delete_js_select.png")
