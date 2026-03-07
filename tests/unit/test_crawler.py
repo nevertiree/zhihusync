@@ -11,6 +11,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 
+@pytest.mark.unit
 class TestCrawlerUtils:
     """爬虫工具函数测试"""
 
@@ -58,6 +59,7 @@ class TestCrawlerUtils:
         assert question_id == ""
 
 
+@pytest.mark.unit
 class TestStorageUtils:
     """存储模块工具函数测试"""
 
@@ -99,6 +101,7 @@ class TestStorageUtils:
         assert hash1 != hash3
 
 
+@pytest.mark.unit
 class TestDatabaseOperations:
     """数据库操作测试"""
 
@@ -193,6 +196,7 @@ class TestDatabaseOperations:
         assert "total_users" in stats
 
 
+@pytest.mark.unit
 class TestConfigLoader:
     """配置加载测试"""
 
