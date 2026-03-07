@@ -10,6 +10,7 @@ import os
 import tempfile
 
 import pytest
+
 from storage import StorageManager
 
 
@@ -30,6 +31,7 @@ def temp_storage():
         yield storage
 
 
+@pytest.mark.unit
 class TestFilePathGeneration:
     """Tests for file path generation."""
 
@@ -81,6 +83,7 @@ class TestFilePathGeneration:
         assert result.isalnum()
 
 
+@pytest.mark.unit
 class TestHtmlBuilding:
     """Tests for HTML document building."""
 
@@ -150,6 +153,7 @@ class TestHtmlBuilding:
         assert "#0066ff" in result  # Zhihu blue
 
 
+@pytest.mark.unit
 class TestStorageStats:
     """Tests for storage statistics."""
 
@@ -158,9 +162,13 @@ class TestStorageStats:
         result = temp_storage.get_storage_stats()
 
         assert result["html_count"] == 0
-        assert result["image_count"] == 0
+        assert result["avatar_count"] == 0
+        assert result["answer_image_count"] == 0
+        assert result["total_image_count"] == 0
         assert result["html_size_mb"] == 0
-        assert result["image_size_mb"] == 0
+        assert result["avatar_size_mb"] == 0
+        assert result["answer_image_size_mb"] == 0
+        assert result["total_image_size_mb"] == 0
 
     def test_check_answer_exists(self, temp_storage):
         """Test checking if answer exists."""
@@ -169,13 +177,14 @@ class TestStorageStats:
         assert exists is False
 
 
+@pytest.mark.unit
 class TestImagePathGeneration:
     """Tests for image path generation."""
 
     def test_get_local_image_path(self, temp_storage):
         """Test local image path generation."""
         result = temp_storage._get_local_image_path("https://pic1.zhimg.com/test.jpg")
-        assert result.startswith("../static/images/")
+        assert result.startswith("/data/images/answers/")
         assert result.endswith(".jpg")
 
     def test_get_local_image_path_with_hash(self, temp_storage):
@@ -186,6 +195,7 @@ class TestImagePathGeneration:
         assert result1 != result2
 
 
+@pytest.mark.unit
 class TestHtmlProcessing:
     """Tests for HTML processing."""
 

@@ -102,7 +102,7 @@ class TestFullSyncProcess:
                 status_data = status_resp.json()
                 status = status_data.get("status")
 
-                print(f"[{i*5}s] Sync status: {status}")
+                print(f"[{i * 5}s] Sync status: {status}")
 
                 if status in ["success", "failed"]:
                     break
@@ -138,7 +138,7 @@ class TestFullSyncProcess:
                 progress = status_data.get("progress", 0)
                 message = status_data.get("message", "")
 
-                print(f"[{i*10}s] Status: {status}, Progress: {progress}%, Message: {message}")
+                print(f"[{i * 10}s] Status: {status}, Progress: {progress}%, Message: {message}")
 
                 if status in ["success", "failed"]:
                     break

@@ -112,9 +112,7 @@ class LoggingConfig(BaseModel):
 
     level: str = "INFO"
     # 使用北京时间 (UTC+8)，loguru 的 time 字段支持 tz 参数
-    format: str = (
-        "<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level}</level> | <cyan>{name}</cyan> | <level>{message}</level>"
-    )
+    format: str = "<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level}</level> | <cyan>{name}</cyan> | <level>{message}</level>"
     file: str = "/app/data/meta/zhihusync.log"
     rotation: str = "10 MB"
     retention: str = "30 days"

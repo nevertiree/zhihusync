@@ -7,17 +7,18 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from config_loader import load_config
-from crawler import ZhihuCrawler
-from db import Answer, DatabaseManager, SyncLog
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from image_generator import ImageGenerator
 from loguru import logger
 from pydantic import BaseModel
+
+from config_loader import load_config
+from crawler import ZhihuCrawler
+from db import Answer, DatabaseManager, SyncLog
+from image_generator import ImageGenerator
 from storage import StorageManager
 from timezone_utils import get_beijing_now
 
@@ -539,7 +540,9 @@ async def update_cookies(cookie_update: CookieUpdate):
         message = (
             f"Cookie 已保存 ({cookie_count} 条) - {msg}"
             if is_valid and missing
-            else f"Cookie 已保存 ({cookie_count} 条)" if is_valid else f"Cookie 已保存 ({cookie_count} 条) - ⚠️ {msg}"
+            else f"Cookie 已保存 ({cookie_count} 条)"
+            if is_valid
+            else f"Cookie 已保存 ({cookie_count} 条) - ⚠️ {msg}"
         )
 
         return {
@@ -1549,7 +1552,7 @@ async def retry_comment_anomaly():
                 request_delay=config.browser.request_delay,
             ) as crawler:
                 for i, answer in enumerate(anomaly_answers):
-                    app_state["sync_message"] = f"正在采集评论 ({i+1}/{total}): {answer.question_title[:30]}..."
+                    app_state["sync_message"] = f"正在采集评论 ({i + 1}/{total}): {answer.question_title[:30]}..."
 
                     try:
                         result = await crawler.process_comments(answer.id)

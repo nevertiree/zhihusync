@@ -907,7 +907,7 @@ body {{
             for html_file in html_files:
                 try:
                     # 先提取并删除HTML中引用的本地图片
-                    async with aiofiles.open(html_file, "r", encoding="utf-8") as f:
+                    async with aiofiles.open(html_file, encoding="utf-8") as f:
                         content = await f.read()
 
                     # 查找引用的本地图片 (/data/images/answers/xxx.jpg)
@@ -1005,7 +1005,7 @@ body {{
                 return False
 
             # 读取现有HTML
-            async with aiofiles.open(path, "r", encoding="utf-8") as f:
+            async with aiofiles.open(path, encoding="utf-8") as f:
                 html_content = await f.read()
 
             # 构建评论HTML

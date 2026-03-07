@@ -11,11 +11,12 @@ from pathlib import Path
 from typing import Any
 
 from bs4 import BeautifulSoup, Tag
-from db import DatabaseManager
 from loguru import logger
 from playwright.async_api import Browser, BrowserContext, Page, async_playwright
-from storage import StorageManager
 from tenacity import retry, stop_after_attempt, wait_exponential
+
+from db import DatabaseManager
+from storage import StorageManager
 from timezone_utils import get_beijing_now
 
 # 随机 User-Agent 列表
@@ -90,10 +91,7 @@ class ZhihuCrawler:
             return True
 
         # 检查外部回调（如果设置了）
-        if self.stop_check_callback and self.stop_check_callback():
-            return True
-
-        return False
+        return bool(self.stop_check_callback and self.stop_check_callback())
 
     async def __aenter__(self):
         """异步上下文管理器入口"""
@@ -181,7 +179,7 @@ class ZhihuCrawler:
             }
 
         try:
-            self.browser = await browser_type.launch(**launch_options)
+            self.browser = await browser_type.launch(**launch_options)  # type: ignore[arg-type]
         except Exception as e:
             logger.warning(f"启动 {browser_name} 失败: {e}，尝试其他浏览器...")
             # 尝试其他浏览器
@@ -189,7 +187,7 @@ class ZhihuCrawler:
                 if fallback != browser_name:
                     try:
                         browser_type = getattr(playwright, fallback)
-                        self.browser = await browser_type.launch(**launch_options)
+                        self.browser = await browser_type.launch(**launch_options)  # type: ignore[arg-type]
                         logger.info(f"使用备用浏览器: {fallback}")
                         break
                     except Exception as e2:
@@ -226,16 +224,16 @@ class ZhihuCrawler:
         if storage_state:
             try:
                 context_options["storage_state"] = storage_state
-                self.context = await self.browser.new_context(**context_options)
+                self.context = await self.browser.new_context(**context_options)  # type: ignore[arg-type]
                 logger.info("已使用 storage_state 创建 context")
             except Exception as e:
                 logger.warning(f"使用 storage_state 失败: {e}，尝试手动添加 cookie")
                 context_options.pop("storage_state", None)
-                self.context = await self.browser.new_context(**context_options)
+                self.context = await self.browser.new_context(**context_options)  # type: ignore[arg-type]
                 # 手动添加 cookie
                 await self._add_cookies_manually(storage_state)
         else:
-            self.context = await self.browser.new_context(**context_options)
+            self.context = await self.browser.new_context(**context_options)  # type: ignore[arg-type]
 
         self.page = await self.context.new_page()
 
@@ -262,8 +260,7 @@ class ZhihuCrawler:
                 logger.warning("页面未初始化，无法注入反检测脚本")
                 return
             # 注入脚本隐藏 webdriver 标志
-            await self.page.add_init_script(
-                """
+            await self.page.add_init_script("""
                 // 删除 webdriver 标志
                 Object.defineProperty(navigator, 'webdriver', {
                     get: () => undefined,
@@ -318,8 +315,7 @@ class ZhihuCrawler:
 
                 // 隐藏 Playwright 特定属性
                 delete navigator.__proto__.webdriver;
-            """
-            )
+            """)
             logger.debug("已注入反检测脚本")
         except Exception as e:
             logger.warning(f"注入反检测脚本失败: {e}")
@@ -385,8 +381,7 @@ class ZhihuCrawler:
                 return result
 
             # 直接访问知乎 API 验证登录状态（最可靠的方式）
-            api_response = await self.page.evaluate(
-                """
+            api_response = await self.page.evaluate("""
                 async () => {
                     try {
                         const response = await fetch('https://www.zhihu.com/api/v4/me', {
@@ -406,8 +401,7 @@ class ZhihuCrawler:
                         return { success: false, error: e.toString() };
                     }
                 }
-            """
-            )
+            """)
 
             if api_response and api_response.get("success"):
                 result["checks"]["cookie_valid"] = True
@@ -477,8 +471,7 @@ class ZhihuCrawler:
 
             if not has_user_menu:
                 # 尝试检查 localStorage 中的用户信息
-                user_info = await self.page.evaluate(
-                    """
+                user_info = await self.page.evaluate("""
                     () => {
                         try {
                             const user = localStorage.getItem('$$user');
@@ -487,8 +480,7 @@ class ZhihuCrawler:
                             return null;
                         }
                     }
-                """
-                )
+                """)
 
                 if not user_info:
                     logger.warning("⚠️ Cookie 可能已过期，建议更新 Cookie 以减少 403 错误")
@@ -543,7 +535,7 @@ class ZhihuCrawler:
                         cookie_dict["expires"] = int(float(expires))
                 formatted_cookies.append(cookie_dict)
 
-            await self.context.add_cookies(formatted_cookies)
+            await self.context.add_cookies(formatted_cookies)  # type: ignore[arg-type]
             logger.info(f"通过 Playwright API 设置了 {len(formatted_cookies)} 条 cookie")
 
             # 创建页面并访问知乎以验证 cookie
@@ -615,8 +607,7 @@ class ZhihuCrawler:
             # 检查是否有登录态
             assert self.page is not None  # noqa: S101
             # 方法1: 检查 localStorage 中的用户信息
-            user_info = await self.page.evaluate(
-                """
+            user_info = await self.page.evaluate("""
                 () => {
                     try {
                         const user = localStorage.getItem('$$user');
@@ -625,8 +616,7 @@ class ZhihuCrawler:
                         return null;
                     }
                 }
-            """
-            )
+            """)
 
             # 方法2: 检查页面上的用户头像或昵称元素
             assert self.page is not None  # noqa: S101
@@ -778,8 +768,7 @@ class ZhihuCrawler:
 
             # 提取用户信息
             assert self.page is not None  # noqa: S101
-            user_info = await self.page.evaluate(
-                """
+            user_info = await self.page.evaluate("""
                 () => {
                     const result = {
                         name: null,
@@ -837,8 +826,7 @@ class ZhihuCrawler:
 
                     return result;
                 }
-            """
-            )
+            """)
 
             if user_info.get("name") or user_info.get("avatar_url"):
                 # 下载用户头像
@@ -853,8 +841,7 @@ class ZhihuCrawler:
                     headline=user_info.get("headline"),
                 )
                 logger.info(
-                    f"获取到用户信息: name={user_info.get('name')}, "
-                    f"headline={user_info.get('headline', '')[:30]}..."
+                    f"获取到用户信息: name={user_info.get('name')}, headline={user_info.get('headline', '')[:30]}..."
                 )
             else:
                 logger.warning("未能获取到用户详细信息")
@@ -918,11 +905,9 @@ class ZhihuCrawler:
             # 每次滚动更多次，更激进的滚动策略
             assert self.page is not None  # noqa: S101
             for _ in range(5):  # 增加滚动次数到5次
-                await self.page.evaluate(
-                    """() => {
+                await self.page.evaluate("""() => {
                         window.scrollBy(0, 1500);
-                    }"""
-                )
+                    }""")
                 # 随机延迟 1-3 秒，给页面足够时间加载
                 sleep_time = random.uniform(1.0, 3.0)
                 await asyncio.sleep(sleep_time)
@@ -990,8 +975,7 @@ class ZhihuCrawler:
                 # 尝试点击"查看更多"或"加载更多"按钮
                 try:
                     assert self.page is not None  # noqa: S101
-                    has_more = await self.page.evaluate(
-                        """() => {
+                    has_more = await self.page.evaluate("""() => {
                             const selectors = [
                                 '.ActivityItem-more',
                                 '.ContentItem-more',
@@ -1010,8 +994,7 @@ class ZhihuCrawler:
                                 }
                             }
                             return false;
-                        }"""
-                    )
+                        }""")
                     if has_more:
                         logger.info("点击了'查看更多'按钮")
                         await asyncio.sleep(random.uniform(2.0, 4.0))
@@ -1527,7 +1510,7 @@ class ZhihuCrawler:
             # 查找所有展开按钮
             assert self.page is not None  # noqa: S101
             expand_buttons = await self.page.query_selector_all(
-                'button.ContentItem-more, button.Button:has-text("阅读全文"), ' 'button.Button:has-text("展开全文")'
+                'button.ContentItem-more, button.Button:has-text("阅读全文"), button.Button:has-text("展开全文")'
             )
 
             for button in expand_buttons[:5]:  # 限制最多点击5个
@@ -1539,16 +1522,14 @@ class ZhihuCrawler:
 
             # 也尝试通过 JavaScript 点击
             assert self.page is not None  # noqa: S101
-            await self.page.evaluate(
-                """
+            await self.page.evaluate("""
                 () => {
                     const buttons = document.querySelectorAll(
                         'button.ContentItem-more, .ContentItem-more'
                     );
                     buttons.forEach(btn => btn.click());
                 }
-            """
-            )
+            """)
             await asyncio.sleep(1)
 
         except Exception as e:
@@ -1562,8 +1543,7 @@ class ZhihuCrawler:
 
         # 获取所有样式表内容
         assert self.page is not None  # noqa: S101
-        styles = await self.page.evaluate(
-            """
+        styles = await self.page.evaluate("""
             () => {
                 const styles = [];
                 // 获取内联样式
@@ -1579,8 +1559,7 @@ class ZhihuCrawler:
                 });
                 return styles.join('\\n');
             }
-        """
-        )
+        """)
 
         # 构建包含样式的完整 HTML
         soup = BeautifulSoup(html_content, "lxml")
@@ -1819,8 +1798,7 @@ class ZhihuCrawler:
     async def _scroll_page(self):
         """滚动页面加载内容"""
         assert self.page is not None  # noqa: S101
-        await self.page.evaluate(
-            """
+        await self.page.evaluate("""
             async () => {
                 await new Promise((resolve) => {
                     let totalHeight = 0;
@@ -1842,8 +1820,7 @@ class ZhihuCrawler:
                     }, 5000);
                 });
             }
-        """
-        )
+        """)
 
     async def _scroll_page_for_activities(self):
         """滚动页面加载更多动态内容"""
@@ -1852,8 +1829,7 @@ class ZhihuCrawler:
         # 先点击"查看更多"或"展开"按钮（如果有）
         try:
             assert self.page is not None  # noqa: S101
-            await self.page.evaluate(
-                """
+            await self.page.evaluate("""
                 () => {
                     // 点击所有"查看更多"按钮
                     const buttons = document.querySelectorAll(
@@ -1868,8 +1844,7 @@ class ZhihuCrawler:
                     );
                     expandButtons.forEach(btn => btn.click());
                 }
-            """
-            )
+            """)
             await asyncio.sleep(1)
         except Exception:
             pass
@@ -1980,7 +1955,6 @@ class ZhihuCrawler:
             question_title: 问题标题
         """
         try:
-
             import aiofiles
 
             path = Path(html_path)
@@ -1988,7 +1962,7 @@ class ZhihuCrawler:
                 return
 
             # 读取现有HTML
-            async with aiofiles.open(path, "r", encoding="utf-8") as f:
+            async with aiofiles.open(path, encoding="utf-8") as f:
                 content = await f.read()
 
             # 检查是否已添加删除标注
@@ -2195,7 +2169,7 @@ class ZhihuCrawler:
                 )
 
                 logger.warning(
-                    f"已记录下载失败 #{failure_id}: {question_title[:60]}... | " f"可在'明细'页面查看失败项并重新采集"
+                    f"已记录下载失败 #{failure_id}: {question_title[:60]}... | 可在'明细'页面查看失败项并重新采集"
                 )
                 return False
 

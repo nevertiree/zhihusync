@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Any
 
 from loguru import logger
-from playwright.async_api import Browser, BrowserContext, async_playwright
+from playwright.async_api import Browser, BrowserContext, Playwright, async_playwright
 
 
 class ImageGenerator:
@@ -70,7 +70,7 @@ class ImageGenerator:
 
         self._browser: Browser | None = None
         self._context: BrowserContext | None = None
-        self._playwright = None
+        self._playwright: Playwright | None = None
 
         logger.info(f"图片生成器初始化: {output_dir}, {self.viewport_width}x{self.viewport_height}")
 
@@ -277,8 +277,7 @@ class ImageGenerator:
             await asyncio.sleep(0.5)
 
             # 获取页面尺寸
-            dimensions = await page.evaluate(
-                """
+            dimensions = await page.evaluate("""
                 () => {
                     const card = document.querySelector('.zhihu-card');
                     const content = document.querySelector('.RichContent');
@@ -290,8 +289,7 @@ class ImageGenerator:
                         cardTop: card?.offsetTop || 0,
                     };
                 }
-            """
-            )
+            """)
 
             logger.debug(f"页面尺寸: {dimensions}")
 

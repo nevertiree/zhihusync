@@ -19,8 +19,9 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
 import aiohttp
-from db import DatabaseManager
 from loguru import logger
+
+from db import DatabaseManager
 from models import AlertConfig, AlertHistory
 
 
@@ -222,7 +223,7 @@ class AlertManager:
                 <p>{message}</p>
                 <hr>
                 <p style="font-size: 12px; color: #666;">
-                    发送时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}<br>
+                    发送时间: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}<br>
                     告警类型: {alert_type}<br>
                     来源: zhihusync
                 </p>

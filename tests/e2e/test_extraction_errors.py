@@ -132,9 +132,9 @@ class TestExtractionErrorsUI:
 
             # 文本应该变化
             assert new_text != original_text, "按钮文本应该切换"
-            assert (
-                "未解决" in new_text or "已解决" in new_text
-            ), f"按钮文本应该是'查看未解决'或'查看已解决'，实际是'{new_text}'"
+            assert "未解决" in new_text or "已解决" in new_text, (
+                f"按钮文本应该是'查看未解决'或'查看已解决'，实际是'{new_text}'"
+            )
 
             print("[PASS] 按钮切换功能正常")
 
