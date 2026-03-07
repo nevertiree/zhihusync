@@ -2,40 +2,14 @@
 # 支持多种部署方式，通过 --profile 参数切换
 #
 # 使用方法:
-#   docker-compose up -d                    # 本地构建标准版
-#   docker-compose --profile hub up -d      # Docker Hub 预构建版
-#   docker-compose --profile full up -d     # 完整版(Chromium+Firefox)
-#   docker-compose --profile minimal up -d  # 精简版
+#   docker compose up -d                    # 本地构建标准版
+#   docker compose --profile hub up -d      # Docker Hub 预构建版
 
 version: "3.8"
 
 services:
-  # ========== 本地构建标准版(默认) ==========
+  # ========== Docker Hub 预构建版（推荐，安装脚本使用）==========
   zhihusync:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: zhihusync:local
-    restart: unless-stopped
-    ports:
-      - "6067:6067"
-    volumes:
-      - ./data/html:/app/data/html
-      - ./data/meta:/app/data/meta
-      - ./data/images:/app/data/images
-      - ./data/static:/app/data/static
-      - ./config:/app/config
-    environment:
-      - PLAYWRIGHT_BROWSER=chromium
-      - PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
-      - ZHIHUSYNC_LOGGING_LEVEL=${LOG_LEVEL:-INFO}
-    deploy:
-      resources:
-        limits:
-          memory: 2G
-
-  # ========== Docker Hub 预构建版 ==========
-  zhihusync-hub:
     image: nevertiree26/zhihusync:latest
     container_name: zhihusync
     restart: unless-stopped
@@ -52,7 +26,3 @@ services:
       - PLAYWRIGHT_BROWSER=chromium
       - PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
       - ZHIHUSYNC_LOGGING_LEVEL=${LOG_LEVEL:-INFO}
-    deploy:
-      resources:
-        limits:
-          memory: 2G
