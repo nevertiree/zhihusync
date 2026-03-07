@@ -35,8 +35,9 @@ Thumbs.db
 *.md
 !README.md
 
-# 脚本
-scripts/
+# 脚本（保留 install-browser.sh 用于精简版镜像）
+scripts/*
+!scripts/install-browser.sh
 start.sh
 
 # 其他
