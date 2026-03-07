@@ -131,8 +131,8 @@ download_config() {
 
     local base_url="https://raw.githubusercontent.com/nevertiree/zhihusync/master"
 
-    # 下载 docker-compose.yml (使用 hub 版本，预构建镜像)
-    if curl -fsSL "$base_url/docker-compose.hub.yml" -o "$INSTALL_PATH/docker-compose.yml"; then
+    # 下载 docker-compose.yml
+    if curl -fsSL "$base_url/docker-compose.yml" -o "$INSTALL_PATH/docker-compose.yml"; then
         echo "   ✅ docker-compose.yml"
     else
         print_color "$RED" "   ❌ 下载失败: docker-compose.yml"
@@ -178,10 +178,10 @@ start_service() {
     cd "$INSTALL_PATH"
 
     # 先停止可能存在的旧容器
-    docker compose down 2>/dev/null || docker-compose down 2>/dev/null || true
+    docker compose --profile hub down 2>/dev/null || docker-compose --profile hub down 2>/dev/null || true
 
-    # 使用 docker compose 启动
-    if docker compose up -d 2>/dev/null || docker-compose up -d; then
+    # 使用 docker compose 启动 (Hub 版本)
+    if docker compose --profile hub up -d 2>/dev/null || docker-compose --profile hub up -d; then
         print_color "$GREEN" "✅ 服务启动成功！"
     else
         print_color "$RED" "❌ 服务启动失败"

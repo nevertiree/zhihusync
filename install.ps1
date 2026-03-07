@@ -160,7 +160,7 @@ function Download-Config {
 
     $baseUrl = "https://raw.githubusercontent.com/nevertiree/zhihusync/master"
     $files = @{
-        "docker-compose.hub.yml" = "$script:InstallPath/docker-compose.yml"
+        "docker-compose.yml" = "$script:InstallPath/docker-compose.yml"
         ".env.example" = "$script:InstallPath/.env.example"
     }
 
@@ -208,16 +208,16 @@ function Start-Service {
     Set-Location $script:InstallPath
 
     # 先停止可能存在的旧容器（忽略错误）
-    cmd /c "docker compose down 2>nul"
+    cmd /c "docker compose --profile hub down 2>nul"
 
-    # 使用 docker compose 启动
-    cmd /c "docker compose up -d 2>nul"
+    # 使用 docker compose 启动 (Hub 版本)
+    cmd /c "docker compose --profile hub up -d 2>nul"
     $exitCode = $LASTEXITCODE
 
     if ($exitCode -ne 0) {
         # 尝试旧版命令
-        cmd /c "docker-compose down 2>nul"
-        cmd /c "docker-compose up -d 2>nul"
+        cmd /c "docker-compose --profile hub down 2>nul"
+        cmd /c "docker-compose --profile hub up -d 2>nul"
         $exitCode = $LASTEXITCODE
     }
 
