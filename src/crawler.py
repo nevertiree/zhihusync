@@ -187,7 +187,7 @@ class ZhihuCrawler:
                 if fallback != browser_name:
                     try:
                         browser_type = getattr(playwright, fallback)
-                        self.browser = await browser_type.launch(**launch_options)
+                        self.browser = await browser_type.launch(**launch_options)  # type: ignore[arg-type]
                         logger.info(f"使用备用浏览器: {fallback}")
                         break
                     except Exception as e2:
