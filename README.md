@@ -14,6 +14,58 @@
 
 </div>
 
+## 🚀 一键安装
+
+**只需一条命令，快速部署 zhihusync：**
+
+### Linux / macOS
+```bash
+curl -fsSL https://raw.githubusercontent.com/nevertiree/zhihusync/master/install.sh | bash
+```
+
+### Windows (PowerShell)
+```powershell
+powershell -Command "& { Invoke-Expression (Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/nevertiree/zhihusync/master/install.ps1').Content }"
+```
+
+**安装完成后：**
+1. 编辑 `.env` 文件配置知乎用户 ID
+2. 访问 http://localhost:6067 配置 Cookie
+3. 开始自动备份！
+
+---
+
+<details>
+<summary>📋 手动安装（如果一键安装失败）</summary>
+
+```bash
+# 1. 创建目录
+mkdir zhihusync && cd zhihusync
+
+# 2. 下载配置
+curl -O https://raw.githubusercontent.com/nevertiree/zhihusync/master/docker-compose.yml
+curl -O https://raw.githubusercontent.com/nevertiree/zhihusync/master/.env.example
+cp .env.example .env
+
+# 3. 使用 Docker Hub 预构建镜像启动（无需本地构建）
+docker compose --profile hub up -d
+
+# 4. 访问 http://localhost:6067
+```
+
+**其他部署方式：**
+```bash
+# 本地构建标准版
+docker compose up -d
+
+# 完整版(Chromium+Firefox)
+docker compose --profile full up -d
+
+# 精简版(~600MB，首次启动下载浏览器)
+docker compose --profile minimal up -d
+```
+</details>
+
 ---
 
 ## 📖 简介
