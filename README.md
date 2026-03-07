@@ -39,14 +39,30 @@ powershell -Command "& { Invoke-Expression (Invoke-WebRequest -Uri 'https://raw.
 <summary>📋 手动安装（如果一键安装失败）</summary>
 
 ```bash
-# 1. 克隆项目
-git clone https://github.com/nevertiree/zhihusync.git
-cd zhihusync
+# 1. 创建目录
+mkdir zhihusync && cd zhihusync
 
-# 2. 使用 Docker 启动
-docker-compose up -d
+# 2. 下载配置
+curl -O https://raw.githubusercontent.com/nevertiree/zhihusync/master/docker-compose.yml
+curl -O https://raw.githubusercontent.com/nevertiree/zhihusync/master/.env.example
+cp .env.example .env
 
-# 3. 访问 http://localhost:6067
+# 3. 使用 Docker Hub 预构建镜像启动（无需本地构建）
+docker compose --profile hub up -d
+
+# 4. 访问 http://localhost:6067
+```
+
+**其他部署方式：**
+```bash
+# 本地构建标准版
+docker compose up -d
+
+# 完整版(Chromium+Firefox)
+docker compose --profile full up -d
+
+# 精简版(~600MB，首次启动下载浏览器)
+docker compose --profile minimal up -d
 ```
 </details>
 
