@@ -14,9 +14,10 @@ from pathlib import Path
 from typing import Any
 
 from loguru import logger
-from models import AlertConfig, Answer, Base, Comment, DownloadFailure, ExtractionError, SyncLog, User
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import Session, sessionmaker
+
+from models import AlertConfig, Answer, Base, Comment, DownloadFailure, ExtractionError, SyncLog, User
 from timezone_utils import get_beijing_now
 
 

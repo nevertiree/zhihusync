@@ -48,6 +48,7 @@ def run_web():
     此函数会阻塞直到服务器停止。
     """
     import uvicorn
+
     from web import app
 
     uvicorn.run(app, host="0.0.0.0", port=6067, log_level="info")
@@ -79,6 +80,7 @@ async def run_both():
 
     # 启动 Web 服务(阻塞)
     import uvicorn
+
     from web import app
 
     config_uvicorn = uvicorn.Config(app, host="0.0.0.0", port=6067, log_level="info")

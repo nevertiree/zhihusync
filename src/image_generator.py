@@ -277,8 +277,7 @@ class ImageGenerator:
             await asyncio.sleep(0.5)
 
             # 获取页面尺寸
-            dimensions = await page.evaluate(
-                """
+            dimensions = await page.evaluate("""
                 () => {
                     const card = document.querySelector('.zhihu-card');
                     const content = document.querySelector('.RichContent');
@@ -290,8 +289,7 @@ class ImageGenerator:
                         cardTop: card?.offsetTop || 0,
                     };
                 }
-            """
-            )
+            """)
 
             logger.debug(f"页面尺寸: {dimensions}")
 
