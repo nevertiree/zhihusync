@@ -30,6 +30,7 @@ def temp_storage():
         yield storage
 
 
+@pytest.mark.unit
 class TestFilePathGeneration:
     """Tests for file path generation."""
 
@@ -81,6 +82,7 @@ class TestFilePathGeneration:
         assert result.isalnum()
 
 
+@pytest.mark.unit
 class TestHtmlBuilding:
     """Tests for HTML document building."""
 
@@ -150,6 +152,7 @@ class TestHtmlBuilding:
         assert "#0066ff" in result  # Zhihu blue
 
 
+@pytest.mark.unit
 class TestStorageStats:
     """Tests for storage statistics."""
 
@@ -173,6 +176,7 @@ class TestStorageStats:
         assert exists is False
 
 
+@pytest.mark.unit
 class TestImagePathGeneration:
     """Tests for image path generation."""
 
@@ -190,6 +194,7 @@ class TestImagePathGeneration:
         assert result1 != result2
 
 
+@pytest.mark.unit
 class TestHtmlProcessing:
     """Tests for HTML processing."""
 
