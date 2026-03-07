@@ -33,7 +33,8 @@ def get_zhihu_cookies():
         # 启动浏览器（使用用户数据目录，保持登录状态）
         print("\n启动浏览器...")
         browser = p.chromium.launch(
-            headless=False, args=["--disable-blink-features=AutomationControlled"]  # 显示浏览器窗口
+            headless=False,
+            args=["--disable-blink-features=AutomationControlled"],  # 显示浏览器窗口
         )
 
         context = browser.new_context(
