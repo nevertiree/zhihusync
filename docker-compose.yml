@@ -1,39 +1,40 @@
+# zhihusync Docker Compose 配置
+# 推荐使用标准版（默认），如需其他版本请使用 --profile 参数
+#
+# 快速开始：
+#   docker-compose up -d                    # 标准版（Chromium，推荐）
+#   docker-compose --profile full up -d     # 完整版（Chromium + Firefox）
+#   docker-compose --profile minimal up -d  # 精简版（首次启动下载浏览器）
+#   docker-compose --profile nginx up -d    # 添加 Nginx 静态文件服务
+
 version: "3.8"
 
 services:
+  # ========== 标准版（推荐）- 仅 Chromium，约 1.8GB ==========
   zhihusync:
     build:
       context: .
       dockerfile: Dockerfile
-    image: zhihusync:latest
+    image: zhihusync:standard
     container_name: zhihusync
     restart: unless-stopped
 
     ports:
-      # Web 管理界面 (主机6067映射到容器6067)
       - "6067:6067"
 
     volumes:
-      # 数据持久化
       - ./data/html:/app/data/html
       - ./data/meta:/app/data/meta
       - ./data/images:/app/data/images
       - ./data/static:/app/data/static
-      # 配置文件（可选，首次启动会自动创建）
       - ./config:/app/config
 
     environment:
-      # 浏览器类型: auto(自动检测), chromium, firefox
-      # 镜像已打包 chromium 和 firefox，开箱即用
-      - PLAYWRIGHT_BROWSER=${PLAYWRIGHT_BROWSER:-auto}
-
-      # 知乎配置（推荐在 Web 界面配置，也可通过环境变量预设）
+      - PLAYWRIGHT_BROWSER=chromium
       - ZHIHUSYNC_ZHIHU_USER_ID=${ZHIHU_USER_ID:-}
       - ZHIHUSYNC_ZHIHU_SCAN_INTERVAL=${SCAN_INTERVAL:-60}
       - ZHIHUSYNC_BROWSER_HEADLESS=${HEADLESS:-true}
       - ZHIHUSYNC_LOGGING_LEVEL=${LOG_LEVEL:-INFO}
-
-      # 禁用运行时浏览器下载（已打包在基础镜像中）
       - PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
 
     logging:
@@ -42,7 +43,6 @@ services:
         max-size: "10m"
         max-file: "3"
 
-    # NAS 资源限制（可根据需要调整）
     deploy:
       resources:
         limits:
@@ -52,7 +52,77 @@ services:
           cpus: "0.5"
           memory: 512M
 
-  # 可选: Nginx 用于直接浏览 HTML 备份文件
+  # ========== 完整版 - Chromium + Firefox，约 2.3GB ==========
+  zhihusync-full:
+    build:
+      context: .
+      dockerfile: Dockerfile.full
+    image: zhihusync:full
+    container_name: zhihusync-full
+    restart: unless-stopped
+    profiles: ["full"]
+
+    ports:
+      - "6067:6067"
+
+    volumes:
+      - ./data/html:/app/data/html
+      - ./data/meta:/app/data/meta
+      - ./data/images:/app/data/images
+      - ./data/static:/app/data/static
+      - ./config:/app/config
+
+    environment:
+      - PLAYWRIGHT_BROWSER=${PLAYWRIGHT_BROWSER:-auto}
+      - ZHIHUSYNC_ZHIHU_USER_ID=${ZHIHU_USER_ID:-}
+      - ZHIHUSYNC_ZHIHU_SCAN_INTERVAL=${SCAN_INTERVAL:-60}
+      - ZHIHUSYNC_BROWSER_HEADLESS=${HEADLESS:-true}
+      - ZHIHUSYNC_LOGGING_LEVEL=${LOG_LEVEL:-INFO}
+      - PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2G
+
+  # ========== 精简版 - 仅 Python，首次启动下载浏览器，约 600MB ==========
+  zhihusync-minimal:
+    build:
+      context: .
+      dockerfile: Dockerfile.minimal
+    image: zhihusync:minimal
+    container_name: zhihusync-minimal
+    restart: unless-stopped
+    profiles: ["minimal"]
+
+    ports:
+      - "6067:6067"
+
+    volumes:
+      - ./data/html:/app/data/html
+      - ./data/meta:/app/data/meta
+      - ./data/images:/app/data/images
+      - ./data/static:/app/data/static
+      - ./config:/app/config
+      # 浏览器缓存目录（避免重复下载）
+      - browser-cache:/app/ms-playwright
+
+    environment:
+      - PLAYWRIGHT_BROWSER=chromium
+      - ZHIHUSYNC_ZHIHU_USER_ID=${ZHIHU_USER_ID:-}
+      - ZHIHUSYNC_ZHIHU_SCAN_INTERVAL=${SCAN_INTERVAL:-60}
+      - ZHIHUSYNC_BROWSER_HEADLESS=${HEADLESS:-true}
+      - ZHIHUSYNC_LOGGING_LEVEL=${LOG_LEVEL:-INFO}
+      - PLAYWRIGHT_DOWNLOAD_HOST=https://npmmirror.com/mirrors/playwright
+
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2G
+
+  # ========== 可选：Nginx 静态文件服务 ==========
   nginx:
     image: nginx:alpine
     container_name: zhihusync-web
@@ -64,7 +134,7 @@ services:
       - ./data/images:/usr/share/nginx/html/images:ro
       - ./data/static:/usr/share/nginx/html/static:ro
       - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
-    depends_on:
-      - zhihusync
-    profiles:
-      - nginx
+    profiles: ["nginx"]
+
+volumes:
+  browser-cache:

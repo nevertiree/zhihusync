@@ -86,8 +86,8 @@ docker-compose -f docker-compose.hub.yml up -d
 git clone https://github.com/nevertiree/zhihusync.git
 cd zhihusync
 
-# 使用轻量级镜像构建（推荐）
-docker-compose -f docker-compose.build.yml up -d
+# 标准版构建（推荐，仅 Chromium，约 1.8GB）
+docker-compose up -d
 
 # 访问 Web 界面
 # http://localhost:6067
@@ -97,10 +97,9 @@ docker-compose -f docker-compose.build.yml up -d
 
 | 方案 | 大小 | 构建命令 | 适用场景 |
 |------|------|----------|----------|
-| **Chromium 轻量版** | ~1.8GB | `docker-compose -f docker-compose.build.yml up -d` | 推荐大多数用户使用 |
-| **Alpine 精简版** | ~1.2GB | `docker-compose -f docker-compose.build.yml --profile alpine up -d` | 追求极致小体积 |
-| **最小镜像** | ~600MB | `docker-compose -f docker-compose.build.yml --profile minimal up -d` | 首次启动下载浏览器 |
-| **完整版** | ~2.3GB | `docker-compose -f docker-compose.build.yml --profile full up -d` | 需要 Firefox 备选 |
+| **标准版（推荐）** | ~1.8GB | `docker-compose up -d` | 仅 Chromium，推荐大多数用户使用 |
+| **完整版** | ~2.3GB | `docker-compose --profile full up -d` | Chromium + Firefox，需要备选浏览器 |
+| **精简版** | ~600MB | `docker-compose --profile minimal up -d` | 首次启动时下载浏览器，适合存储紧张 |
 
 ### 方式三：本地运行
 

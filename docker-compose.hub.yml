@@ -1,5 +1,11 @@
-# Docker Hub 部署配置 - 直接使用预构建镜像
-# 无需本地构建，下载即用
+# Docker Hub 预构建镜像部署配置
+# 无需本地构建，直接拉取使用（适合网络不稳定环境）
+#
+# 使用方法：
+#   docker-compose -f docker-compose.hub.yml up -d
+#
+# 如需 Nginx 静态文件服务：
+#   docker-compose -f docker-compose.hub.yml --profile nginx up -d
 
 version: "3.8"
 
@@ -10,27 +16,21 @@ services:
     restart: unless-stopped
 
     ports:
-      # Web 管理界面
       - "6067:6067"
 
     volumes:
-      # 数据持久化
       - ./data/html:/app/data/html
       - ./data/meta:/app/data/meta
       - ./data/images:/app/data/images
       - ./data/static:/app/data/static
-      # 配置文件
       - ./config:/app/config
 
     environment:
-      # 浏览器类型: auto(自动检测), chromium, firefox
-      - PLAYWRIGHT_BROWSER=${PLAYWRIGHT_BROWSER:-auto}
-      # 知乎配置（推荐在 Web 界面配置）
+      - PLAYWRIGHT_BROWSER=${PLAYWRIGHT_BROWSER:-chromium}
       - ZHIHUSYNC_ZHIHU_USER_ID=${ZHIHU_USER_ID:-}
       - ZHIHUSYNC_ZHIHU_SCAN_INTERVAL=${SCAN_INTERVAL:-60}
       - ZHIHUSYNC_BROWSER_HEADLESS=${HEADLESS:-true}
       - ZHIHUSYNC_LOGGING_LEVEL=${LOG_LEVEL:-INFO}
-      # 禁用运行时浏览器下载
       - PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
 
     logging:
@@ -48,7 +48,6 @@ services:
           cpus: "0.5"
           memory: 512M
 
-  # 可选: Nginx 用于直接浏览 HTML 备份文件
   nginx:
     image: nginx:alpine
     container_name: zhihusync-web
@@ -62,5 +61,4 @@ services:
       - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
     depends_on:
       - zhihusync
-    profiles:
-      - nginx
+    profiles: ["nginx"]
