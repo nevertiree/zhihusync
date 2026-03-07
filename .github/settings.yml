@@ -4,7 +4,7 @@
 repository:
   # 基本设置
   name: zhihusync
-  description: 自动备份知乎点赞内容，防止珍贵回答丢失
+  description: 知乎点赞内容自动备份工具 - 防止珍贵回答丢失
   private: false
 
   # 功能开关
@@ -32,6 +32,33 @@ branches:
         dismiss_stale_reviews: true
         require_code_owner_reviews: false
 
+      # 禁止直接推送（空用户列表表示禁止所有人直接推送）
+      restrictions:
+        users: []
+        teams: []
+
+      # 禁止强制推送和删除
+      allow_force_pushes: false
+      allow_deletions: false
+
+      # 需要状态检查通过
+      required_status_checks:
+        strict: true
+        contexts:
+          - "lint"
+          - "unit-tests"
+
+      # 要求分支最新
+      require_linear_history: false
+      require_signature: false
+
+  - name: develop
+    protection:
+      # 需要 PR 才能合并
+      required_pull_request_reviews:
+        required_approving_review_count: 1
+        dismiss_stale_reviews: true
+
       # 禁止直接推送
       restrictions:
         users: []
@@ -41,7 +68,7 @@ branches:
       allow_force_pushes: false
       allow_deletions: false
 
-      # 需要状态检查通过（可选）
+      # 需要状态检查通过
       required_status_checks:
         strict: true
         contexts:
