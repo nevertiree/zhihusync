@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 """启动Web服务"""
+
 import sys
 
 sys.path.insert(0, "src")

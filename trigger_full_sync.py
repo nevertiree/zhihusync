@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 """触发全量同步"""
+
 import time
 
 import requests
@@ -15,7 +16,7 @@ def wait_for_service(max_retries=30):
                 return True
         except Exception:
             pass
-        print(f"⏳ 等待服务启动... ({i+1}/{max_retries})")
+        print(f"⏳ 等待服务启动... ({i + 1}/{max_retries})")
         time.sleep(1)
     return False
 
@@ -56,7 +57,7 @@ def check_status():
                     print(f"\r{status_emoji} [{status.upper()}] {message} ({progress}%)", end="", flush=True)
 
                     if status in ["success", "failed"]:
-                        print(f"\n\n{'='*60}")
+                        print(f"\n\n{'=' * 60}")
                         print(f"同步结束: {message}")
                         break
 
