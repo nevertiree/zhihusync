@@ -160,7 +160,7 @@ function Download-Config {
 
     $baseUrl = "https://raw.githubusercontent.com/nevertiree/zhihusync/master"
     $files = @{
-        "docker-compose.yml" = "$script:InstallPath/docker-compose.yml"
+        "docker-compose.hub.yml" = "$script:InstallPath/docker-compose.yml"
         ".env.example" = "$script:InstallPath/.env.example"
     }
 
@@ -207,18 +207,25 @@ function Start-Service {
 
     Set-Location $script:InstallPath
 
+    # 先停止可能存在的旧容器（忽略错误）
+    cmd /c "docker compose down 2>nul"
+
     # 使用 docker compose 启动
-    try {
-        docker compose up -d 2>&1 | Out-Null
-        if ($LASTEXITCODE -ne 0) {
-            throw "docker compose failed"
-        }
-    } catch {
+    cmd /c "docker compose up -d 2>nul"
+    $exitCode = $LASTEXITCODE
+
+    if ($exitCode -ne 0) {
         # 尝试旧版命令
-        docker-compose up -d
+        cmd /c "docker-compose down 2>nul"
+        cmd /c "docker-compose up -d 2>nul"
+        $exitCode = $LASTEXITCODE
     }
 
-    Write-Color "✅ 服务启动成功！" "Green"
+    if ($exitCode -eq 0) {
+        Write-Color "✅ 服务启动成功！" "Green"
+    } else {
+        Write-Color "⚠️  服务启动可能有问题，请检查日志" "Yellow"
+    }
     Write-Host ""
 }
 
