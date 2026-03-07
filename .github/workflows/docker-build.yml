@@ -113,6 +113,13 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Verify build context
+        run: |
+          echo "=== Build Context Files ==="
+          ls -la scripts/
+          echo "=== .dockerignore ==="
+          cat .dockerignore
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -141,5 +148,5 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           platforms: linux/amd64
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          # 精简版不使用缓存，避免 .dockerignore 变更不生效
+          no-cache: true
