@@ -90,10 +90,7 @@ class ZhihuCrawler:
             return True
 
         # 检查外部回调（如果设置了）
-        if self.stop_check_callback and self.stop_check_callback():
-            return True
-
-        return False
+        return bool(self.stop_check_callback and self.stop_check_callback())
 
     async def __aenter__(self):
         """异步上下文管理器入口"""
@@ -1988,7 +1985,7 @@ class ZhihuCrawler:
                 return
 
             # 读取现有HTML
-            async with aiofiles.open(path, "r", encoding="utf-8") as f:
+            async with aiofiles.open(path, encoding="utf-8") as f:
                 content = await f.read()
 
             # 检查是否已添加删除标注
