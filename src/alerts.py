@@ -19,8 +19,9 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
 import aiohttp
-from db import DatabaseManager
 from loguru import logger
+
+from db import DatabaseManager
 from models import AlertConfig, AlertHistory
 
 
