@@ -132,6 +132,13 @@ body {
   overflow-x: hidden;
 }
 
+/* 设置固定在底部 */
+.sidebar-settings {
+  padding: 8px;
+  border-top: 1px solid var(--border-color);
+  margin-top: auto;
+}
+
 .nav-item {
   display: flex;
   align-items: center;
