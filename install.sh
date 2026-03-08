@@ -145,6 +145,15 @@ configure_data_dir() {
                 break
             fi
         else
+            # 目录不存在，询问用户是否创建
+            echo ""
+            read -p "目录不存在，是否创建? [Y/n]: " confirm
+            if [[ "$confirm" =~ ^[Nn]$ ]]; then
+                echo "   已取消，请重新选择目录"
+                echo ""
+                continue
+            fi
+
             # 尝试创建目录
             if mkdir -p "$data_dir" 2>/dev/null; then
                 print_color "$GREEN" "✅ 目录创建成功"
@@ -193,6 +202,12 @@ start_service() {
     print_color "$YELLOW" "🚀 启动 zhihusync 服务..."
     echo ""
 
+    # 创建必要的子目录（Docker 挂载需要）
+    print_color "$BLUE" "📁 创建数据子目录..."
+    mkdir -p "$DATA_DIR/html" "$DATA_DIR/meta" "$DATA_DIR/images" "$DATA_DIR/static"
+    print_color "$GREEN" "✅ 子目录创建完成"
+    echo ""
+
     # 停止可能存在的旧容器
     docker rm -f zhihusync 2>/dev/null || true
 
@@ -239,9 +254,12 @@ show_completion() {
     echo "   1. 访问 http://localhost:6067"
     if [ -z "$ZHIHU_USER_ID" ]; then
         echo "   2. 在网页中配置知乎用户 ID"
+        echo "   3. 配置知乎 Cookie（按页面指引操作）"
+        echo "   4. 开始自动备份！"
+    else
+        echo "   2. 配置知乎 Cookie（按页面指引操作）"
+        echo "   3. 开始自动备份！"
     fi
-    echo "   2. 配置知乎 Cookie（按页面指引操作）"
-    echo "   3. 开始自动备份！"
     echo ""
     print_color "$BLUE" "🔧 常用命令:"
     echo "   查看日志: docker logs -f zhihusync"
