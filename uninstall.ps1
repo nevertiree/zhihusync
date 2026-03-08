@@ -76,24 +76,63 @@ function Find-Container {
     return $null
 }
 
-# 配置数据目录（必须用户确认）
+# 从 Docker 容器获取挂载的数据目录
+function Get-DataDirFromContainer {
+    param([string]$ContainerId)
+
+    if ([string]::IsNullOrWhiteSpace($ContainerId)) {
+        return $null
+    }
+
+    # 从容器的挂载点获取数据目录
+    # 查找形如 "Source": "C:\\Users\\xxx\\zhihusync\\data\\html" 的挂载
+    $inspect = docker inspect $ContainerId 2>$null | ConvertFrom-Json
+    if ($inspect -and $inspect.Mounts) {
+        $htmlMount = $inspect.Mounts | Where-Object { $_.Destination -eq "/app/data/html" }
+        if ($htmlMount) {
+            # 获取父目录 (去掉 \html)
+            $dataDir = Split-Path $htmlMount.Source -Parent
+            return $dataDir
+        }
+    }
+    return $null
+}
+
+# 配置数据目录（优先从容器获取，用户确认）
 function Configure-DataDir {
     Write-Color "💾 配置数据目录位置" "Yellow"
     Write-Host ""
-    Write-Color "📌 请确认数据保存目录：" "Cyan"
+
+    # 优先从容器获取
+    $detectedDir = $null
+    if ($script:CONTAINER_ID) {
+        $detectedDir = Get-DataDirFromContainer -ContainerId $script:CONTAINER_ID
+    }
+
+    if ($detectedDir -and (Test-Path $detectedDir)) {
+        Write-Color "📌 从容器检测到数据目录:" "Cyan"
+        Write-Host "   $detectedDir"
+        Write-Host ""
+        $confirm = Read-Host "确认卸载此目录? [Y/n]"
+        if ($confirm -notmatch '^[Nn]$') {
+            $script:DATA_DIR = $detectedDir
+            $script:CONFIG_DIR = Join-Path (Split-Path $detectedDir -Parent) "config"
+            return $true
+        }
+    }
+
+    Write-Color "📌 请输入数据保存目录：" "Cyan"
     Write-Host "   这是 zhihusync 保存备份数据的位置，卸载将删除此目录"
     Write-Host ""
 
-    # 默认路径
-    $defaultDir = "$env:USERPROFILE\zhihusync\data"
-
     while ($true) {
         Write-Host ""
-        $dataDir = Read-Host "请输入数据目录路径 [默认示例: $defaultDir]"
+        $dataDir = Read-Host "请输入数据目录路径"
 
-        # 使用默认值
+        # 不能为空
         if ([string]::IsNullOrWhiteSpace($dataDir)) {
-            $dataDir = $defaultDir
+            Write-Color "❌ 请输入有效的目录路径" "Red"
+            continue
         }
 
         # 解析路径
@@ -218,23 +257,23 @@ function Main {
     # 检查 Docker
     $dockerAvailable = Test-Docker
 
-    # 查找容器
-    $containerId = $null
+    # 查找容器（保存到全局变量供后续使用）
+    $script:CONTAINER_ID = $null
     if ($dockerAvailable) {
-        $containerId = Find-Container
+        $script:CONTAINER_ID = Find-Container
     }
 
-    # 配置数据目录
+    # 配置数据目录（会使用 CONTAINER_ID 自动检测）
     if (-not (Configure-DataDir)) {
         Write-Color "❌ 卸载已取消" "Yellow"
         exit 0
     }
 
     # 最终确认
-    Final-Confirm -ContainerId $containerId
+    Final-Confirm -ContainerId $script:CONTAINER_ID
 
     # 执行卸载
-    Perform-Uninstall -ContainerId $containerId
+    Perform-Uninstall -ContainerId $script:CONTAINER_ID
 }
 
 # 执行

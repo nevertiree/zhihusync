@@ -53,24 +53,58 @@ find_container() {
     echo "$container_id"
 }
 
-# 配置数据目录（必须用户确认）
+# 从 Docker 容器获取挂载的数据目录
+get_data_dir_from_container() {
+    local container_id=$1
+    local data_dir=""
+
+    if [ -n "$container_id" ]; then
+        # 从容器的挂载点获取数据目录
+        # 格式: /host/path:/app/data/html
+        data_dir=$(docker inspect "$container_id" 2>/dev/null | \
+            grep -oE '"[^:]+:/app/data/html"' | \
+            sed 's/"//g' | \
+            sed 's|:/app/data/html||')
+    fi
+
+    echo "$data_dir"
+}
+
+# 配置数据目录（优先从容器获取，用户确认）
 configure_data_dir() {
     print_color "$YELLOW" "💾 配置数据目录位置"
     echo ""
-    print_color "$CYAN" "📌 请确认数据保存目录："
+
+    # 优先从容器获取
+    local detected_dir=""
+    if [ -n "$CONTAINER_ID" ]; then
+        detected_dir=$(get_data_dir_from_container "$CONTAINER_ID")
+    fi
+
+    if [ -n "$detected_dir" ] && [ -d "$detected_dir" ]; then
+        print_color "$CYAN" "📌 从容器检测到数据目录:"
+        echo "   $detected_dir"
+        echo ""
+        read -p "确认卸载此目录? [Y/n]: " confirm
+        if [[ ! "$confirm" =~ ^[Nn]$ ]]; then
+            DATA_DIR="$detected_dir"
+            CONFIG_DIR="$(dirname "$DATA_DIR")/config"
+            return 0
+        fi
+    fi
+
+    print_color "$CYAN" "📌 请输入数据保存目录："
     echo "   这是 zhihusync 保存备份数据的位置，卸载将删除此目录"
     echo ""
 
-    # 默认路径
-    default_dir="$HOME/zhihusync/data"
-
     while true; do
         echo ""
-        read -p "请输入数据目录路径 [默认示例: $default_dir]: " data_dir
+        read -p "请输入数据目录路径: " data_dir
 
         # 使用默认值
         if [ -z "$data_dir" ]; then
-            data_dir="$default_dir"
+            print_color "$RED" "❌ 请输入有效的目录路径"
+            continue
         fi
 
         # 展开 ~ 符号
@@ -191,23 +225,23 @@ main() {
     check_docker
     local docker_available=$?
 
-    # 查找容器
-    local container_id
+    # 查找容器（保存到全局变量供后续使用）
+    CONTAINER_ID=""
     if [ $docker_available -eq 0 ]; then
-        container_id=$(find_container)
+        CONTAINER_ID=$(find_container)
     fi
 
-    # 配置数据目录
+    # 配置数据目录（会使用 CONTAINER_ID 自动检测）
     if ! configure_data_dir; then
         print_color "$YELLOW" "❌ 卸载已取消"
         exit 0
     fi
 
     # 最终确认
-    final_confirm "$container_id"
+    final_confirm "$CONTAINER_ID"
 
     # 执行卸载
-    perform_uninstall "$container_id"
+    perform_uninstall "$CONTAINER_ID"
 }
 
 # 执行
