@@ -290,12 +290,7 @@ mypy src/   # 类型检查
 
 ### Remote 配置
 
-- `origin`: 自托管 Git 服务器 (192.168.50.2:8822)
-- `github`: GitHub (github.com/nevertiree/zhihusync)
-
-推送顺序：
-1. 先 push 到 `origin`（自托管服务器）
-2. 再通过 PR 合并到 `github/master`
+- `origin`: GitHub (github.com/nevertiree/zhihusync)
 
 ---
 
