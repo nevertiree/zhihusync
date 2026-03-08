@@ -1,4 +1,4 @@
-<div align="center">
+﻿<div align="center">
 
 # 🔄 zhihusync
 
@@ -14,27 +14,49 @@
 
 </div>
 
-## 🚀 一键安装（全自动）
+## 🚀 一键安装（推荐）
 
 **只需一条命令，全自动安装 zhihusync：**
 
-### Linux / macOS
+### Linux / macOS / WSL2
 ```bash
 curl -fsSL https://raw.githubusercontent.com/nevertiree/zhihusync/master/install.sh | bash
 ```
 
 ### Windows (PowerShell)
 ```powershell
-powershell -Command "& { Invoke-Expression (Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/nevertiree/zhihusync/master/install.ps1').Content }"
+irm https://raw.githubusercontent.com/nevertiree/zhihusync/master/install.ps1 | iex
 ```
 
 ### 安装过程
-✅ **自动检查并安装 Docker**（如未安装）
-✅ **交互式配置数据保存位置**（提供路径示例）
+✅ **自动检查 Docker**（如未安装会提示安装方法）
+✅ **交互式配置数据目录**（提供路径示例，必须用户确认）
 ✅ **可选配置知乎用户 ID**（也可稍后在网页配置）
 ✅ **自动拉取镜像并启动服务**
 
 **安装完成后访问：** http://localhost:6067
+
+---
+
+## 🗑️ 一键卸载
+
+**如需完全删除 zhihusync 及所有数据：**
+
+### Linux / macOS / WSL2
+```bash
+curl -fsSL https://raw.githubusercontent.com/nevertiree/zhihusync/master/uninstall.sh | bash
+```
+
+### Windows (PowerShell)
+```powershell
+irm https://raw.githubusercontent.com/nevertiree/zhihusync/master/uninstall.ps1 | iex
+```
+
+### 卸载说明
+⚠️ **从 Docker 容器自动检测数据目录**（无需手动输入）
+⚠️ **必须用户确认数据目录**（即使目录存在也不会默认删除）
+⚠️ **需要输入 DELETE 最终确认**（防止误操作）
+✅ **自动停止并删除容器、数据目录**
 
 ---
 
@@ -47,13 +69,14 @@ powershell -Command "& { Invoke-Expression (Invoke-WebRequest -Uri 'https://raw.
 | `data/html/` | 备份的知乎回答 HTML 文件 |
 | `data/meta/` | 数据库（备份记录、元数据） |
 | `data/images/` | 下载的图片 |
+| `data/static/` | 静态资源（头像等） |
 
 **建议路径：**
-- **Windows**: `D:ackupackup` 或 `E:ackup`
-- **Linux**: `$HOME/backup/data` 或 `/mnt/data/backup`
+- **Windows**: `D:\zhihusync\data` 或 `E:\zhihusync\data`
+- **Linux**: `$HOME/zhihusync/data` 或 `/opt/zhihusync/data`
 - **NAS**: 挂载的共享文件夹
 
-⚠️ **请务必确保数据目录安全，定期备份！**
+⚠️ **请务必确保数据目录安全，定期备份！卸载时会删除此目录！**
 
 ---
 
@@ -62,23 +85,25 @@ powershell -Command "& { Invoke-Expression (Invoke-WebRequest -Uri 'https://raw.
 
 ```bash
 # 1. 创建数据目录
-mkdir -p ~/backup/data
+mkdir -p ~/zhihusync/data
 
 # 2. 直接运行（无需下载任何文件）
 docker run -d \
   --name zhihusync \
   --restart unless-stopped \
   -p 6067:6067 \
-  -v ~/backup/data/html:/app/data/html \
-  -v ~/backup/data/meta:/app/data/meta \
-  -v ~/backup/data/images:/app/data/images \
-  -v ~/backup/data/static:/app/data/static \
-  -v ~/backup/config:/app/config \
+  -v ~/zhihusync/data/html:/app/data/html \
+  -v ~/zhihusync/data/meta:/app/data/meta \
+  -v ~/zhihusync/data/images:/app/data/images \
+  -v ~/zhihusync/data/static:/app/data/static \
+  -v ~/zhihusync/config:/app/config \
   nevertiree26/zhihusync:latest
 
 # 3. 访问 http://localhost:6067
 ```
 </details>
+
+---
 
 ---
 
