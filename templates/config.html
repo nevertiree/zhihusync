@@ -329,13 +329,19 @@
     </div>
 
     <div class="card">
-        <div class="card-header">
+        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
             <h3>📋 用户列表</h3>
+            <div class="user-search-box" style="display: flex; gap: 8px;">
+                <input type="text" id="user-search-input" class="form-input" placeholder="搜索用户名或ID..." style="width: 200px; padding: 6px 12px; font-size: 13px;">
+                <button class="btn btn-sm btn-secondary" onclick="searchUsers()">搜索</button>
+                <button class="btn btn-sm" onclick="clearUserSearch()" style="background: var(--bg-hover); color: var(--text-secondary);">重置</button>
+            </div>
         </div>
         <div class="card-body compact">
             <div class="user-list-container" id="users-list">
                 <div class="empty-state">暂无用户</div>
             </div>
+            <div id="user-search-result" style="display: none; margin-top: 12px; padding: 12px; background: var(--bg-tertiary); border-radius: 8px; font-size: 13px; color: var(--text-muted);"></div>
         </div>
     </div>
 </div>
@@ -1242,48 +1248,93 @@
 /* 用户卡片样式 */
 .user-list-container {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
     gap: 16px;
 }
 
 .user-card {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 14px;
     padding: 16px;
     background: var(--bg-secondary);
     border: 2px solid var(--border-color);
     border-radius: 12px;
-    transition: all 0.2s ease;
+    transition: all 0.25s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.user-card::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    background: transparent;
+    transition: background 0.25s ease;
 }
 
 .user-card:hover {
     border-color: var(--primary-color);
-    box-shadow: 0 4px 12px rgba(0, 102, 255, 0.1);
+    box-shadow: 0 4px 16px rgba(0, 102, 255, 0.12);
+    transform: translateY(-2px);
 }
 
 .user-card.has-cookie {
-    background: linear-gradient(135deg, rgba(82, 196, 26, 0.08) 0%, rgba(82, 196, 26, 0.15) 100%);
+    background: linear-gradient(135deg, rgba(82, 196, 26, 0.06) 0%, rgba(82, 196, 26, 0.12) 100%);
     border-color: var(--success);
+    box-shadow: 0 2px 8px rgba(82, 196, 26, 0.1);
+}
+
+.user-card.has-cookie::before {
+    background: var(--success);
 }
 
 .user-card.has-cookie:hover {
-    box-shadow: 0 4px 12px rgba(82, 196, 26, 0.2);
+    box-shadow: 0 4px 16px rgba(82, 196, 26, 0.2);
+    border-color: var(--success);
+}
+
+/* Cookie 标识标签 */
+.user-card .cookie-indicator {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 8px;
+    height: 8px;
+    background: var(--success);
+    border-radius: 50%;
+    box-shadow: 0 0 0 2px var(--bg-secondary), 0 0 0 4px rgba(82, 196, 26, 0.3);
+    animation: pulse-indicator 2s infinite;
+}
+
+@keyframes pulse-indicator {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.7; transform: scale(1.1); }
 }
 
 .user-card .user-avatar {
-    width: 48px;
-    height: 48px;
+    width: 52px;
+    height: 52px;
     border-radius: 50%;
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     display: flex;
     align-items: center;
     justify-content: center;
     color: white;
-    font-size: 18px;
+    font-size: 20px;
     font-weight: 600;
     flex-shrink: 0;
     overflow: hidden;
+    border: 2px solid var(--bg-secondary);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.user-card.has-cookie .user-avatar {
+    border-color: rgba(82, 196, 26, 0.3);
+    box-shadow: 0 2px 8px rgba(82, 196, 26, 0.2);
 }
 
 .user-card .user-avatar img {
@@ -1295,44 +1346,88 @@
 .user-card .user-info {
     flex: 1;
     min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
 }
 
 .user-card .user-name {
     font-weight: 600;
-    font-size: 14px;
+    font-size: 15px;
     color: var(--text-primary);
-    margin-bottom: 2px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    line-height: 1.3;
 }
 
 .user-card .user-id {
     font-size: 12px;
     color: var(--text-muted);
-    margin-bottom: 2px;
+    font-family: 'SF Mono', Monaco, monospace;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .user-card .user-sync {
     font-size: 11px;
     color: var(--text-muted);
+    opacity: 0.8;
 }
 
 .user-card .user-badges {
     display: flex;
     flex-direction: column;
     align-items: flex-end;
-    gap: 6px;
+    gap: 8px;
+    margin-left: 8px;
 }
 
 .user-card .user-badges .badge {
     font-size: 11px;
-    padding: 2px 8px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
 }
 
 .user-card .user-badges .btn {
     font-size: 11px;
-    padding: 4px 10px;
+    padding: 4px 12px;
+    border-radius: 6px;
+    opacity: 0.8;
+    transition: opacity 0.2s;
+}
+
+.user-card:hover .user-badges .btn {
+    opacity: 1;
+}
+
+/* 搜索框样式 */
+.user-search-box {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.user-search-box .form-input {
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    transition: all 0.2s;
+}
+
+.user-search-box .form-input:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(0, 102, 255, 0.1);
+}
+
+/* 搜索结果提示 */
+#user-search-result {
+    text-align: center;
+    border-left: 3px solid var(--primary-color);
 }
 
 /* 响应式 */
@@ -1791,54 +1886,185 @@ function showExtensionGuide() {
 }
 
 // 用户相关
+// 全局用户数据缓存
+let allUsers = [];
+let cookieUserId = null;
+
 async function loadUsers() {
     try {
-        const res = await fetch('/api/users');
-        const data = await res.json();
-        
-        console.log('加载用户数据:', data);
-
+        console.log('开始加载用户数据...');
         const list = document.getElementById('users-list');
         const statusItem = document.getElementById('status-user');
+        
+        // 先显示加载中状态
+        if (list) list.innerHTML = '<div class="empty-state">加载中...</div>';
+        
+        const res = await fetch('/api/users');
+        if (!res.ok) {
+            throw new Error(`API 返回错误: ${res.status}`);
+        }
+        
+        const data = await res.json();
+        console.log('加载用户数据成功:', data);
 
         if (!data.users || data.users.length === 0) {
-            list.innerHTML = '<div class="empty-state">暂无用户</div>';
-            statusItem.innerHTML = '<span class="status-icon">👤</span><span class="status-text">用户: 未配置</span>';
+            console.log('用户列表为空');
+            if (list) list.innerHTML = '<div class="empty-state">暂无用户</div>';
+            if (statusItem) statusItem.innerHTML = '<span class="status-icon">👤</span><span class="status-text">用户: 未配置</span>';
+            allUsers = [];
             return;
         }
 
+        // 保存用户数据到全局变量
+        allUsers = data.users;
+        console.log(`加载了 ${allUsers.length} 个用户`);
+
         const user = data.users[0];
-        statusItem.className = 'status-item ok';
-        statusItem.innerHTML = `<span class="status-icon">✅</span><span class="status-text">用户: ${user.name || user.user_id}</span>`;
+        if (statusItem) {
+            statusItem.className = 'status-item ok';
+            statusItem.innerHTML = `<span class="status-icon">✅</span><span class="status-text">用户: ${user.name || user.user_id}</span>`;
+        }
 
         // 检查是否有 Cookie 的用户
-        const cookieRes = await fetch('/api/cookies/check');
-        const cookieData = await cookieRes.json();
-        const cookieUserId = cookieData.user_id || null;
-        
-        console.log('Cookie 数据:', cookieData);
+        try {
+            const cookieRes = await fetch('/api/cookies/check');
+            const cookieData = await cookieRes.json();
+            cookieUserId = cookieData.user_id || null;
+            console.log('Cookie 数据:', cookieData);
+        } catch (cookieErr) {
+            console.warn('获取 Cookie 信息失败:', cookieErr);
+            cookieUserId = null;
+        }
 
-        // 使用新的用户卡片样式
-        list.innerHTML = data.users.map(u => `
-            <div class="user-card ${u.user_id === cookieUserId ? 'has-cookie' : ''}">
+        // 渲染用户列表
+        renderUsers(allUsers);
+    } catch (e) {
+        console.error('加载用户失败:', e);
+        const list = document.getElementById('users-list');
+        const statusItem = document.getElementById('status-user');
+        if (list) list.innerHTML = `<div class="empty-state">加载失败: ${e.message}</div>`;
+        if (statusItem) statusItem.innerHTML = '<span class="status-icon">❌</span><span class="status-text">用户: 加载失败</span>';
+    }
+}
+
+// 渲染用户列表
+function renderUsers(users) {
+    const list = document.getElementById('users-list');
+    const resultDiv = document.getElementById('user-search-result');
+    
+    console.log('渲染用户列表, 数据:', users);
+    
+    if (!users || users.length === 0) {
+        // 如果是初始加载（allUsers为空），显示加载中状态
+        if (allUsers.length === 0) {
+            list.innerHTML = '<div class="empty-state">加载中...</div>';
+        } else {
+            list.innerHTML = '<div class="empty-state">没有找到匹配的用户</div>';
+        }
+        if (resultDiv) resultDiv.style.display = 'none';
+        return;
+    }
+
+    // 使用新的用户卡片样式
+    list.innerHTML = users.map(u => {
+        const displayName = u.name || u.user_id;
+        const isCookieUser = u.user_id === cookieUserId;
+        
+        return `
+            <div class="user-card ${isCookieUser ? 'has-cookie' : ''}">
                 <div class="user-avatar">
-                    ${u.avatar_url ? `<img src="${u.avatar_url}" alt="${u.name || u.user_id}">` : (u.name ? u.name.charAt(0).toUpperCase() : u.user_id.charAt(0).toUpperCase())}
+                    ${u.avatar_url ? 
+                        `<img src="${u.avatar_url}" alt="${displayName}" onerror="this.parentElement.innerHTML='${getUserInitial(displayName)}'">` : 
+                        getUserInitial(displayName)
+                    }
                 </div>
                 <div class="user-info">
-                    <div class="user-name">${u.name || u.user_id}</div>
-                    <div class="user-id">@${u.user_id}</div>
-                    ${u.last_sync ? `<div class="user-sync">同步于: ${u.last_sync}</div>` : ''}
+                    <div class="user-name" title="${displayName}">${displayName}</div>
+                    <div class="user-id" title="@${u.user_id}">@${u.user_id}</div>
+                    ${u.last_sync ? `<div class="user-sync">同步于: ${formatSyncTime(u.last_sync)}</div>` : ''}
                 </div>
                 <div class="user-badges">
-                    ${u.user_id === cookieUserId ? '<span class="badge badge-success">已验证</span>' : ''}
+                    ${isCookieUser ? '<span class="badge badge-success" title="此用户已配置 Cookie">🍯 已验证</span>' : ''}
                     <button class="btn btn-sm btn-danger" onclick="removeUser('${u.user_id}')">删除</button>
                 </div>
             </div>
-        `).join('');
-    } catch (e) {
-        console.error('加载用户失败:', e);
+        `;
+    }).join('');
+    
+    // 更新搜索结果提示
+    if (resultDiv) {
+        if (users.length < allUsers.length) {
+            resultDiv.textContent = `显示 ${users.length} / ${allUsers.length} 个用户`;
+            resultDiv.style.display = 'block';
+        } else {
+            resultDiv.style.display = 'none';
+        }
     }
 }
+
+// 获取用户初始字母（用于头像占位符）
+function getUserInitial(name) {
+    if (!name) return '?';
+    // 提取第一个字符或字母
+    const first = name.charAt(0);
+    return first.toUpperCase();
+}
+
+// 格式化同步时间
+function formatSyncTime(syncTime) {
+    if (!syncTime) return '从未';
+    // 如果是时间戳或日期字符串，转换为相对时间
+    const date = new Date(syncTime);
+    if (!isNaN(date.getTime())) {
+        const now = new Date();
+        const diff = now - date;
+        const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+        if (days === 0) return '今天';
+        if (days === 1) return '昨天';
+        if (days < 30) return `${days}天前`;
+        if (days < 365) return `${Math.floor(days / 30)}个月前`;
+        return `${Math.floor(days / 365)}年前`;
+    }
+    return syncTime;
+}
+
+// 搜索用户
+function searchUsers() {
+    const searchInput = document.getElementById('user-search-input');
+    const keyword = searchInput.value.trim().toLowerCase();
+    
+    if (!keyword) {
+        renderUsers(allUsers);
+        return;
+    }
+    
+    const filtered = allUsers.filter(u => {
+        const nameMatch = (u.name || '').toLowerCase().includes(keyword);
+        const idMatch = (u.user_id || '').toLowerCase().includes(keyword);
+        return nameMatch || idMatch;
+    });
+    
+    renderUsers(filtered);
+}
+
+// 清除搜索
+function clearUserSearch() {
+    const searchInput = document.getElementById('user-search-input');
+    searchInput.value = '';
+    renderUsers(allUsers);
+}
+
+// 监听回车键搜索
+document.addEventListener('DOMContentLoaded', () => {
+    const searchInput = document.getElementById('user-search-input');
+    if (searchInput) {
+        searchInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                searchUsers();
+            }
+        });
+    }
+});
 
 async function addUser() {
     const userId = document.getElementById('new-user-id').value.trim();

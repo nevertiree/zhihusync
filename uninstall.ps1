@@ -6,6 +6,14 @@ if ($ExecutionContext.SessionState.LanguageMode -eq "FullLanguage") {
     $ErrorActionPreference = "Stop"
 }
 
+# 可能的镜像名称
+$DOCKER_IMAGES = @(
+    "nevertiree26/zhihusync:latest",
+    "nevertiree26/zhihusync",
+    "zhihusync:latest",
+    "zhihusync"
+)
+
 # 颜色输出函数
 function Write-Color {
     param(
@@ -85,7 +93,7 @@ function Get-DataDirFromContainer {
     }
 
     # 从容器的挂载点获取数据目录
-    # 查找形如 "Source": "C:\\Users\\xxx\\zhihusync\\data\\html" 的挂载
+    # 查找形如 "Source": "C:\Users\xxx\zhihusync\data\html" 的挂载
     $inspect = docker inspect $ContainerId 2>$null | ConvertFrom-Json
     if ($inspect -and $inspect.Mounts) {
         $htmlMount = $inspect.Mounts | Where-Object { $_.Destination -eq "/app/data/html" }
@@ -94,6 +102,21 @@ function Get-DataDirFromContainer {
             $dataDir = Split-Path $htmlMount.Source -Parent
             return $dataDir
         }
+    }
+    return $null
+}
+
+# 获取容器使用的镜像
+function Get-ImageFromContainer {
+    param([string]$ContainerId)
+
+    if ([string]::IsNullOrWhiteSpace($ContainerId)) {
+        return $null
+    }
+
+    $inspect = docker inspect $ContainerId 2>$null | ConvertFrom-Json
+    if ($inspect -and $inspect[0].Config) {
+        return $inspect[0].Config.Image
     }
     return $null
 }
@@ -162,6 +185,47 @@ function Configure-DataDir {
     }
 }
 
+# 询问是否备份数据
+function Ask-ForBackup {
+    if (-not $script:DATA_DIR -or -not (Test-Path $script:DATA_DIR)) {
+        return
+    }
+
+    # 计算数据目录大小
+    $dataSize = (Get-ChildItem $script:DATA_DIR -Recurse -ErrorAction SilentlyContinue |
+                Measure-Object -Property Length -Sum).Sum
+    $sizeString = if ($dataSize -gt 1GB) {
+        "{0:N2} GB" -f ($dataSize / 1GB)
+    } elseif ($dataSize -gt 1MB) {
+        "{0:N2} MB" -f ($dataSize / 1MB)
+    } else {
+        "{0:N2} KB" -f ($dataSize / 1KB)
+    }
+
+    Write-Host ""
+    Write-Color "📦 数据目录大小: $sizeString" "Cyan"
+    $backupChoice = Read-Host "是否在卸载前备份数据? [y/N]"
+
+    if ($backupChoice -match '^[Yy]$') {
+        $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
+        $backupDir = "$script:DATA_DIR.backup.$timestamp"
+        Write-Color "📁 备份数据到: $backupDir" "Blue"
+
+        try {
+            Copy-Item -Path $script:DATA_DIR -Destination $backupDir -Recurse -Force
+            Write-Color "✅ 数据备份成功" "Green"
+            $script:BACKUP_DIR = $backupDir
+        }
+        catch {
+            Write-Color "❌ 数据备份失败: $_" "Red"
+            $continueAnyway = Read-Host "是否继续卸载? [y/N]"
+            if ($continueAnyway -notmatch '^[Yy]$') {
+                exit 0
+            }
+        }
+    }
+}
+
 # 最终确认
 function Final-Confirm {
     param([string]$ContainerId)
@@ -174,6 +238,10 @@ function Final-Confirm {
 
     if ($ContainerId) {
         Write-Host "🐳 Docker 容器: zhihusync ($ContainerId)"
+        $image = Get-ImageFromContainer -ContainerId $ContainerId
+        if ($image) {
+            Write-Host "🖼️  容器镜像: $image"
+        }
     }
     else {
         Write-Host "🐳 Docker 容器: 未找到运行中的容器"
@@ -182,6 +250,10 @@ function Final-Confirm {
     if ($script:DATA_DIR) {
         Write-Host "📁 数据目录: $($script:DATA_DIR)"
         Write-Host "⚙️  配置目录: $($script:CONFIG_DIR)"
+    }
+
+    if ($script:BACKUP_DIR) {
+        Write-Host "💾 备份位置: $($script:BACKUP_DIR)"
     }
 
     Write-Host ""
@@ -194,6 +266,55 @@ function Final-Confirm {
         Write-Color "❌ 卸载已取消" "Yellow"
         exit 0
     }
+}
+
+# 查找并删除相关镜像
+function Find-AndRemoveImages {
+    Write-Color "🖼️  检查 Docker 镜像..." "Blue"
+
+    $foundImages = @()
+
+    # 查找所有可能的镜像
+    foreach ($img in $DOCKER_IMAGES) {
+        $exists = docker images --format "{{.Repository}}:{{.Tag}}" | Select-String -Pattern "^$([regex]::Escape($img))$" -Quiet
+        if ($exists) {
+            $foundImages += $img
+        }
+    }
+
+    # 同时查找没有标签的镜像（ dangling ）
+    $dangling = docker images --filter "dangling=true" --format "{{.ID}}" 2>$null
+
+    if ($foundImages.Count -eq 0 -and -not $dangling) {
+        Write-Color "   未找到相关镜像" "Cyan"
+        return
+    }
+
+    if ($foundImages.Count -gt 0) {
+        Write-Host ""
+        Write-Color "发现以下镜像:" "Cyan"
+        foreach ($img in $foundImages) {
+            Write-Host "   • $img"
+        }
+    }
+
+    Write-Host ""
+    $deleteImage = Read-Host "是否删除这些 Docker 镜像? [y/N]"
+    if ($deleteImage -match '^[Yy]$') {
+        foreach ($img in $foundImages) {
+            Write-Color "   删除: $img" "Blue"
+            docker rmi $img 2>$null | Out-Null
+        }
+
+        # 删除 dangling 镜像
+        if ($dangling) {
+            Write-Color "   清理悬空镜像..." "Blue"
+            $dangling | ForEach-Object { docker rmi $_ 2>$null | Out-Null }
+        }
+
+        Write-Color "✅ Docker 镜像已删除" "Green"
+    }
+    Write-Host ""
 }
 
 # 执行卸载
@@ -212,17 +333,8 @@ function Perform-Uninstall {
         Write-Host ""
     }
 
-    # 询问是否删除镜像
-    $images = docker images "nevertiree26/zhihusync" --format "{{.Repository}}:{{.Tag}}" 2>$null
-    if ($images) {
-        $deleteImage = Read-Host "是否删除 Docker 镜像? [y/N]"
-        if ($deleteImage -match '^[Yy]$') {
-            Write-Color "🖼️  删除 Docker 镜像..." "Blue"
-            docker rmi nevertiree26/zhihusync:latest 2>$null | Out-Null
-            Write-Color "✅ Docker 镜像已删除" "Green"
-            Write-Host ""
-        }
-    }
+    # 删除镜像
+    Find-AndRemoveImages
 
     # 删除数据目录
     if ($script:DATA_DIR -and (Test-Path $script:DATA_DIR)) {
@@ -241,9 +353,17 @@ function Perform-Uninstall {
 ╚═══════════════════════════════════════════════════════════╝
 "@ "Green"
     Write-Host ""
+
+    if ($script:BACKUP_DIR) {
+        Write-Color "💾 数据已备份到:" "Cyan"
+        Write-Host "   $($script:BACKUP_DIR)"
+        Write-Host ""
+    }
+
     Write-Color "📋 残留检查清单:" "Cyan"
     Write-Host "   • Docker 卷: docker volume ls | findstr zhihusync"
     Write-Host "   • 网络配置: docker network ls | findstr zhihusync"
+    Write-Host "   • 所有镜像: docker images | findstr zhihusync"
     Write-Host ""
     Write-Color "如需重新安装，请访问:" "Yellow"
     Write-Host "   https://github.com/nevertiree/zhihusync"
@@ -268,6 +388,9 @@ function Main {
         Write-Color "❌ 卸载已取消" "Yellow"
         exit 0
     }
+
+    # 询问是否备份
+    Ask-ForBackup
 
     # 最终确认
     Final-Confirm -ContainerId $script:CONTAINER_ID
