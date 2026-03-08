@@ -254,6 +254,51 @@ mypy src/   # 类型检查
 
 ---
 
+## 🌿 Git Workflow (Git Flow)
+
+本项目使用 **Git Flow** 工作流，严禁直接 push 到 `master` 分支。
+
+### 分支规则
+
+| 分支 | 用途 | 保护规则 |
+|------|------|----------|
+| `master` | 生产环境代码 | 禁止直接 push，禁止 force push，必须通过 PR 合并 |
+| `develop` | 开发集成分支 | 禁止直接 push，必须通过 PR 合并 |
+| `feature/*` | 功能开发分支 | 可自由 push |
+| `hotfix/*` | 紧急修复分支 | 可自由 push |
+
+### 开发流程
+
+1. **从 master 创建 feature 分支**
+   ```bash
+   git checkout master
+   git pull origin master
+   git checkout -b feature/your-feature-name
+   ```
+
+2. **开发和提交**
+   ```bash
+   git add .
+   git commit -m "feat: xxx"
+   git push -u origin feature/your-feature-name
+   ```
+
+3. **创建 Pull Request**
+   - 在 GitHub 上创建 PR，从 `feature/*` 合并到 `master`
+   - 等待代码审查（需要 1 个 approval）
+   - 合并后删除 feature 分支
+
+### Remote 配置
+
+- `origin`: 自托管 Git 服务器 (192.168.50.2:8822)
+- `github`: GitHub (github.com/nevertiree/zhihusync)
+
+推送顺序：
+1. 先 push 到 `origin`（自托管服务器）
+2. 再通过 PR 合并到 `github/master`
+
+---
+
 ## 📚 参考文档
 
 - [pre-commit 文档](https://pre-commit.com/)
