@@ -30,6 +30,7 @@ app_state: dict[str, Any] = {
     "sync_message": "",
     "last_sync": None,
     "stop_requested": False,  # 停止请求标志
+    "cookie_info": None,  # 缓存的 cookie 验证信息
 }
 
 # 加载配置
@@ -561,25 +562,47 @@ async def update_cookies(cookie_update: CookieUpdate):
 
 @app.get("/api/cookies/check")
 async def check_cookies():
-    """检查 Cookie 是否存在"""
+    """检查 Cookie 是否存在，返回详细信息"""
     cookie_file = get_cookie_file_path()
     exists = cookie_file.exists()
 
-    if exists:
-        try:
-            with open(cookie_file, encoding="utf-8") as f:
-                data = json.load(f)
-            # 检查是否有 cookies (支持数组或对象格式)
-            has_cookies = False
-            if isinstance(data, list) and len(data) > 0:
-                has_cookies = True
-            elif isinstance(data, dict):
-                has_cookies = bool(data.get("cookies")) or bool(data.get("origins"))
-            return {"exists": True, "valid": has_cookies}
-        except Exception:
-            return {"exists": True, "valid": False}
+    if not exists:
+        return {"exists": False, "valid": False}
 
-    return {"exists": False, "valid": False}
+    try:
+        with open(cookie_file, encoding="utf-8") as f:
+            data = json.load(f)
+        # 检查是否有 cookies (支持数组或对象格式)
+        has_cookies = False
+        if isinstance(data, list) and len(data) > 0:
+            has_cookies = True
+        elif isinstance(data, dict):
+            has_cookies = bool(data.get("cookies")) or bool(data.get("origins"))
+
+        # 获取文件修改时间作为添加时间
+        stat = cookie_file.stat()
+        added_time = datetime.fromtimestamp(stat.st_mtime).isoformat()
+
+        # 获取缓存的用户信息
+        cookie_info = app_state.get("cookie_info", {})
+
+        return {
+            "exists": True,
+            "valid": has_cookies,
+            "user_id": cookie_info.get("user_id"),
+            "user_name": cookie_info.get("user_name"),
+            "added_time": added_time,
+            "is_logged_in": cookie_info.get("is_logged_in", False),
+        }
+    except Exception:
+        return {
+            "exists": True,
+            "valid": False,
+            "user_id": None,
+            "user_name": None,
+            "added_time": None,
+            "is_logged_in": False,
+        }
 
 
 @app.post("/api/cookies/test")
@@ -615,6 +638,12 @@ async def test_cookies():
             result = await crawler.test_login()
 
             if result.get("is_logged_in"):
+                # 缓存 cookie 信息
+                app_state["cookie_info"] = {
+                    "user_id": result.get("user_id"),
+                    "user_name": result.get("user_name"),
+                    "is_logged_in": True,
+                }
                 return {
                     "status": "success",
                     "is_logged_in": True,
@@ -623,6 +652,8 @@ async def test_cookies():
                     "message": result.get("message", "登录有效"),
                 }
             else:
+                # 清除缓存
+                app_state["cookie_info"] = None
                 return {
                     "status": "error",
                     "is_logged_in": False,

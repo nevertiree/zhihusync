@@ -47,25 +47,30 @@
 
 <!-- Cookie 配置 - 左右两栏布局 -->
 <div class="tab-content active" id="tab-cookie">
-    <!-- Cookie 信息显示区域（验证成功后显示） -->
+    <!-- Cookie 信息卡片 -->
     <div id="cookie-info-display" style="display: none; margin-bottom: 20px;">
-        <div class="card" style="border: 2px solid var(--success); background: linear-gradient(135deg, rgba(82, 196, 26, 0.05) 0%, rgba(82, 196, 26, 0.1) 100%);">
+        <div class="card" id="cookie-info-card" style="border: 2px solid var(--success); background: linear-gradient(135deg, rgba(82, 196, 26, 0.05) 0%, rgba(82, 196, 26, 0.12) 100%);">
             <div class="card-body" style="padding: 16px 20px;">
                 <div style="display: flex; align-items: center; gap: 16px;">
-                    <div style="width: 48px; height: 48px; background: var(--success); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 24px;">✅</div>
+                    <div id="cookie-status-icon" style="width: 48px; height: 48px; background: var(--success); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 24px;">✅</div>
                     <div style="flex: 1;">
                         <div style="font-weight: 600; color: var(--text-primary); font-size: 15px; margin-bottom: 4px;">
-                            Cookie 已验证并添加
+                            <span id="cookie-card-title">Cookie 已配置</span>
                         </div>
-                        <div style="color: var(--text-secondary); font-size: 13px;">
-                            <span id="cookie-user-name" style="font-weight: 500; color: var(--success);"></span>
-                            <span id="cookie-user-id" style="color: var(--text-muted); margin-left: 8px;"></span>
-                            <span style="color: var(--text-muted); margin: 0 8px;">|</span>
-                            <span id="cookie-add-time" style="color: var(--text-muted);"></span>
+                        <div style="color: var(--text-secondary); font-size: 13px; line-height: 1.6;">
+                            <div>
+                                <span style="color: var(--text-muted);">用户:</span>
+                                <span id="cookie-user-name" style="font-weight: 500; color: var(--text-primary);">-</span>
+                                <span id="cookie-user-id" style="color: var(--text-muted); margin-left: 8px;"></span>
+                            </div>
+                            <div style="margin-top: 2px;">
+                                <span style="color: var(--text-muted);">添加时间:</span>
+                                <span id="cookie-add-time" style="color: var(--text-secondary);">-</span>
+                            </div>
                         </div>
                     </div>
                     <div style="text-align: right;">
-                        <span class="badge badge-success" style="font-size: 12px;">已验证</span>
+                        <span id="cookie-verify-badge" class="badge badge-success" style="font-size: 12px;">已配置</span>
                     </div>
                 </div>
             </div>
@@ -111,6 +116,9 @@
                     <div class="btn-group" style="display: flex; gap: 12px; justify-content: flex-end;">
                         <button class="btn btn-danger" onclick="clearCookie()">
                             <span>🗑️</span> 清除
+                        </button>
+                        <button class="btn btn-secondary" onclick="verifyCookie()">
+                            <span>🔍</span> 验证
                         </button>
                         <button class="btn btn-primary" id="save-cookie-btn" onclick="saveAndValidateCookie()">
                             <span>💾</span> 保存并验证
@@ -316,25 +324,15 @@
 <!-- 用户配置 -->
 <div class="tab-content" id="tab-user">
     <div class="card">
-        <div class="card-header">
-            <h3>➕ 添加用户</h3>
-        </div>
-        <div class="card-body compact">
-            <div class="input-group">
-                <input type="text" class="form-input" id="new-user-id" placeholder="知乎用户 ID，例如: zhang-san-123">
-                <button class="btn btn-primary" onclick="addUser()">添加</button>
-            </div>
-            <p class="form-help">从知乎个人主页 URL 获取，/people/ 后面的部分</p>
-        </div>
-    </div>
-
-    <div class="card">
         <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
             <h3>📋 用户列表</h3>
-            <div class="user-search-box" style="display: flex; gap: 8px;">
-                <input type="text" id="user-search-input" class="form-input" placeholder="搜索用户名或ID..." style="width: 200px; padding: 6px 12px; font-size: 13px;">
-                <button class="btn btn-sm btn-secondary" onclick="searchUsers()">搜索</button>
-                <button class="btn btn-sm" onclick="clearUserSearch()" style="background: var(--bg-hover); color: var(--text-secondary);">重置</button>
+            <div style="display: flex; gap: 8px; align-items: center;">
+                <div class="user-search-box" style="display: flex; gap: 8px;">
+                    <input type="text" id="user-search-input" class="form-input" placeholder="搜索用户名或ID..." style="width: 180px; padding: 6px 12px; font-size: 13px;">
+                    <button class="btn btn-sm btn-secondary" onclick="searchUsers()">搜索</button>
+                    <button class="btn btn-sm" onclick="clearUserSearch()" style="background: var(--bg-hover); color: var(--text-secondary);">重置</button>
+                </div>
+                <button class="btn btn-primary btn-sm" onclick="showAddUserModal()">➕ 添加用户</button>
             </div>
         </div>
         <div class="card-body compact">
@@ -743,6 +741,40 @@
             </ol>
             <div style="margin-top: 20px; text-align: center;">
                 <button class="btn btn-primary" onclick="document.getElementById('extension-modal').style.display='none'" style="padding: 10px 24px;">知道了</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 添加用户模态框 -->
+<div id="add-user-modal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 9999; align-items: center; justify-content: center;">
+    <div style="background: white; border-radius: 12px; width: 90%; max-width: 480px; max-height: 80vh; overflow: auto; position: relative;">
+        <div style="padding: 16px 20px; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center;">
+            <h3 style="margin: 0; font-size: 18px;">➕ 添加用户</h3>
+            <button onclick="closeAddUserModal()" style="width: 32px; height: 32px; border: none; background: #f3f4f6; border-radius: 6px; cursor: pointer; font-size: 18px; display: flex; align-items: center; justify-content: center;">✕</button>
+        </div>
+        <div style="padding: 20px;">
+            <div style="margin-bottom: 20px;">
+                <label style="display: block; font-size: 14px; font-weight: 500; color: var(--text-primary); margin-bottom: 8px;">知乎用户 ID</label>
+                <input type="text" id="modal-user-id" class="form-input" placeholder="例如: zhang-san-123" style="width: 100%; box-sizing: border-box;">
+            </div>
+            
+            <div style="background: var(--bg-tertiary); border-radius: 8px; padding: 16px; margin-bottom: 20px;">
+                <h4 style="margin: 0 0 12px 0; font-size: 14px; color: var(--text-primary);">📖 如何获取用户 ID</h4>
+                <ol style="margin: 0; padding-left: 20px; font-size: 13px; color: var(--text-secondary); line-height: 1.8;">
+                    <li>打开知乎并登录 <a href="https://www.zhihu.com" target="_blank">zhihu.com</a></li>
+                    <li>点击头像 → 我的主页</li>
+                    <li>查看地址栏 URL: <code style="background: var(--bg-secondary); padding: 2px 6px; border-radius: 4px;">zhihu.com/people/<b>xxxxx</b></code></li>
+                    <li><b>xxxxx</b> 就是用户 ID</li>
+                </ol>
+                <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border-color); font-size: 13px; color: var(--text-muted);">
+                    💡 示例: <code>zhang-san-123</code>、<code>wang-wu</code>
+                </div>
+            </div>
+            
+            <div style="display: flex; gap: 12px; justify-content: flex-end;">
+                <button class="btn" onclick="closeAddUserModal()" style="background: var(--bg-hover); color: var(--text-secondary);">取消</button>
+                <button class="btn btn-primary" onclick="addUserFromModal()">添加</button>
             </div>
         </div>
     </div>
@@ -1577,8 +1609,8 @@ async function saveAndValidateCookie() {
                 autoAddSuccess = await autoAddUser(testData.user_id, testData.user_name);
             }
             
-            // 显示 Cookie 信息在页面顶部
-            showCookieInfo(testData.user_name, testData.user_id);
+            // 显示 Cookie 信息在页面顶部（验证成功）
+            showCookieInfo(testData.user_name, testData.user_id, new Date().toISOString(), true);
             
             // 验证成功
             resultDiv.style.display = 'block';
@@ -1631,21 +1663,59 @@ async function saveAndValidateCookie() {
 }
 
 // 显示 Cookie 信息
-function showCookieInfo(userName, userId) {
+// 显示 Cookie 信息卡片
+function showCookieInfo(userName, userId, addedTime, isLoggedIn) {
     const infoDiv = document.getElementById('cookie-info-display');
+    const card = document.getElementById('cookie-info-card');
+    const title = document.getElementById('cookie-card-title');
+    const icon = document.getElementById('cookie-status-icon');
     const nameSpan = document.getElementById('cookie-user-name');
     const idSpan = document.getElementById('cookie-user-id');
     const timeSpan = document.getElementById('cookie-add-time');
+    const badge = document.getElementById('cookie-verify-badge');
     
-    if (infoDiv && nameSpan && idSpan && timeSpan) {
-        nameSpan.textContent = userName || '未知用户';
-        idSpan.textContent = userId ? `(@${userId})` : '';
-        timeSpan.textContent = `添加时间: ${new Date().toLocaleString('zh-CN')}`;
-        infoDiv.style.display = 'block';
-        
-        // 滚动到页面顶部
-        infoDiv.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (!infoDiv) return;
+    
+    // 设置内容
+    nameSpan.textContent = userName || '未知用户';
+    idSpan.textContent = userId ? `(@${userId})` : '';
+    
+    // 格式化添加时间
+    if (addedTime) {
+        const date = new Date(addedTime);
+        timeSpan.textContent = date.toLocaleString('zh-CN', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+    } else {
+        timeSpan.textContent = '-';
     }
+    
+    // 根据验证状态设置样式
+    if (isLoggedIn) {
+        // 已验证
+        card.style.borderColor = 'var(--success)';
+        card.style.background = 'linear-gradient(135deg, rgba(82, 196, 26, 0.05) 0%, rgba(82, 196, 26, 0.12) 100%)';
+        icon.style.background = 'var(--success)';
+        icon.textContent = '✅';
+        title.textContent = 'Cookie 已验证';
+        badge.className = 'badge badge-success';
+        badge.textContent = '已验证';
+    } else {
+        // 未验证/仅配置
+        card.style.borderColor = 'var(--warning)';
+        card.style.background = 'linear-gradient(135deg, rgba(250, 173, 20, 0.05) 0%, rgba(250, 173, 20, 0.1) 100%)';
+        icon.style.background = 'var(--warning)';
+        icon.textContent = '🍪';
+        title.textContent = 'Cookie 已配置';
+        badge.className = 'badge badge-warning';
+        badge.textContent = '待验证';
+    }
+    
+    infoDiv.style.display = 'block';
 }
 
 // 等待提示框相关函数
@@ -1804,7 +1874,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // 检查 Cookie 状态 - 页面加载时调用
 async function checkCookieStatus() {
     try {
-        // 先检查是否存在
+        // 只检查是否存在，不进行在线验证（避免刷新时延迟）
         const checkRes = await fetch('/api/cookies/check');
         const checkData = await checkRes.json();
         
@@ -1821,20 +1891,48 @@ async function checkCookieStatus() {
                 statusItem.className = 'status-item';
                 statusItem.innerHTML = '<span class="status-icon">🍪</span><span class="status-text">Cookie: 未配置</span>';
             }
+            // 隐藏 cookie 信息卡片
+            document.getElementById('cookie-info-display').style.display = 'none';
             return;
         }
         
-        // 存在则进行真实验证
+        // 存在则显示已配置状态，不进行在线验证
         if (badge) {
-            badge.className = 'badge';
-            badge.textContent = '验证中...';
+            badge.className = 'badge badge-success';
+            badge.textContent = '已配置';
+        }
+        if (statusItem) {
+            statusItem.className = 'status-item ok';
+            statusItem.innerHTML = '<span class="status-icon">✅</span><span class="status-text">Cookie: 已配置</span>';
         }
         
+        // 显示 cookie 信息卡片
+        showCookieInfo(
+            checkData.user_name,
+            checkData.user_id,
+            checkData.added_time,
+            checkData.is_logged_in
+        );
+    } catch (e) {
+        console.error('检查 Cookie 失败:', e);
+    }
+}
+
+// 手动验证 Cookie（用户点击验证按钮时调用）
+async function verifyCookie() {
+    const badge = document.getElementById('cookie-status-badge') || document.getElementById('cookie-badge');
+    const statusItem = document.getElementById('status-cookie');
+    
+    if (badge) {
+        badge.className = 'badge';
+        badge.textContent = '验证中...';
+    }
+    
+    try {
         const testRes = await fetch('/api/cookies/test', { method: 'POST' });
         const testData = await testRes.json();
         
         if (testData.is_logged_in) {
-            // 验证成功
             if (badge) {
                 badge.className = 'badge badge-success';
                 badge.textContent = '✅ 有效';
@@ -1843,8 +1941,11 @@ async function checkCookieStatus() {
                 statusItem.className = 'status-item ok';
                 statusItem.innerHTML = '<span class="status-icon">✅</span><span class="status-text">Cookie: 正常</span>';
             }
+            if (testData.user_name || testData.user_id) {
+                showCookieInfo(testData.user_name, testData.user_id, new Date().toISOString(), true);
+            }
+            showToast('Cookie 验证通过', 'success');
         } else {
-            // 验证失败
             if (badge) {
                 badge.className = 'badge badge-danger';
                 badge.textContent = '❌ 失效';
@@ -1853,9 +1954,11 @@ async function checkCookieStatus() {
                 statusItem.className = 'status-item warning';
                 statusItem.innerHTML = '<span class="status-icon">⚠️</span><span class="status-text">Cookie: 需更新</span>';
             }
+            showToast('Cookie 已失效，请重新配置', 'warning');
         }
     } catch (e) {
-        console.error('检查 Cookie 失败:', e);
+        console.error('验证 Cookie 失败:', e);
+        showToast('验证失败，请检查网络', 'error');
     }
 }
 
@@ -2066,8 +2169,48 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
+// 添加用户模态框控制
+function showAddUserModal() {
+    document.getElementById('add-user-modal').style.display = 'flex';
+    // 自动聚焦输入框
+    setTimeout(() => document.getElementById('modal-user-id').focus(), 100);
+}
+
+function closeAddUserModal() {
+    document.getElementById('add-user-modal').style.display = 'none';
+    document.getElementById('modal-user-id').value = '';
+}
+
+async function addUserFromModal() {
+    const userId = document.getElementById('modal-user-id').value.trim();
+    if (!userId) {
+        showToast('请输入用户 ID', 'warning');
+        return;
+    }
+
+    try {
+        const res = await fetch('/api/users', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_id: userId })
+        });
+
+        if (res.ok) {
+            showToast('用户添加成功', 'success');
+            closeAddUserModal();
+            loadUsers();
+        } else {
+            const data = await res.json();
+            showToast(data.detail || '添加失败', 'error');
+        }
+    } catch (e) {
+        showToast('添加失败', 'error');
+    }
+}
+
+// 兼容旧版添加方式（从输入框）
 async function addUser() {
-    const userId = document.getElementById('new-user-id').value.trim();
+    const userId = document.getElementById('new-user-id')?.value.trim() || document.getElementById('modal-user-id')?.value.trim();
     if (!userId) return showToast('请输入用户 ID', 'warning');
 
     try {
@@ -2079,7 +2222,8 @@ async function addUser() {
 
         if (res.ok) {
             showToast('用户添加成功', 'success');
-            document.getElementById('new-user-id').value = '';
+            const oldInput = document.getElementById('new-user-id');
+            if (oldInput) oldInput.value = '';
             loadUsers();
         } else {
             const data = await res.json();
