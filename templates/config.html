@@ -1733,6 +1733,10 @@ function showCookieInfo(userName, userId, addedTime, isLoggedIn) {
     
     if (!infoDiv) return;
     
+    // 区分已配置和已验证状态
+    // isLoggedIn === true: 验证成功
+    // isLoggedIn === false: 已保存但未验证或验证失败
+    
     // 设置内容
     nameSpan.textContent = userName || '未知用户';
     idSpan.textContent = userId ? `(@${userId})` : '';
@@ -1762,14 +1766,14 @@ function showCookieInfo(userName, userId, addedTime, isLoggedIn) {
         badge.className = 'badge badge-success';
         badge.textContent = '已验证';
     } else {
-        // 未验证/仅配置
-        card.style.borderColor = 'var(--warning)';
-        card.style.background = 'linear-gradient(135deg, rgba(250, 173, 20, 0.05) 0%, rgba(250, 173, 20, 0.1) 100%)';
-        icon.style.background = 'var(--warning)';
+        // 已配置但未验证（保存成功但验证未通过或未验证）
+        card.style.borderColor = 'var(--info)';
+        card.style.background = 'linear-gradient(135deg, rgba(24, 144, 255, 0.05) 0%, rgba(24, 144, 255, 0.1) 100%)';
+        icon.style.background = 'var(--info)';
         icon.textContent = '🍪';
         title.textContent = 'Cookie 已配置';
-        badge.className = 'badge badge-warning';
-        badge.textContent = '待验证';
+        badge.className = 'badge badge-info';
+        badge.textContent = '已配置';
     }
     
     infoDiv.style.display = 'block';

@@ -658,6 +658,8 @@ async def update_cookies(cookie_update: CookieUpdate):
                 "domains": list(cookie_domains),
                 "cookie_count": cookie_count,
                 "valid": is_valid,
+                "is_logged_in": False,  # 已保存但未验证
+                "added_time": datetime.now().isoformat(),
             }
         )
 
