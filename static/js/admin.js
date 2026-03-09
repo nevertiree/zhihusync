@@ -142,7 +142,25 @@ document.addEventListener('DOMContentLoaded', function() {
             setTimeout(() => alert.remove(), 300);
         }, 3000);
     });
+
+    // 获取并更新同步状态
+    fetchSyncStatus();
+    // 每 5 秒刷新一次状态
+    setInterval(fetchSyncStatus, 5000);
 });
+
+// 获取同步状态
+async function fetchSyncStatus() {
+    try {
+        const res = await fetch('/api/sync/status');
+        if (res.ok) {
+            const data = await res.json();
+            updateSidebarStatus(data.status);
+        }
+    } catch (e) {
+        console.error('获取同步状态失败:', e);
+    }
+}
 
 // 键盘快捷键
 document.addEventListener('keydown', function(e) {
