@@ -817,53 +817,69 @@ async def get_storage_mounts():
         # 检查是否在 Docker 环境中
         in_docker = Path("/.dockerenv").exists() or os.environ.get("ZHIHUSYNC_ENV") == "docker"
 
+        # 解析 mountinfo 获取挂载映射
+        mount_mappings = {}
         if in_docker:
-            # 读取 /proc/self/mountinfo 获取挂载信息
-            mount_info = []
             try:
                 with open("/proc/self/mountinfo", encoding="utf-8") as f:
                     for line in f:
                         parts = line.strip().split()
                         if len(parts) >= 10:
                             # mountinfo 格式: ID parentID major:minor root mount_point mount_options... separator fs_type source super_options
-                            # 找到 docker 相关的挂载
                             mount_point = parts[4]
                             root = parts[3]
-                            if mount_point.startswith("/app/data") or mount_point.startswith("/app/config"):
-                                mount_info.append(
-                                    {
-                                        "container_path": mount_point,
-                                        "host_path": root if root != "/" else mount_point,
-                                    }
-                                )
-            except Exception:
-                pass
+                            # 只关注 /app 相关的挂载
+                            if mount_point.startswith("/app/"):
+                                mount_mappings[mount_point] = root if root != "/" else mount_point
+            except Exception as e:
+                logger.warning(f"读取 mountinfo 失败: {e}")
 
-        # 构建存储路径映射
+        # 构建存储路径映射（包含内外路径）
+        def get_host_path(container_path: str) -> str:
+            """根据容器路径获取宿主机路径."""
+            # 尝试找到匹配的挂载点
+            for container_mount, host_mount in sorted(mount_mappings.items(), key=lambda x: -len(x[0])):
+                if container_path.startswith(container_mount):
+                    relative = container_path[len(container_mount) :].lstrip("/")
+                    if relative:
+                        return f"{host_mount}/{relative}"
+                    return host_mount
+            return container_path
+
         mounts = {
             "html": {
                 "container_path": config.storage.html_path,
+                "host_path": get_host_path(config.storage.html_path),
                 "description": "HTML 文件存储",
             },
             "db": {
                 "container_path": config.storage.db_path,
+                "host_path": get_host_path(config.storage.db_path),
                 "description": "数据库文件",
             },
             "static": {
                 "container_path": config.storage.static_path,
+                "host_path": get_host_path(config.storage.static_path),
                 "description": "静态资源文件",
             },
             "images": {
                 "container_path": config.storage.images_path,
+                "host_path": get_host_path(config.storage.images_path),
                 "description": "图片文件",
             },
-            "cookie": {
-                "container_path": str(get_cookie_file_path()),
-                "description": "Cookie 文件",
+            "data_root": {
+                "container_path": "/app/data",
+                "host_path": mount_mappings.get("/app/data", "/app/data"),
+                "description": "数据根目录",
+            },
+            "config_root": {
+                "container_path": "/app/config",
+                "host_path": mount_mappings.get("/app/config", "/app/config"),
+                "description": "配置目录",
             },
         }
 
-        # 尝试从环境变量获取 Docker 挂载信息
+        # 尝试从环境变量获取 Docker 挂载信息（用户自定义映射）
         docker_mounts = {}
         for key, value in os.environ.items():
             if key.startswith("DOCKER_MOUNT_"):
@@ -874,7 +890,7 @@ async def get_storage_mounts():
             "in_docker": in_docker,
             "mounts": mounts,
             "docker_mounts": docker_mounts,
-            "mount_info": mount_info if in_docker else [],
+            "mount_mappings": mount_mappings,
             "hostname": hostname,
         }
     except Exception as e:
