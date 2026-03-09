@@ -132,6 +132,7 @@ class AppConfig(BaseSettings):
         storage: 存储相关配置.
         browser: 浏览器相关配置.
         logging: 日志相关配置.
+        cookie_info: Cookie信息（可选）.
 
     Examples:
         >>> config = AppConfig()
@@ -143,6 +144,7 @@ class AppConfig(BaseSettings):
     storage: StorageConfig = Field(default_factory=StorageConfig)
     browser: BrowserConfig = Field(default_factory=BrowserConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
+    cookie_info: dict | None = None  # Cookie信息，从配置文件加载
 
     class Config:
         """Pydantic配置类."""
