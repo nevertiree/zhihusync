@@ -125,23 +125,46 @@ class StorageManager:
     def get_answer_filepath(self, answer_id: str, question_title: str, content: str | None = None) -> Path:
         """生成回答文件路径.
 
-        格式: {html_path}/{question_title}_{hash}_{answer_id}.html
+        格式: {html_path}/{question_title}_{answer_id}.html
+        注意: 不再使用内容哈希，确保同一 answer_id 只有一个文件，避免重复
 
         Args:
             answer_id: 回答ID.
             question_title: 问题标题.
-            content: 文件内容(用于生成哈希).
+            content: 文件内容(已废弃，保留参数兼容).
 
         Returns:
             Path: 生成的文件路径.
         """
         safe_title = self._sanitize_filename(question_title)
-        if content:
-            content_hash = self._generate_file_hash(content)
-            filename = f"{safe_title}_{content_hash}_{answer_id}.html"
-        else:
-            filename = f"{safe_title}_{answer_id}.html"
+        filename = f"{safe_title}_{answer_id}.html"
         return self.html_path / filename
+
+    def cleanup_duplicate_files(self, answer_id: str, keep_filepath: Path | None = None) -> int:
+        """清理同一 answer_id 的重复文件（旧格式基于哈希的文件名）.
+
+        Args:
+            answer_id: 回答ID.
+            keep_filepath: 保留的文件路径（如果不为None，则不删除此文件）.
+
+        Returns:
+            int: 删除的文件数量.
+        """
+        pattern = f"*_{answer_id}.html"
+        matches = list(self.html_path.glob(pattern))
+        deleted = 0
+
+        for file_path in matches:
+            if keep_filepath and file_path.resolve() == keep_filepath.resolve():
+                continue
+            try:
+                file_path.unlink()
+                deleted += 1
+                logger.info(f"删除重复文件: {file_path.name}")
+            except Exception as e:
+                logger.warning(f"删除文件失败 {file_path}: {e}")
+
+        return deleted
 
     async def save_answer(
         self,
@@ -175,12 +198,17 @@ class StorageManager:
         # 处理 HTML 并下载图片
         processed_html = await self._process_html(full_html, answer_id)
 
-        # 生成文件路径
-        filepath = self.get_answer_filepath(answer_id, question_title, html_content)
+        # 生成文件路径（不再使用内容哈希，避免重复文件）
+        filepath = self.get_answer_filepath(answer_id, question_title)
 
-        # 保存文件
+        # 保存文件（直接覆盖，确保同一 answer_id 只有一个文件）
         async with aiofiles.open(filepath, "w", encoding="utf-8") as f:
             await f.write(processed_html)
+
+        # 清理同一 answer_id 的重复文件（旧格式基于哈希的文件名）
+        deleted_count = self.cleanup_duplicate_files(answer_id, keep_filepath=filepath)
+        if deleted_count > 0:
+            logger.info(f"清理了 {deleted_count} 个重复文件 for answer {answer_id}")
 
         logger.info(f"保存 HTML: {filepath}")
         return str(filepath)
@@ -945,20 +973,15 @@ body {{
 
         Args:
             answer_id: 回答ID.
-            content: 内容(用于匹配哈希).
+            content: 内容(已废弃，保留参数兼容).
 
         Returns:
             bool: 存在返回True.
         """
-        pattern = f"*{answer_id}.html"
+        # 文件名格式: {title}_{answer_id}.html
+        pattern = f"*_{answer_id}.html"
         matches = list(self.html_path.glob(pattern))
-
-        if not matches or not content:
-            return bool(matches)
-
-        # 检查内容哈希
-        content_hash = self._generate_file_hash(content)
-        return any(content_hash in match.name for match in matches)
+        return bool(matches)
 
     def get_storage_stats(self) -> dict:
         """获取存储统计.
