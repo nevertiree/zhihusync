@@ -459,6 +459,50 @@
         </div>
     </div>
 
+    <!-- 下载设置 -->
+    <div class="card">
+        <div class="card-header">
+            <h3>⬇️ 下载设置</h3>
+        </div>
+        <div class="card-body compact">
+            <form id="storage-form">
+                <div class="form-row-4">
+                    <div class="form-group">
+                        <label>下载图片</label>
+                        <select class="form-select" id="download-images">
+                            <option value="true">是</option>
+                            <option value="false">否</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>下载头像</label>
+                        <select class="form-select" id="download-avatars">
+                            <option value="true">是</option>
+                            <option value="false">否</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>压缩 HTML</label>
+                        <select class="form-select" id="compress-html">
+                            <option value="true">是</option>
+                            <option value="false" selected>否</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>保留原始数据</label>
+                        <select class="form-select" id="save-raw">
+                            <option value="true">是</option>
+                            <option value="false" selected>否</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">保存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <div class="card">
         <div class="card-header">
             <h3>🌐 浏览器设置</h3>
@@ -508,159 +552,151 @@
 
 <!-- 存储配置 -->
 <div class="tab-content" id="tab-storage">
-    <!-- Docker 挂载信息 -->
-    <div class="card" id="docker-mount-card" style="display: none;">
+    <!-- 存储路径配置（整合 Docker 存储映射） -->
+    <div class="card" id="storage-config-card">
         <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
-            <h3>🐳 Docker 存储映射</h3>
-            <span class="badge badge-info">当前挂载</span>
-        </div>
-        <div class="card-body compact">
-            <div id="docker-mount-info">
-                <!-- HTML 路径 -->
-                <div class="storage-mount-item" style="padding: 12px; background: var(--bg-tertiary); border-radius: 8px; margin-bottom: 8px;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                        <span style="font-weight: 600; color: var(--text-primary);">📄 HTML 文件</span>
-                        <span class="badge badge-success">已挂载</span>
-                    </div>
-                    <div style="display: grid; grid-template-columns: 80px 1fr; gap: 8px; font-size: 13px;">
-                        <span style="color: var(--text-muted);">容器内:</span>
-                        <code id="mount-html-container" style="font-family: monospace; color: var(--primary-color);">/app/data/html</code>
-                        <span style="color: var(--text-muted);">宿主机:</span>
-                        <code id="mount-html-host" style="font-family: monospace; color: var(--success);">-</code>
-                    </div>
-                </div>
-                <!-- 数据库路径 -->
-                <div class="storage-mount-item" style="padding: 12px; background: var(--bg-tertiary); border-radius: 8px; margin-bottom: 8px;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                        <span style="font-weight: 600; color: var(--text-primary);">🗄️ 数据库</span>
-                        <span class="badge badge-success">已挂载</span>
-                    </div>
-                    <div style="display: grid; grid-template-columns: 80px 1fr; gap: 8px; font-size: 13px;">
-                        <span style="color: var(--text-muted);">容器内:</span>
-                        <code id="mount-db-container" style="font-family: monospace; color: var(--primary-color);">/app/data/meta</code>
-                        <span style="color: var(--text-muted);">宿主机:</span>
-                        <code id="mount-db-host" style="font-family: monospace; color: var(--success);">-</code>
-                    </div>
-                </div>
-                <!-- 静态资源路径 -->
-                <div class="storage-mount-item" style="padding: 12px; background: var(--bg-tertiary); border-radius: 8px; margin-bottom: 8px;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                        <span style="font-weight: 600; color: var(--text-primary);">📦 静态资源</span>
-                        <span class="badge badge-success">已挂载</span>
-                    </div>
-                    <div style="display: grid; grid-template-columns: 80px 1fr; gap: 8px; font-size: 13px;">
-                        <span style="color: var(--text-muted);">容器内:</span>
-                        <code id="mount-static-container" style="font-family: monospace; color: var(--primary-color);">/app/data/static</code>
-                        <span style="color: var(--text-muted);">宿主机:</span>
-                        <code id="mount-static-host" style="font-family: monospace; color: var(--success);">-</code>
-                    </div>
-                </div>
-                <!-- 图片路径 -->
-                <div class="storage-mount-item" style="padding: 12px; background: var(--bg-tertiary); border-radius: 8px; margin-bottom: 8px;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                        <span style="font-weight: 600; color: var(--text-primary);">🖼️ 图片文件</span>
-                        <span class="badge badge-success">已挂载</span>
-                    </div>
-                    <div style="display: grid; grid-template-columns: 80px 1fr; gap: 8px; font-size: 13px;">
-                        <span style="color: var(--text-muted);">容器内:</span>
-                        <code id="mount-images-container" style="font-family: monospace; color: var(--primary-color);">/app/data/images</code>
-                        <span style="color: var(--text-muted);">宿主机:</span>
-                        <code id="mount-images-host" style="font-family: monospace; color: var(--success);">-</code>
-                    </div>
-                </div>
-                <!-- 数据根目录 -->
-                <div class="storage-mount-item" style="padding: 12px; background: var(--bg-secondary); border-radius: 8px; border: 1px solid var(--border-color);">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                        <span style="font-weight: 600; color: var(--text-primary);">📁 数据根目录</span>
-                        <span class="badge badge-info">主挂载点</span>
-                    </div>
-                    <div style="display: grid; grid-template-columns: 80px 1fr; gap: 8px; font-size: 13px;">
-                        <span style="color: var(--text-muted);">容器内:</span>
-                        <code id="mount-data-root-container" style="font-family: monospace; color: var(--primary-color);">/app/data</code>
-                        <span style="color: var(--text-muted);">宿主机:</span>
-                        <code id="mount-data-root-host" style="font-family: monospace; color: var(--success);">-</code>
-                    </div>
-                </div>
-            </div>
-            <div style="margin-top: 16px; padding: 12px; background: var(--bg-secondary); border-radius: 8px; font-size: 13px; color: var(--text-secondary);">
-                <strong>💡 说明：</strong>容器内路径是 Docker 容器内部使用的路径，宿主机路径是实际存储数据的主机路径。
-                <br>修改挂载需要停止容器并使用新的 <code>-v</code> 参数重新启动。
-            </div>
-        </div>
-    </div>
-
-    <!-- 存储路径配置 -->
-    <div class="card">
-        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
-            <h3>📁 存储路径配置</h3>
+            <h3>🐳 Docker 存储配置</h3>
             <button class="btn btn-sm btn-primary" onclick="toggleStorageEdit()" id="edit-storage-btn">修改路径</button>
         </div>
         <div class="card-body compact">
             <form id="storage-path-form">
-                <!-- HTML 路径 -->
-                <div class="storage-path-item" style="margin-bottom: 16px; padding: 12px; background: var(--bg-tertiary); border-radius: 8px;">
-                    <div style="font-weight: 600; color: var(--text-primary); margin-bottom: 8px;">📄 HTML 存储</div>
-                    <div class="form-group" style="margin-bottom: 8px;">
-                        <label style="font-size: 12px; color: var(--text-muted);">容器内路径</label>
-                        <input type="text" class="form-input" id="html-path" readonly style="font-family: monospace;">
+                <!-- 查看模式：显示挂载信息 -->
+                <div id="storage-view-mode">
+                    <!-- HTML 路径 -->
+                    <div class="storage-mount-item" style="padding: 12px; background: var(--bg-tertiary); border-radius: 8px; margin-bottom: 8px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                            <span style="font-weight: 600; color: var(--text-primary);">📄 HTML 存储</span>
+                            <span class="badge badge-success">已挂载</span>
+                        </div>
+                        <div style="display: grid; grid-template-columns: 70px 1fr; gap: 8px; font-size: 13px;" class="mount-info">
+                            <span style="color: var(--text-muted);">容器内:</span>
+                            <code id="view-html-container" style="font-family: monospace; color: var(--primary-color);">/app/data/html</code>
+                            <span style="color: var(--text-muted);">宿主机:</span>
+                            <code id="view-html-host" style="font-family: monospace; color: var(--success);">-</code>
+                        </div>
                     </div>
-                    <div class="form-group" style="margin-bottom: 0;">
-                        <label style="font-size: 12px; color: var(--text-muted);">宿主机路径 <span class="badge badge-warning" style="font-size: 10px; padding: 2px 6px;">修改需重启</span></label>
-                        <input type="text" class="form-input host-path-input" id="html-host-path" readonly style="font-family: monospace; background: var(--bg-secondary);" placeholder="例如: /home/user/zhihusync/data/html">
-                        <span class="form-help">实际存储在宿主机的路径，修改后需要重启 Docker 容器</span>
+                    <!-- 数据库路径 -->
+                    <div class="storage-mount-item" style="padding: 12px; background: var(--bg-tertiary); border-radius: 8px; margin-bottom: 8px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                            <span style="font-weight: 600; color: var(--text-primary);">🗄️ 数据库存储</span>
+                            <span class="badge badge-success">已挂载</span>
+                        </div>
+                        <div style="display: grid; grid-template-columns: 70px 1fr; gap: 8px; font-size: 13px;" class="mount-info">
+                            <span style="color: var(--text-muted);">容器内:</span>
+                            <code id="view-db-container" style="font-family: monospace; color: var(--primary-color);">/app/data/meta/zhihusync.db</code>
+                            <span style="color: var(--text-muted);">宿主机:</span>
+                            <code id="view-db-host" style="font-family: monospace; color: var(--success);">-</code>
+                        </div>
+                    </div>
+                    <!-- 静态资源路径 -->
+                    <div class="storage-mount-item" style="padding: 12px; background: var(--bg-tertiary); border-radius: 8px; margin-bottom: 8px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                            <span style="font-weight: 600; color: var(--text-primary);">📦 静态资源</span>
+                            <span class="badge badge-success">已挂载</span>
+                        </div>
+                        <div style="display: grid; grid-template-columns: 70px 1fr; gap: 8px; font-size: 13px;" class="mount-info">
+                            <span style="color: var(--text-muted);">容器内:</span>
+                            <code id="view-static-container" style="font-family: monospace; color: var(--primary-color);">/app/data/static</code>
+                            <span style="color: var(--text-muted);">宿主机:</span>
+                            <code id="view-static-host" style="font-family: monospace; color: var(--success);">-</code>
+                        </div>
+                    </div>
+                    <!-- 图片路径 -->
+                    <div class="storage-mount-item" style="padding: 12px; background: var(--bg-tertiary); border-radius: 8px; margin-bottom: 8px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                            <span style="font-weight: 600; color: var(--text-primary);">🖼️ 图片存储</span>
+                            <span class="badge badge-success">已挂载</span>
+                        </div>
+                        <div style="display: grid; grid-template-columns: 70px 1fr; gap: 8px; font-size: 13px;" class="mount-info">
+                            <span style="color: var(--text-muted);">容器内:</span>
+                            <code id="view-images-container" style="font-family: monospace; color: var(--primary-color);">/app/data/images</code>
+                            <span style="color: var(--text-muted);">宿主机:</span>
+                            <code id="view-images-host" style="font-family: monospace; color: var(--success);">-</code>
+                        </div>
+                    </div>
+                    <!-- 数据根目录 -->
+                    <div class="storage-mount-item" style="padding: 12px; background: var(--bg-secondary); border-radius: 8px; border: 1px solid var(--border-color);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                            <span style="font-weight: 600; color: var(--text-primary);">📁 数据根目录</span>
+                            <span class="badge badge-info">主挂载点</span>
+                        </div>
+                        <div style="display: grid; grid-template-columns: 70px 1fr; gap: 8px; font-size: 13px;" class="mount-info">
+                            <span style="color: var(--text-muted);">容器内:</span>
+                            <code id="view-data-root-container" style="font-family: monospace; color: var(--primary-color);">/app/data</code>
+                            <span style="color: var(--text-muted);">宿主机:</span>
+                            <code id="view-data-root-host" style="font-family: monospace; color: var(--success);">-</code>
+                        </div>
                     </div>
                 </div>
-                <!-- 数据库路径 -->
-                <div class="storage-path-item" style="margin-bottom: 16px; padding: 12px; background: var(--bg-tertiary); border-radius: 8px;">
-                    <div style="font-weight: 600; color: var(--text-primary); margin-bottom: 8px;">🗄️ 数据库存储</div>
-                    <div class="form-group" style="margin-bottom: 8px;">
-                        <label style="font-size: 12px; color: var(--text-muted);">容器内路径</label>
-                        <input type="text" class="form-input" id="db-path" readonly style="font-family: monospace;">
+
+                <!-- 编辑模式：显示输入框 -->
+                <div id="storage-edit-mode" style="display: none;">
+                    <!-- HTML 路径 -->
+                    <div class="storage-path-item" style="margin-bottom: 16px; padding: 12px; background: var(--bg-tertiary); border-radius: 8px;">
+                        <div style="font-weight: 600; color: var(--text-primary); margin-bottom: 8px;">📄 HTML 存储</div>
+                        <div class="form-group" style="margin-bottom: 8px;">
+                            <label style="font-size: 12px; color: var(--text-muted);">容器内路径</label>
+                            <input type="text" class="form-input" id="html-path" readonly style="font-family: monospace;">
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label style="font-size: 12px; color: var(--text-muted);">宿主机路径</label>
+                            <input type="text" class="form-input host-path-input" id="html-host-path" style="font-family: monospace;" placeholder="例如: /home/user/zhihusync/data/html">
+                        </div>
                     </div>
-                    <div class="form-group" style="margin-bottom: 0;">
-                        <label style="font-size: 12px; color: var(--text-muted);">宿主机路径 <span class="badge badge-warning" style="font-size: 10px; padding: 2px 6px;">修改需重启</span></label>
-                        <input type="text" class="form-input host-path-input" id="db-host-path" readonly style="font-family: monospace; background: var(--bg-secondary);" placeholder="例如: /home/user/zhihusync/data/meta">
-                        <span class="form-help">实际存储在宿主机的路径，修改后需要重启 Docker 容器</span>
+                    <!-- 数据库路径 -->
+                    <div class="storage-path-item" style="margin-bottom: 16px; padding: 12px; background: var(--bg-tertiary); border-radius: 8px;">
+                        <div style="font-weight: 600; color: var(--text-primary); margin-bottom: 8px;">🗄️ 数据库存储</div>
+                        <div class="form-group" style="margin-bottom: 8px;">
+                            <label style="font-size: 12px; color: var(--text-muted);">容器内路径</label>
+                            <input type="text" class="form-input" id="db-path" readonly style="font-family: monospace;">
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label style="font-size: 12px; color: var(--text-muted);">宿主机路径</label>
+                            <input type="text" class="form-input host-path-input" id="db-host-path" style="font-family: monospace;" placeholder="例如: /home/user/zhihusync/data/meta">
+                        </div>
+                    </div>
+                    <!-- 静态资源路径 -->
+                    <div class="storage-path-item" style="margin-bottom: 16px; padding: 12px; background: var(--bg-tertiary); border-radius: 8px;">
+                        <div style="font-weight: 600; color: var(--text-primary); margin-bottom: 8px;">📦 静态资源</div>
+                        <div class="form-group" style="margin-bottom: 8px;">
+                            <label style="font-size: 12px; color: var(--text-muted);">容器内路径</label>
+                            <input type="text" class="form-input" id="static-path" readonly style="font-family: monospace;">
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label style="font-size: 12px; color: var(--text-muted);">宿主机路径</label>
+                            <input type="text" class="form-input host-path-input" id="static-host-path" style="font-family: monospace;" placeholder="例如: /home/user/zhihusync/data/static">
+                        </div>
+                    </div>
+                    <!-- 图片路径 -->
+                    <div class="storage-path-item" style="margin-bottom: 16px; padding: 12px; background: var(--bg-tertiary); border-radius: 8px;">
+                        <div style="font-weight: 600; color: var(--text-primary); margin-bottom: 8px;">🖼️ 图片存储</div>
+                        <div class="form-group" style="margin-bottom: 8px;">
+                            <label style="font-size: 12px; color: var(--text-muted);">容器内路径</label>
+                            <input type="text" class="form-input" id="images-path" readonly style="font-family: monospace;">
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label style="font-size: 12px; color: var(--text-muted);">宿主机路径</label>
+                            <input type="text" class="form-input host-path-input" id="images-host-path" style="font-family: monospace;" placeholder="例如: /home/user/zhihusync/data/images">
+                        </div>
+                    </div>
+                    <!-- 数据根目录 -->
+                    <div class="storage-path-item" style="padding: 12px; background: var(--bg-secondary); border-radius: 8px; border: 1px solid var(--border-color);">
+                        <div style="font-weight: 600; color: var(--text-primary); margin-bottom: 8px;">📁 数据根目录（主挂载点）</div>
+                        <div class="form-group" style="margin-bottom: 8px;">
+                            <label style="font-size: 12px; color: var(--text-muted);">容器内路径</label>
+                            <input type="text" class="form-input" id="data-root-path" readonly style="font-family: monospace;" value="/app/data">
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label style="font-size: 12px; color: var(--text-muted);">宿主机路径 <span class="badge badge-danger" style="font-size: 10px; padding: 2px 6px;">重要</span></label>
+                            <input type="text" class="form-input host-path-input" id="data-root-host-path" style="font-family: monospace;" placeholder="例如: /home/user/zhihusync/data">
+                            <span class="form-help">修改此路径会影响所有数据存储位置</span>
+                        </div>
                     </div>
                 </div>
-                <!-- 静态资源路径 -->
-                <div class="storage-path-item" style="margin-bottom: 16px; padding: 12px; background: var(--bg-tertiary); border-radius: 8px;">
-                    <div style="font-weight: 600; color: var(--text-primary); margin-bottom: 8px;">📦 静态资源</div>
-                    <div class="form-group" style="margin-bottom: 8px;">
-                        <label style="font-size: 12px; color: var(--text-muted);">容器内路径</label>
-                        <input type="text" class="form-input" id="static-path" readonly style="font-family: monospace;">
-                    </div>
-                    <div class="form-group" style="margin-bottom: 0;">
-                        <label style="font-size: 12px; color: var(--text-muted);">宿主机路径 <span class="badge badge-warning" style="font-size: 10px; padding: 2px 6px;">修改需重启</span></label>
-                        <input type="text" class="form-input host-path-input" id="static-host-path" readonly style="font-family: monospace; background: var(--bg-secondary);" placeholder="例如: /home/user/zhihusync/data/static">
-                        <span class="form-help">实际存储在宿主机的路径，修改后需要重启 Docker 容器</span>
-                    </div>
-                </div>
-                <!-- 图片路径 -->
-                <div class="storage-path-item" style="margin-bottom: 16px; padding: 12px; background: var(--bg-tertiary); border-radius: 8px;">
-                    <div style="font-weight: 600; color: var(--text-primary); margin-bottom: 8px;">🖼️ 图片存储</div>
-                    <div class="form-group" style="margin-bottom: 8px;">
-                        <label style="font-size: 12px; color: var(--text-muted);">容器内路径</label>
-                        <input type="text" class="form-input" id="images-path" readonly style="font-family: monospace;">
-                    </div>
-                    <div class="form-group" style="margin-bottom: 0;">
-                        <label style="font-size: 12px; color: var(--text-muted);">宿主机路径 <span class="badge badge-warning" style="font-size: 10px; padding: 2px 6px;">修改需重启</span></label>
-                        <input type="text" class="form-input host-path-input" id="images-host-path" readonly style="font-family: monospace; background: var(--bg-secondary);" placeholder="例如: /home/user/zhihusync/data/images">
-                        <span class="form-help">实际存储在宿主机的路径，修改后需要重启 Docker 容器</span>
-                    </div>
-                </div>
-                <!-- 数据根目录 -->
-                <div class="storage-path-item" style="padding: 12px; background: var(--bg-secondary); border-radius: 8px; border: 1px solid var(--border-color);">
-                    <div style="font-weight: 600; color: var(--text-primary); margin-bottom: 8px;">📁 数据根目录（主挂载点）</div>
-                    <div class="form-group" style="margin-bottom: 8px;">
-                        <label style="font-size: 12px; color: var(--text-muted);">容器内路径</label>
-                        <input type="text" class="form-input" id="data-root-path" readonly style="font-family: monospace;" value="/app/data">
-                    </div>
-                    <div class="form-group" style="margin-bottom: 0;">
-                        <label style="font-size: 12px; color: var(--text-muted);">宿主机路径 <span class="badge badge-danger" style="font-size: 10px; padding: 2px 6px;">重要</span></label>
-                        <input type="text" class="form-input host-path-input" id="data-root-host-path" readonly style="font-family: monospace; background: var(--bg-secondary);" placeholder="例如: /home/user/zhihusync/data">
-                        <span class="form-help">修改此路径会影响所有数据存储位置，建议保持默认或使用统一的根目录挂载</span>
-                    </div>
+
+                <div style="margin-top: 16px; padding: 12px; background: var(--bg-secondary); border-radius: 8px; font-size: 13px; color: var(--text-secondary);">
+                    <strong>💡 说明：</strong>容器内路径是 Docker 内部使用的路径，宿主机路径是实际存储数据的位置。
+                    <br>修改宿主机路径需要重新启动 Docker 容器。
                 </div>
                 <div id="storage-edit-actions" style="display: none; margin-top: 16px; padding: 16px; background: var(--bg-tertiary); border-radius: 8px;">
                     <div style="color: var(--warning); font-size: 13px; margin-bottom: 12px;">
@@ -692,49 +728,6 @@
                     <div id="migration-progress" style="width: 0%; height: 100%; background: var(--primary-color); transition: width 0.3s;"></div>
                 </div>
             </div>
-        </div>
-    </div>
-
-    <div class="card">
-        <div class="card-header">
-            <h3>⬇️ 下载设置</h3>
-        </div>
-        <div class="card-body compact">
-            <form id="storage-form">
-                <div class="form-row-4">
-                    <div class="form-group">
-                        <label>下载图片</label>
-                        <select class="form-select" id="download-images">
-                            <option value="true">是</option>
-                            <option value="false">否</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>下载头像</label>
-                        <select class="form-select" id="download-avatars">
-                            <option value="true">是</option>
-                            <option value="false">否</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>压缩 HTML</label>
-                        <select class="form-select" id="compress-html">
-                            <option value="true">是</option>
-                            <option value="false" selected>否</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>保留原始数据</label>
-                        <select class="form-select" id="save-raw">
-                            <option value="true">是</option>
-                            <option value="false" selected>否</option>
-                        </select>
-                    </div>
-                </div>
-                <div class="form-actions">
-                    <button type="submit" class="btn btn-primary">保存</button>
-                </div>
-            </form>
         </div>
     </div>
 </div>
@@ -2594,40 +2587,31 @@ async function loadStorageMounts() {
 
         storageMounts = data;
 
-        // 显示 Docker 挂载卡片
-        if (data.in_docker) {
-            document.getElementById('docker-mount-card').style.display = 'block';
-
-            // 更新挂载路径显示（Docker 映射信息卡片）
-            if (data.mounts) {
-                // HTML
-                document.getElementById('mount-html-container').textContent = data.mounts.html?.container_path || '/app/data/html';
-                document.getElementById('mount-html-host').textContent = data.mounts.html?.host_path || '-';
-                // DB
-                document.getElementById('mount-db-container').textContent = data.mounts.db?.container_path || '/app/data/meta';
-                document.getElementById('mount-db-host').textContent = data.mounts.db?.host_path || '-';
-                // Static
-                document.getElementById('mount-static-container').textContent = data.mounts.static?.container_path || '/app/data/static';
-                document.getElementById('mount-static-host').textContent = data.mounts.static?.host_path || '-';
-                // Images
-                document.getElementById('mount-images-container').textContent = data.mounts.images?.container_path || '/app/data/images';
-                document.getElementById('mount-images-host').textContent = data.mounts.images?.host_path || '-';
-                // Data Root
-                document.getElementById('mount-data-root-container').textContent = data.mounts.data_root?.container_path || '/app/data';
-                document.getElementById('mount-data-root-host').textContent = data.mounts.data_root?.host_path || '-';
-            }
-        }
-
-        // 更新存储路径配置表单
+        // 更新存储配置显示
         if (data.mounts) {
-            // 容器内路径（只读）
+            // 查看模式 - 更新显示
+            document.getElementById('view-html-container').textContent = data.mounts.html?.container_path || '/app/data/html';
+            document.getElementById('view-html-host').textContent = data.mounts.html?.host_path || '-';
+
+            document.getElementById('view-db-container').textContent = data.mounts.db?.container_path || '/app/data/meta/zhihusync.db';
+            document.getElementById('view-db-host').textContent = data.mounts.db?.host_path || '-';
+
+            document.getElementById('view-static-container').textContent = data.mounts.static?.container_path || '/app/data/static';
+            document.getElementById('view-static-host').textContent = data.mounts.static?.host_path || '-';
+
+            document.getElementById('view-images-container').textContent = data.mounts.images?.container_path || '/app/data/images';
+            document.getElementById('view-images-host').textContent = data.mounts.images?.host_path || '-';
+
+            document.getElementById('view-data-root-container').textContent = data.mounts.data_root?.container_path || '/app/data';
+            document.getElementById('view-data-root-host').textContent = data.mounts.data_root?.host_path || '-';
+
+            // 编辑模式 - 更新输入框
             document.getElementById('html-path').value = data.mounts.html?.container_path || '/app/data/html';
-            document.getElementById('db-path').value = data.mounts.db?.container_path || '/app/data/meta';
+            document.getElementById('db-path').value = data.mounts.db?.container_path || '/app/data/meta/zhihusync.db';
             document.getElementById('static-path').value = data.mounts.static?.container_path || '/app/data/static';
             document.getElementById('images-path').value = data.mounts.images?.container_path || '/app/data/images';
             document.getElementById('data-root-path').value = data.mounts.data_root?.container_path || '/app/data';
 
-            // 宿主机路径（可编辑）
             document.getElementById('html-host-path').value = data.mounts.html?.host_path || '';
             document.getElementById('db-host-path').value = data.mounts.db?.host_path || '';
             document.getElementById('static-host-path').value = data.mounts.static?.host_path || '';
@@ -2643,34 +2627,16 @@ async function loadStorageMounts() {
 function toggleStorageEdit() {
     isStorageEditMode = !isStorageEditMode;
 
-    // 容器内路径（只读）
-    const containerInputs = ['html-path', 'db-path', 'static-path', 'images-path', 'data-root-path'];
-    // 宿主机路径（可编辑）
-    const hostInputs = ['html-host-path', 'db-host-path', 'static-host-path', 'images-host-path', 'data-root-host-path'];
+    const viewMode = document.getElementById('storage-view-mode');
+    const editMode = document.getElementById('storage-edit-mode');
     const actions = document.getElementById('storage-edit-actions');
     const btn = document.getElementById('edit-storage-btn');
     const dockerOutput = document.getElementById('docker-command-output');
 
     if (isStorageEditMode) {
         // 进入编辑模式
-        // 容器内路径保持只读
-        containerInputs.forEach(id => {
-            const el = document.getElementById(id);
-            if (el) {
-                el.readOnly = true;
-                el.style.background = 'var(--bg-secondary)';
-                el.style.opacity = '0.7';
-            }
-        });
-        // 宿主机路径可编辑
-        hostInputs.forEach(id => {
-            const el = document.getElementById(id);
-            if (el) {
-                el.readOnly = false;
-                el.style.background = 'var(--bg-primary)';
-                el.style.opacity = '1';
-            }
-        });
+        viewMode.style.display = 'none';
+        editMode.style.display = 'block';
         actions.style.display = 'block';
         dockerOutput.style.display = 'none';
         btn.textContent = '取消修改';
@@ -2678,17 +2644,15 @@ function toggleStorageEdit() {
         btn.classList.add('btn-secondary');
     } else {
         // 退出编辑模式
-        inputs.forEach(id => {
-            document.getElementById(id).readOnly = true;
-            document.getElementById(id).style.background = 'var(--bg-secondary)';
-        });
+        viewMode.style.display = 'block';
+        editMode.style.display = 'none';
         actions.style.display = 'none';
         btn.textContent = '修改路径';
         btn.classList.remove('btn-secondary');
         btn.classList.add('btn-primary');
 
         // 重新加载配置恢复原始值
-        loadConfig();
+        loadStorageMounts();
     }
 }
 
