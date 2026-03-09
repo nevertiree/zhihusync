@@ -1,8 +1,45 @@
 /* zhihusync 管理界面通用脚本 */
 
+// ========== 同步状态功能（定义在最前面，确保可用）==========
+
+// 更新侧边栏状态
+function updateSidebarStatus(status) {
+    const dot = document.getElementById('status-dot');
+    const text = document.getElementById('status-text');
+    if (!dot || !text) return;
+
+    const statusMap = {
+        'idle': { text: '就绪', class: 'idle' },
+        'running': { text: '同步中...', class: 'running' },
+        'success': { text: '就绪', class: 'success' },
+        'failed': { text: '失败', class: 'failed' }
+    };
+
+    const info = statusMap[status] || statusMap['idle'];
+
+    dot.className = 'status-dot ' + info.class;
+    text.textContent = info.text;
+}
+
+// 获取同步状态
+async function fetchSyncStatus() {
+    try {
+        const res = await fetch('/api/sync/status');
+        if (res.ok) {
+            const data = await res.json();
+            updateSidebarStatus(data.status);
+        }
+    } catch (e) {
+        console.error('获取同步状态失败:', e);
+    }
+}
+
+// ========== 工具函数 ==========
+
 // 显示 Toast 通知
 function showToast(message, type = 'info', duration = 3000) {
     const container = document.getElementById('toast-container');
+    if (!container) return;
 
     const toast = document.createElement('div');
     toast.className = `toast ${type}`;
@@ -26,24 +63,6 @@ function showToast(message, type = 'info', duration = 3000) {
         toast.style.transform = 'translateX(100%)';
         setTimeout(() => toast.remove(), 300);
     }, duration);
-}
-
-// 更新侧边栏状态
-function updateSidebarStatus(status) {
-    const dot = document.getElementById('status-dot');
-    const text = document.getElementById('status-text');
-
-    const statusMap = {
-        'idle': { text: '就绪', class: '' },
-        'running': { text: '同步中...', class: 'running' },
-        'success': { text: '就绪', class: 'success' },
-        'failed': { text: '失败', class: 'failed' }
-    };
-
-    const info = statusMap[status] || statusMap['idle'];
-
-    dot.className = 'status-dot ' + info.class;
-    text.textContent = info.text;
 }
 
 // 关闭模态框
@@ -124,14 +143,15 @@ async function api(url, options = {}) {
     return res.json();
 }
 
-// 立即获取同步状态（如果 DOM 已就绪）
-if (document.readyState === 'complete' || document.readyState === 'interactive') {
-    fetchSyncStatus();
-    setInterval(fetchSyncStatus, 5000);
-}
+// ========== 初始化代码 ==========
 
-// 初始化代码高亮（如果页面有代码块）
+// 页面加载完成后获取同步状态
 document.addEventListener('DOMContentLoaded', function() {
+    // 立即获取一次同步状态
+    fetchSyncStatus();
+    // 每5秒轮询一次
+    setInterval(fetchSyncStatus, 5000);
+
     // 为所有表格行添加点击效果
     document.querySelectorAll('.data-table tbody tr').forEach(row => {
         row.addEventListener('click', function(e) {
@@ -148,26 +168,7 @@ document.addEventListener('DOMContentLoaded', function() {
             setTimeout(() => alert.remove(), 300);
         }, 3000);
     });
-
-    // 获取并更新同步状态（如果上面没有执行）
-    if (document.readyState !== 'complete' && document.readyState !== 'interactive') {
-        fetchSyncStatus();
-        setInterval(fetchSyncStatus, 5000);
-    }
 });
-
-// 获取同步状态
-async function fetchSyncStatus() {
-    try {
-        const res = await fetch('/api/sync/status');
-        if (res.ok) {
-            const data = await res.json();
-            updateSidebarStatus(data.status);
-        }
-    } catch (e) {
-        console.error('获取同步状态失败:', e);
-    }
-}
 
 // 键盘快捷键
 document.addEventListener('keydown', function(e) {
