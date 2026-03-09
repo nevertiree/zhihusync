@@ -508,18 +508,102 @@
 
 <!-- 存储配置 -->
 <div class="tab-content" id="tab-storage">
-    <div class="card">
-        <div class="card-header">
-            <h3>📁 存储路径</h3>
+    <!-- Docker 挂载信息 -->
+    <div class="card" id="docker-mount-card" style="display: none;">
+        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+            <h3>🐳 Docker 存储映射</h3>
+            <span class="badge badge-info">容器内路径</span>
         </div>
         <div class="card-body compact">
-            <div class="form-group">
-                <label>HTML 存储路径</label>
-                <input type="text" class="form-input" id="html-path" readonly>
+            <div id="docker-mount-info">
+                <div class="storage-mount-item" style="display: grid; grid-template-columns: 120px 1fr auto; gap: 12px; align-items: center; padding: 12px; background: var(--bg-tertiary); border-radius: 8px; margin-bottom: 8px;">
+                    <span style="font-weight: 500; color: var(--text-secondary);">HTML 文件</span>
+                    <code id="mount-html-path" style="font-family: monospace; color: var(--primary-color);">/app/data/html</code>
+                    <span class="badge badge-success">已挂载</span>
+                </div>
+                <div class="storage-mount-item" style="display: grid; grid-template-columns: 120px 1fr auto; gap: 12px; align-items: center; padding: 12px; background: var(--bg-tertiary); border-radius: 8px; margin-bottom: 8px;">
+                    <span style="font-weight: 500; color: var(--text-secondary);">数据库</span>
+                    <code id="mount-db-path" style="font-family: monospace; color: var(--primary-color);">/app/data/meta</code>
+                    <span class="badge badge-success">已挂载</span>
+                </div>
+                <div class="storage-mount-item" style="display: grid; grid-template-columns: 120px 1fr auto; gap: 12px; align-items: center; padding: 12px; background: var(--bg-tertiary); border-radius: 8px; margin-bottom: 8px;">
+                    <span style="font-weight: 500; color: var(--text-secondary);">静态资源</span>
+                    <code id="mount-static-path" style="font-family: monospace; color: var(--primary-color);">/app/data/static</code>
+                    <span class="badge badge-success">已挂载</span>
+                </div>
+                <div class="storage-mount-item" style="display: grid; grid-template-columns: 120px 1fr auto; gap: 12px; align-items: center; padding: 12px; background: var(--bg-tertiary); border-radius: 8px; margin-bottom: 8px;">
+                    <span style="font-weight: 500; color: var(--text-secondary);">图片文件</span>
+                    <code id="mount-images-path" style="font-family: monospace; color: var(--primary-color);">/app/data/images</code>
+                    <span class="badge badge-success">已挂载</span>
+                </div>
+                <div class="storage-mount-item" style="display: grid; grid-template-columns: 120px 1fr auto; gap: 12px; align-items: center; padding: 12px; background: var(--bg-tertiary); border-radius: 8px;">
+                    <span style="font-weight: 500; color: var(--text-secondary);">配置文件</span>
+                    <code id="mount-config-path" style="font-family: monospace; color: var(--primary-color);">/app/config</code>
+                    <span class="badge badge-success">已挂载</span>
+                </div>
             </div>
-            <div class="form-group">
-                <label>数据库路径</label>
-                <input type="text" class="form-input" id="db-path" readonly>
+            <div style="margin-top: 16px; padding: 12px; background: var(--bg-secondary); border-radius: 8px; font-size: 13px; color: var(--text-secondary);">
+                <strong>💡 说明：</strong>上述路径为容器内的挂载点。实际数据存储位置取决于 Docker 启动时的 <code>-v</code> 参数映射。
+                <br>例如：运行时使用 <code>-v /host/data:/app/data</code>，则容器内的 <code>/app/data</code> 对应宿主机的 <code>/host/data</code>。
+            </div>
+        </div>
+    </div>
+
+    <!-- 存储路径配置 -->
+    <div class="card">
+        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+            <h3>📁 存储路径配置</h3>
+            <button class="btn btn-sm btn-primary" onclick="toggleStorageEdit()" id="edit-storage-btn">修改路径</button>
+        </div>
+        <div class="card-body compact">
+            <form id="storage-path-form">
+                <div class="form-group">
+                    <label>HTML 存储路径（容器内）</label>
+                    <input type="text" class="form-input" id="html-path" readonly>
+                    <span class="form-help">HTML 备份文件存储位置</span>
+                </div>
+                <div class="form-group">
+                    <label>数据库路径（容器内）</label>
+                    <input type="text" class="form-input" id="db-path" readonly>
+                    <span class="form-help">SQLite 数据库文件路径</span>
+                </div>
+                <div class="form-group">
+                    <label>静态资源路径（容器内）</label>
+                    <input type="text" class="form-input" id="static-path" readonly>
+                    <span class="form-help">静态资源文件存储位置</span>
+                </div>
+                <div class="form-group">
+                    <label>图片存储路径（容器内）</label>
+                    <input type="text" class="form-input" id="images-path" readonly>
+                    <span class="form-help">下载的图片存储位置</span>
+                </div>
+                <div id="storage-edit-actions" style="display: none; margin-top: 16px; padding: 16px; background: var(--bg-tertiary); border-radius: 8px;">
+                    <div style="color: var(--warning); font-size: 13px; margin-bottom: 12px;">
+                        <strong>⚠️ 警告：</strong>修改存储路径需要迁移数据并重启服务。请确保新的路径已经正确挂载到 Docker 容器中。
+                    </div>
+                    <div style="display: flex; gap: 12px;">
+                        <button type="button" class="btn btn-warning" onclick="migrateStorage()">迁移数据并重启</button>
+                        <button type="button" class="btn" onclick="toggleStorageEdit()">取消</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 数据迁移状态 -->
+    <div class="card" id="migration-status-card" style="display: none;">
+        <div class="card-header">
+            <h3>🔄 数据迁移状态</h3>
+        </div>
+        <div class="card-body compact">
+            <div id="migration-status" style="padding: 16px; background: var(--bg-tertiary); border-radius: 8px;">
+                <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
+                    <span class="loading"></span>
+                    <span id="migration-message">正在迁移数据...</span>
+                </div>
+                <div class="progress-bar" style="height: 8px; background: var(--bg-secondary); border-radius: 4px; overflow: hidden;">
+                    <div id="migration-progress" style="width: 0%; height: 100%; background: var(--primary-color); transition: width 0.3s;"></div>
+                </div>
             </div>
         </div>
     </div>
@@ -2263,8 +2347,13 @@ async function loadConfig() {
         // 存储
         document.getElementById('html-path').value = data.html_path || '/app/data/html';
         document.getElementById('db-path').value = data.db_path || '/app/data/meta/zhihusync.db';
+        document.getElementById('static-path').value = data.static_path || '/app/data/static';
+        document.getElementById('images-path').value = data.images_path || '/app/data/images';
         document.getElementById('download-images').value = String(data.download_images !== false);
         document.getElementById('download-avatars').value = String(data.download_avatars !== false);
+
+        // 加载 Docker 挂载信息
+        await loadStorageMounts();
 
         // 监控
         const monitorStatus = document.getElementById('status-monitor');
@@ -2403,6 +2492,147 @@ function createToastContainer() {
     container.className = 'toast-container';
     document.body.appendChild(container);
     return container;
+}
+
+// ============ 存储路径管理 ============
+
+let storageMounts = {};
+let isStorageEditMode = false;
+
+// 加载 Docker 挂载信息
+async function loadStorageMounts() {
+    try {
+        const res = await fetch('/api/storage/mounts');
+        const data = await res.json();
+
+        storageMounts = data;
+
+        // 显示 Docker 挂载卡片
+        if (data.in_docker) {
+            document.getElementById('docker-mount-card').style.display = 'block';
+
+            // 更新挂载路径显示
+            if (data.mounts) {
+                document.getElementById('mount-html-path').textContent = data.mounts.html?.container_path || '/app/data/html';
+                document.getElementById('mount-db-path').textContent = data.mounts.db?.container_path || '/app/data/meta';
+                document.getElementById('mount-static-path').textContent = data.mounts.static?.container_path || '/app/data/static';
+                document.getElementById('mount-images-path').textContent = data.mounts.images?.container_path || '/app/data/images';
+                document.getElementById('mount-config-path').textContent = '/app/config';
+            }
+        }
+    } catch (e) {
+        console.error('加载存储挂载信息失败:', e);
+    }
+}
+
+// 切换存储路径编辑模式
+function toggleStorageEdit() {
+    isStorageEditMode = !isStorageEditMode;
+
+    const inputs = ['html-path', 'db-path', 'static-path', 'images-path'];
+    const actions = document.getElementById('storage-edit-actions');
+    const btn = document.getElementById('edit-storage-btn');
+
+    if (isStorageEditMode) {
+        // 进入编辑模式
+        inputs.forEach(id => {
+            document.getElementById(id).readOnly = false;
+            document.getElementById(id).style.background = 'var(--bg-primary)';
+        });
+        actions.style.display = 'block';
+        btn.textContent = '取消修改';
+        btn.classList.remove('btn-primary');
+        btn.classList.add('btn-secondary');
+    } else {
+        // 退出编辑模式
+        inputs.forEach(id => {
+            document.getElementById(id).readOnly = true;
+            document.getElementById(id).style.background = 'var(--bg-secondary)';
+        });
+        actions.style.display = 'none';
+        btn.textContent = '修改路径';
+        btn.classList.remove('btn-secondary');
+        btn.classList.add('btn-primary');
+
+        // 重新加载配置恢复原始值
+        loadConfig();
+    }
+}
+
+// 迁移存储数据
+async function migrateStorage() {
+    const htmlPath = document.getElementById('html-path').value.trim();
+    const dbPath = document.getElementById('db-path').value.trim();
+    const staticPath = document.getElementById('static-path').value.trim();
+    const imagesPath = document.getElementById('images-path').value.trim();
+
+    if (!htmlPath || !dbPath || !staticPath || !imagesPath) {
+        showToast('请填写所有存储路径', 'warning');
+        return;
+    }
+
+    // 确认对话框
+    if (!confirm('确定要迁移数据到新的存储位置吗？\n\n这将：\n1. 复制所有数据到新位置\n2. 更新配置文件\n3. 重启服务以应用更改\n\n原数据不会被删除，请确认新路径已正确挂载。')) {
+        return;
+    }
+
+    // 显示迁移状态
+    document.getElementById('migration-status-card').style.display = 'block';
+    document.getElementById('storage-edit-actions').style.display = 'none';
+
+    try {
+        const res = await fetch('/api/storage/migrate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                html_path: htmlPath,
+                db_path: dbPath,
+                static_path: staticPath,
+                images_path: imagesPath
+            })
+        });
+
+        const data = await res.json();
+
+        if (res.ok) {
+            document.getElementById('migration-message').textContent = '数据迁移完成，正在重启服务...';
+            document.getElementById('migration-progress').style.width = '100%';
+
+            showToast('数据迁移成功，服务即将重启', 'success');
+
+            // 等待几秒后重启服务
+            setTimeout(async () => {
+                try {
+                    await fetch('/api/system/restart', { method: 'POST' });
+                } catch (e) {
+                    console.log('重启请求已发送');
+                }
+
+                // 显示重启提示
+                document.getElementById('migration-message').innerHTML =
+                    '<span style="color: var(--success);">服务已重启，请刷新页面</span>';
+
+                // 倒计时刷新
+                let countdown = 10;
+                const timer = setInterval(() => {
+                    countdown--;
+                    document.getElementById('migration-message').innerHTML =
+                        `<span style="color: var(--success);">服务已重启，${countdown}秒后自动刷新...</span>`;
+
+                    if (countdown <= 0) {
+                        clearInterval(timer);
+                        window.location.reload();
+                    }
+                }, 1000);
+            }, 2000);
+        } else {
+            throw new Error(data.detail || '迁移失败');
+        }
+    } catch (e) {
+        document.getElementById('migration-message').innerHTML =
+            `<span style="color: var(--danger);">迁移失败: ${e.message}</span>`;
+        showToast('数据迁移失败: ' + e.message, 'error');
+    }
 }
 </script>
 {% endblock %}
