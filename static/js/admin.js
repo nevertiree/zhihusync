@@ -124,6 +124,12 @@ async function api(url, options = {}) {
     return res.json();
 }
 
+// 立即获取同步状态（如果 DOM 已就绪）
+if (document.readyState === 'complete' || document.readyState === 'interactive') {
+    fetchSyncStatus();
+    setInterval(fetchSyncStatus, 5000);
+}
+
 // 初始化代码高亮（如果页面有代码块）
 document.addEventListener('DOMContentLoaded', function() {
     // 为所有表格行添加点击效果
@@ -143,10 +149,11 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 3000);
     });
 
-    // 获取并更新同步状态
-    fetchSyncStatus();
-    // 每 5 秒刷新一次状态
-    setInterval(fetchSyncStatus, 5000);
+    // 获取并更新同步状态（如果上面没有执行）
+    if (document.readyState !== 'complete' && document.readyState !== 'interactive') {
+        fetchSyncStatus();
+        setInterval(fetchSyncStatus, 5000);
+    }
 });
 
 // 获取同步状态
