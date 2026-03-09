@@ -653,14 +653,27 @@ async def update_cookies(cookie_update: CookieUpdate):
             if domain:
                 cookie_domains.add(domain)
 
+        # 尝试从 cookie 中提取用户信息
+        # 注意：实际用户信息需要通过验证才能获取，这里先占位
+        user_id = ""
+        user_name = ""
+        for cookie in storage_state.get("cookies", []):
+            name = cookie.get("name", "")
+            if name in ["z_c0"]:
+                # z_c0 是知乎的关键认证 cookie
+                pass  # 无法直接从 cookie 值解析用户信息
+
         update_config_file(
+            user_id=user_id or None,  # 如果为空则不更新 user_id
             cookie_info={
                 "domains": list(cookie_domains),
                 "cookie_count": cookie_count,
                 "valid": is_valid,
                 "is_logged_in": False,  # 已保存但未验证
                 "added_time": datetime.now().isoformat(),
-            }
+                "user_id": user_id if user_id else None,
+                "user_name": user_name if user_name else None,
+            },
         )
 
         # 构建响应消息
@@ -709,15 +722,18 @@ async def check_cookies():
         stat = cookie_file.stat()
         added_time = datetime.fromtimestamp(stat.st_mtime).isoformat()
 
-        # 获取缓存的用户信息
-        cookie_info = app_state.get("cookie_info", {})
+        # 从配置文件读取用户信息（持久化）
+        cookie_info = config.cookie_info or {}
+
+        # 如果配置文件中有 added_time，使用配置文件的，否则使用文件修改时间
+        config_added_time = cookie_info.get("added_time") or cookie_info.get("verified_at")
 
         return {
             "exists": True,
             "valid": has_cookies,
             "user_id": cookie_info.get("user_id"),
             "user_name": cookie_info.get("user_name"),
-            "added_time": added_time,
+            "added_time": config_added_time or added_time,
             "is_logged_in": cookie_info.get("is_logged_in", False),
         }
     except Exception:
