@@ -34,15 +34,14 @@ function Write-Color {
 # 显示欢迎信息
 function Show-Welcome {
     Clear-Host
-    Write-Color @"
-╔═══════════════════════════════════════════════════════════╗
-║                                                           ║
-║   🔄 zhihusync - 知乎点赞内容自动备份工具                    ║
-║                                                           ║
-║   全自动安装，支持 Docker Hub 或本地构建                    ║
-║                                                           ║
-╚═══════════════════════════════════════════════════════════╝
-"@ "Cyan"
+    Write-Host ""
+    Write-Host "╔═══════════════════════════════════════════════════════════╗" -ForegroundColor Cyan
+    Write-Host "║                                                           ║" -ForegroundColor Cyan
+    Write-Host "║   🔄 zhihusync - 知乎点赞内容自动备份工具                 ║" -ForegroundColor Cyan
+    Write-Host "║                                                           ║" -ForegroundColor Cyan
+    Write-Host "║   全自动安装，支持 Docker Hub 或本地构建                  ║" -ForegroundColor Cyan
+    Write-Host "║                                                           ║" -ForegroundColor Cyan
+    Write-Host "╚═══════════════════════════════════════════════════════════╝" -ForegroundColor Cyan
     Write-Host ""
 }
 
@@ -121,14 +120,14 @@ function Configure-DataDir {
 
     # 显示参考示例
     Write-Color "📋 路径参考示例：" "Blue"
-    Write-Host "   Windows:"
-    Write-Host "     • D:\zhihusync\data          (D盘)"
-    Write-Host "     • C:\Users\$env:USERNAME\zhihusync  (用户目录)"
-    Write-Host "     • \\NAS\backup\zhihusync    (NAS 网络路径)"
-    Write-Host ""
+    Write-Host '   Windows:'
+    Write-Host '     • D:\zhihusync\data          (D盘)'
+    Write-Host "     • C:\Users\${env:USERNAME}\zhihusync  (用户目录)"
+    Write-Host '     • \\NAS\backup\zhihusync    (NAS 网络路径)'
+    Write-Host ''
 
     # 默认路径
-    $defaultDir = "$env:USERPROFILE\zhihusync\data"
+    $defaultDir = "${env:USERPROFILE}\zhihusync\data"
 
     while ($true) {
         $dataDir = Read-Host "请输入数据保存目录 [默认: $defaultDir]"
@@ -233,7 +232,7 @@ function Build-ImageLocally {
     Write-Host ""
 
     # 创建临时目录
-    $buildDir = Join-Path $env:TEMP "zhihusync-build-$(Get-Random)"
+    $buildDir = Join-Path ${env:TEMP} "zhihusync-build-$(Get-Random)"
     New-Item -ItemType Directory -Path $buildDir -Force | Out-Null
 
     try {
@@ -413,11 +412,10 @@ function Wait-ForService {
 
 # 显示完成信息
 function Show-Completion {
-    Write-Color @"
-╔═══════════════════════════════════════════════════════════╗
-║                   ✅ 安装完成！                           ║
-╚═══════════════════════════════════════════════════════════╝
-"@ "Green"
+    Write-Host ""
+    Write-Host "╔═══════════════════════════════════════════════════════════╗" -ForegroundColor Green
+    Write-Host "║                   ✅ 安装完成！                           ║" -ForegroundColor Green
+    Write-Host "╚═══════════════════════════════════════════════════════════╝" -ForegroundColor Green
     Write-Host ""
     Write-Color "📱 访问 Web 界面:" "Cyan"
     Write-Host "   http://localhost:6067"
