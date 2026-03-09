@@ -850,192 +850,236 @@ class ZhihuCrawler:
             logger.warning(f"获取用户资料失败: {e}")
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
+    async def _fetch_likes_from_page(  # noqa: C901
+        self,
+        page_url: str,
+        limit: int = 20,
+        item_callback: Callable[[dict, int], Awaitable[None]] | None = None,
+        processed_ids: set[str] | None = None,
+        total_processed: int = 0,
+    ) -> tuple[list[dict], int]:
+        """模拟人类行为的渐进式滚动获取点赞列表.
+
+        策略：
+        1. 小步滚动（每次滚动一点点，800-1200px）
+        2. 长时间等待（4-8秒，让内容充分加载）
+        3. 检查新内容，立即处理
+        4. 模拟阅读时间（3-8秒每条）
+        5. 偶尔回滚（15%概率，模拟人类回翻）
+        6. 重复直到没有新内容
+
+        Args:
+            page_url: 页面URL
+            limit: 最大数量限制，-1表示无限制
+            item_callback: 处理回调函数
+            processed_ids: 已处理的ID集合
+            total_processed: 已处理的数量
+
+        Returns:
+            tuple: (activities列表, 处理后的total_processed)
+        """
+        if processed_ids is None:
+            processed_ids = set()
+
+        no_limit = limit < 0
+        target_count = "无限制" if no_limit else limit
+        logger.info(f"从 {page_url} 获取点赞，目标: {target_count}...")
+        logger.info("使用渐进式滚动策略（模拟人类行为）")
+
+        # 访问页面
+        await self._delay()
+        assert self.page is not None  # noqa: S101
+        await self.page.goto(page_url, wait_until="domcontentloaded")
+
+        # 初始等待，让页面完全加载
+        logger.info("等待页面初始加载...")
+        await asyncio.sleep(5)
+
+        all_activities: list[dict] = []
+        last_count = 0
+        consecutive_no_new = 0  # 连续无新内容次数
+        max_consecutive_no_new = 10 if no_limit else 5  # 全量模式下更多耐心
+        scroll_count = 0
+        max_scrolls = 5000 if no_limit else 100  # 全量模式下更多滚动次数
+
+        logger.info(f"开始渐进式滚动，最大滚动次数: {max_scrolls}")
+
+        while (no_limit or total_processed < limit) and scroll_count < max_scrolls:
+            scroll_count += 1
+
+            # 获取当前内容
+            content = await self.page.content()
+            activities = self._parse_activities_from_html(content)
+            current_count = len(activities)
+
+            # 检查是否有新内容
+            if current_count > last_count:
+                new_activities = activities[last_count:]
+                new_count = len(new_activities)
+                logger.info(f"✓ 发现 {new_count} 条新内容 (总计: {current_count})")
+
+                # 立即处理新内容
+                if item_callback:
+                    for activity in new_activities:
+                        activity_id = activity.get("id", "")
+                        if activity_id and activity_id not in processed_ids:
+                            try:
+                                # 处理前添加随机延迟（模拟人类阅读时间）
+                                read_time = random.uniform(3.0, 8.0)
+                                logger.debug(f"模拟阅读时间: {read_time:.1f}秒")
+                                await asyncio.sleep(read_time)
+
+                                await item_callback(activity, total_processed)
+                                processed_ids.add(activity_id)
+                                total_processed += 1
+
+                                # 每处理10条，额外休息一会儿
+                                if total_processed % 10 == 0:
+                                    rest_time = random.uniform(5.0, 10.0)
+                                    logger.info(f"已处理 {total_processed} 条，休息 {rest_time:.1f} 秒...")
+                                    await asyncio.sleep(rest_time)
+
+                                if not no_limit and total_processed >= limit:
+                                    logger.info(f"已达到目标数量 {limit}")
+                                    break
+                            except Exception as e:
+                                logger.warning(f"处理activity失败: {e}")
+
+                all_activities = activities
+                last_count = current_count
+                consecutive_no_new = 0
+
+                # 检查是否达到限制
+                if not no_limit and total_processed >= limit:
+                    break
+            else:
+                consecutive_no_new += 1
+                if scroll_count % 10 == 0:  # 每10次汇报一次
+                    logger.info(f"第 {consecutive_no_new} 次没有新内容 (滚动 {scroll_count} 次)")
+
+                if consecutive_no_new >= max_consecutive_no_new:
+                    logger.info(f"连续 {max_consecutive_no_new} 次没有新内容，停止滚动")
+                    break
+
+            # 小步滚动 - 模拟人类慢慢往下翻
+            scroll_amount = random.randint(800, 1200)  # 每次滚动800-1200px
+
+            if scroll_count % 10 == 0:
+                logger.debug(f"向下滚动 {scroll_amount}px...")
+
+            # 使用平滑滚动，更像人类
+            await self.page.evaluate(f"""
+                () => {{
+                    window.scrollBy({{
+                        top: {scroll_amount},
+                        behavior: 'smooth'
+                    }});
+                }}
+            """)
+
+            # 等待内容加载（较长时间）
+            wait_time = random.uniform(4.0, 8.0)
+            await asyncio.sleep(wait_time)
+
+            # 偶尔随机向上滚动一点（模拟人类回滚查看）
+            if random.random() < 0.15:  # 15%概率
+                scroll_up = random.randint(200, 500)
+                logger.debug(f"随机向上回滚 {scroll_up}px（模拟人类行为）")
+                await self.page.evaluate(f"window.scrollBy(0, -{scroll_up})")
+                await asyncio.sleep(random.uniform(2.0, 4.0))
+
+            # 偶尔移动鼠标（模拟人类）
+            if random.random() < 0.3:  # 30%概率
+                await self._random_mouse_move()
+
+        logger.info(f"滚动结束: 共 {scroll_count} 次滚动，{len(all_activities)} 条内容，处理 {total_processed} 条")
+
+        if all_activities:
+            logger.info(f"从 {page_url} 共解析到 {len(all_activities)} 条，实际处理 {total_processed} 条")
+
+        return all_activities, total_processed
+
     async def fetch_likes(  # noqa: C901
         self,
         limit: int = 20,
         offset: int = 0,
         item_callback: Callable[[dict, int], Awaitable[None]] | None = None,
     ) -> list[dict]:
-        """获取用户点赞列表 - 增量滚动模式，边滚动边解析边保存"""
-        # 访问用户主页
-        url = f"{self.ZHIHU_BASE}/people/{self.user_id}"
-        logger.info(f"访问用户主页: {url}")
+        """获取用户点赞列表 - 从多个页面源获取，支持增量滚动模式.
 
-        await self._delay()
-        assert self.page is not None  # noqa: S101
-        await self.page.goto(url)
-
-        # 等待页面加载
-        try:
-            assert self.page is not None  # noqa: S101
-            await self.page.wait_for_load_state("networkidle", timeout=10000)
-            await asyncio.sleep(2)
-        except Exception:
-            pass
-
-        # 增量滚动：分批滚动并解析，避免长时间等待
-        # 处理无限制情况（limit < 0）
+        同时访问用户主页和"赞过"页面，获取更多历史数据。
+        """
         no_limit = limit < 0
-        target_count = "无限制" if no_limit else limit
-        logger.info(f"开始增量滚动，目标数量: {target_count}...")
+        processed_ids: set[str] = set()
+        total_processed = 0
         all_activities: list[dict] = []
-        processed_ids: set[str] = set()  # 跟踪已处理的activity ID
-        last_count = 0
-        no_new_content_count = 0
-        max_no_new_content = 8 if no_limit else 5  # 全量模式下更多容错
-        max_scroll_rounds = 1000 if no_limit else 50  # 全量模式下大幅增加滚动轮数
-        scroll_round = 0
-        total_processed = 0  # 实际处理计数
 
-        # 全量模式下，先滚动到底部多次以加载更多历史内容
-        if no_limit:
-            logger.info("全量模式：先进行深度滚动加载历史内容...")
-            for deep_scroll in range(10):
-                await self.page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-                await asyncio.sleep(2)
-                current_height = await self.page.evaluate("document.body.scrollHeight")
-                logger.debug(f"深度滚动 {deep_scroll + 1}/10，页面高度: {current_height}px")
+        # 1. 首先访问用户主页
+        logger.info("=" * 60)
+        logger.info("第1阶段：从用户主页获取点赞...")
+        logger.info("=" * 60)
+        home_url = f"{self.ZHIHU_BASE}/people/{self.user_id}"
+        activities, total_processed = await self._fetch_likes_from_page(
+            page_url=home_url,
+            limit=limit,
+            item_callback=item_callback,
+            processed_ids=processed_ids,
+            total_processed=total_processed,
+        )
+        all_activities.extend(activities)
+        logger.info(f"用户主页采集完成: {len(activities)} 条, 累计: {total_processed} 条")
 
-        # 循环条件：无限制时只检查滚动次数，有限制时检查目标数量
-        last_height = 0
-        while (no_limit or total_processed < limit) and scroll_round < max_scroll_rounds:
-            scroll_round += 1
-            logger.info(f"第 {scroll_round} 轮滚动...")
+        # 2. 如果全量模式，继续访问"赞过"页面获取更多历史数据
+        if no_limit or total_processed < limit:
+            logger.info("=" * 60)
+            logger.info("第2阶段：从'赞过'页面获取更多历史点赞...")
+            logger.info("=" * 60)
+            zans_url = f"{self.ZHIHU_BASE}/people/{self.user_id}/zans"
+            remaining_limit = -1 if no_limit else limit - total_processed
+            zans_activities, total_processed = await self._fetch_likes_from_page(
+                page_url=zans_url,
+                limit=remaining_limit,
+                item_callback=item_callback,
+                processed_ids=processed_ids,
+                total_processed=total_processed,
+            )
+            # 过滤已处理的
+            new_activities = [a for a in zans_activities if a.get("id") not in processed_ids]
+            all_activities.extend(new_activities)
+            logger.info(f"'赞过'页面采集完成: {len(new_activities)} 条新数据, 累计: {total_processed} 条")
 
-            # 每次滚动更多次，更激进的滚动策略
-            assert self.page is not None  # noqa: S101
-            for _ in range(5):  # 增加滚动次数到5次
-                await self.page.evaluate("""() => {
-                        window.scrollBy(0, 1500);
-                    }""")
-                # 随机延迟 1-3 秒，给页面足够时间加载
-                sleep_time = random.uniform(1.0, 3.0)
-                await asyncio.sleep(sleep_time)
-
-            # 额外等待，确保内容加载完成
-            await asyncio.sleep(2)
-
-            # 获取当前页面高度，检查是否有新内容加载
-            current_height = await self.page.evaluate("document.body.scrollHeight")
-            logger.info(f"页面高度: {current_height}px (上次: {last_height}px)")
-
-            # 获取当前页面内容并解析
-            assert self.page is not None  # noqa: S101
-            content = await self.page.content()
-            activities = self._parse_activities_from_html(content)
-
-            if not activities:
-                no_new_content_count += 1
-                if no_new_content_count >= max_no_new_content:
-                    logger.info("没有解析到活动数据，停止滚动")
-                    break
-                continue
-
-            # 检查是否有新内容
-            has_new_activity = len(activities) > last_count
-            has_new_height = current_height > last_height
-
-            if has_new_activity:
-                new_activities = activities[last_count:]  # 只获取新增的部分
-                new_count = len(new_activities)
-                logger.info(f"第 {scroll_round} 轮滚动后: 共 {len(activities)} 条 (+{new_count})")
-
-                # 立即处理新增的activities（边滚动边保存）
-                if item_callback:
-                    for activity in new_activities:
-                        activity_id = activity.get("id", "")
-                        if activity_id and activity_id not in processed_ids:
-                            try:
-                                await item_callback(activity, total_processed)
-                                processed_ids.add(activity_id)
-                                total_processed += 1
-
-                                # 检查是否已达到限制
-                                if not no_limit and total_processed >= limit:
-                                    logger.info(f"已达到目标数量 {limit}，停止滚动")
-                                    break
-                            except Exception as e:
-                                logger.warning(f"处理activity失败: {e}")
-
-                all_activities = activities
-                last_count = len(activities)
-                no_new_content_count = 0
-
-                # 检查是否已达到限制
-                if not no_limit and total_processed >= limit:
-                    break
-            elif has_new_height:
-                # 页面高度增加了但没有新activity，可能是其他内容（如广告）
-                logger.info(f"页面高度增加 ({last_height} -> {current_height}) 但没有新activity")
-                no_new_content_count = 0  # 重置计数器，继续尝试
-            else:
-                no_new_content_count += 1
-                logger.info(f"没有新内容，连续 {no_new_content_count} 次")
-
-                # 尝试点击"查看更多"或"加载更多"按钮
-                try:
-                    assert self.page is not None  # noqa: S101
-                    has_more = await self.page.evaluate("""() => {
-                            const selectors = [
-                                '.ActivityItem-more',
-                                '.ContentItem-more',
-                                '.FeedItem-more',
-                                '[data-za-detail-view-element_name="ViewMore"]',
-                                '.Button:contains("查看更多")',
-                                '.Button:contains("加载更多")',
-                                'button:contains("查看更多")',
-                                'button:contains("加载更多")'
-                            ];
-                            for (const sel of selectors) {
-                                const btn = document.querySelector(sel);
-                                if (btn && btn.offsetParent !== null) {
-                                    btn.click();
-                                    return true;
-                                }
-                            }
-                            return false;
-                        }""")
-                    if has_more:
-                        logger.info("点击了'查看更多'按钮")
-                        await asyncio.sleep(random.uniform(2.0, 4.0))
-                        continue
-                except Exception as e:
-                    logger.debug(f"点击'查看更多'失败: {e}")
-
-            # 更新页面高度记录
-            last_height = current_height
-
-            # 如果已经获取足够内容，提前退出
-            if not no_limit and total_processed >= limit:
-                logger.info(f"已获取足够内容 ({total_processed} 条)，停止滚动")
-                break
-
-            # 连续多次没有新内容，停止滚动
-            if no_new_content_count >= max_no_new_content:
-                logger.info(f"连续 {max_no_new_content} 次没有新内容，停止滚动")
-                # 全量模式下尝试点击更多按钮后继续
-                if no_limit and scroll_round < max_scroll_rounds:
-                    logger.info("全量模式下继续尝试...")
+        # 3. 如果还是不够，尝试直接访问 API
+        if (no_limit or total_processed < limit) and total_processed < 50:
+            logger.info("=" * 60)
+            logger.info("第3阶段：尝试通过 API 获取更多数据...")
+            logger.info("=" * 60)
+            api_activities = await self._fetch_likes_from_api(limit, offset, processed_ids)
+            new_api_activities = [a for a in api_activities if a.get("id") not in processed_ids]
+            # 处理 API 获取的数据
+            if item_callback:
+                for activity in new_api_activities:
                     try:
-                        await self.page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-                        await asyncio.sleep(3)
-                        # 检查是否有新内容
-                        content = await self.page.content()
-                        activities = self._parse_activities_from_html(content)
-                        if len(activities) > last_count:
-                            no_new_content_count = 0
-                            continue
-                    except Exception:
-                        pass
-                break
+                        await item_callback(activity, total_processed)
+                        processed_ids.add(activity.get("id", ""))
+                        total_processed += 1
+                    except Exception as e:
+                        logger.warning(f"处理API activity失败: {e}")
+            all_activities.extend(new_api_activities)
+            logger.info(f"API采集完成: {len(new_api_activities)} 条新数据, 累计: {total_processed} 条")
 
-        if all_activities:
-            logger.info(f"共解析到 {len(all_activities)} 条，实际处理 {total_processed} 条")
-            # 返回所有activities（已通过回调处理过）
-            return all_activities
+        logger.info("=" * 60)
+        logger.info(f"所有来源采集完成: 共 {len(all_activities)} 条，实际处理 {total_processed} 条")
+        logger.info("=" * 60)
+        return all_activities
 
-        # 如果页面解析失败，尝试直接访问 API
-        logger.info("页面解析失败，尝试直接访问 API...")
+    async def _fetch_likes_from_api(
+        self,
+        limit: int,
+        offset: int,
+        processed_ids: set[str],
+    ) -> list[dict]:
+        """通过 API 获取点赞列表."""
+        logger.info("尝试直接访问 API...")
         api_url = f"{self.API_BASE}/members/{self.user_id}/activities?limit={limit}&offset={offset}"
 
         await self._delay()
