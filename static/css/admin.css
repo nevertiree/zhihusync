@@ -247,19 +247,49 @@ body {
   border-radius: 50%;
   background: var(--text-muted);
   flex-shrink: 0;
+  transition: all 0.3s ease;
 }
 
+/* 就绪/空闲状态 - 蓝色 */
+.status-dot.idle {
+  background: var(--info);
+  box-shadow: 0 0 6px rgba(24, 144, 255, 0.4);
+}
+
+/* 同步中状态 - 黄色 + 脉冲动画 */
 .status-dot.running {
   background: var(--warning);
+  box-shadow: 0 0 8px rgba(250, 173, 20, 0.5);
   animation: pulse 1.5s infinite;
 }
 
+/* 成功状态 - 绿色 */
 .status-dot.success {
   background: var(--success);
+  box-shadow: 0 0 6px rgba(82, 196, 26, 0.4);
 }
 
+/* 失败状态 - 红色 */
 .status-dot.failed {
   background: var(--danger);
+  box-shadow: 0 0 6px rgba(255, 77, 79, 0.4);
+}
+
+/* 状态文字颜色 */
+.sync-status:has(.status-dot.idle) .status-text {
+  color: var(--info);
+}
+
+.sync-status:has(.status-dot.running) .status-text {
+  color: var(--warning);
+}
+
+.sync-status:has(.status-dot.success) .status-text {
+  color: var(--success);
+}
+
+.sync-status:has(.status-dot.failed) .status-text {
+  color: var(--danger);
 }
 
 .status-text {
