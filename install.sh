@@ -17,6 +17,10 @@ print_color() {
     echo -e "${1}${2}${NC}"
 }
 
+# 配置
+DOCKER_IMAGE="nevertiree26/zhihusync:latest"
+GITHUB_RAW="https://raw.githubusercontent.com/nevertiree/zhihusync/master"
+
 # 检查是否在 WSL 环境
 is_wsl() {
     if grep -qE "(Microsoft|WSL)" /proc/version 2>/dev/null; then
@@ -27,14 +31,13 @@ is_wsl() {
 
 # 显示欢迎信息
 show_welcome() {
-    # 使用 printf 替代 clear，兼容性更好
     printf '\033[2J\033[H' 2>/dev/null || echo ""
     print_color "$CYAN" "
 ╔═══════════════════════════════════════════════════════════╗
 ║                                                           ║
 ║   🔄 zhihusync - 知乎点赞内容自动备份工具                    ║
 ║                                                           ║
-║   全自动安装，只需配置数据保存位置                          ║
+║   全自动安装，支持 Docker Hub 或本地构建                    ║
 ║                                                           ║
 ╚═══════════════════════════════════════════════════════════╝
 "
@@ -197,6 +200,106 @@ configure_zhihu() {
     echo ""
 }
 
+# 尝试拉取 Docker Hub 镜像
+try_pull_image() {
+    print_color "$YELLOW" "📥 尝试从 Docker Hub 拉取镜像..."
+    print_color "$CYAN" "   镜像: $DOCKER_IMAGE"
+    echo ""
+
+    if docker pull "$DOCKER_IMAGE" 2>&1; then
+        print_color "$GREEN" "✅ 镜像拉取成功"
+        return 0
+    else
+        print_color "$RED" "❌ 镜像拉取失败"
+        return 1
+    fi
+}
+
+# 本地构建镜像
+build_image_locally() {
+    print_color "$YELLOW" "🔨 本地构建镜像..."
+    print_color "$CYAN" "   这将下载 Dockerfile 并本地构建（可能需要 3-8 分钟）"
+    echo ""
+
+    # 创建临时目录
+    BUILD_DIR=$(mktemp -d)
+    cd "$BUILD_DIR"
+
+    # 下载 Dockerfile 和相关文件
+    print_color "$BLUE" "📥 下载构建文件..."
+
+    local files=("Dockerfile.local" "requirements.txt" "entrypoint.sh")
+    for file in "${files[@]}"; do
+        if ! curl -fsSL -o "$file" "$GITHUB_RAW/$file" 2>/dev/null; then
+            print_color "$YELLOW" "⚠️  无法从 GitHub 下载 $file"
+        fi
+    done
+
+    # 检查 Dockerfile 是否存在
+    if [ ! -f "Dockerfile.local" ]; then
+        print_color "$RED" "❌ 无法下载 Dockerfile"
+        cd - > /dev/null
+        rm -rf "$BUILD_DIR"
+        return 1
+    fi
+
+    # 重命名 Dockerfile
+    mv Dockerfile.local Dockerfile
+
+    print_color "$BLUE" "🚀 开始构建（请耐心等待）..."
+    echo ""
+
+    # 构建镜像
+    if docker build -t "$DOCKER_IMAGE" . 2>&1; then
+        print_color "$GREEN" "✅ 镜像构建成功"
+        cd - > /dev/null
+        rm -rf "$BUILD_DIR"
+        return 0
+    else
+        print_color "$RED" "❌ 镜像构建失败"
+        cd - > /dev/null
+        rm -rf "$BUILD_DIR"
+        return 1
+    fi
+}
+
+# 获取镜像（拉取或构建）
+get_image() {
+    echo ""
+    print_color "$YELLOW" "🐳 获取 Docker 镜像..."
+    echo ""
+
+    # 首先尝试拉取
+    if try_pull_image; then
+        return 0
+    fi
+
+    # 拉取失败，询问是否本地构建
+    echo ""
+    print_color "$YELLOW" "⚠️  从 Docker Hub 拉取镜像失败，可能的原因："
+    echo "   • 网络连接问题"
+    echo "   • Docker Hub 访问受限"
+    echo "   • 镜像不存在"
+    echo ""
+
+    read -p "是否尝试本地构建镜像? [Y/n]: " build_choice
+    if [[ "$build_choice" =~ ^[Nn]$ ]]; then
+        print_color "$RED" "❌ 安装已取消"
+        exit 1
+    fi
+
+    if build_image_locally; then
+        return 0
+    else
+        print_color "$RED" "❌ 无法获取镜像，安装失败"
+        print_color "$CYAN" "💡 建议："
+        echo "   1. 检查网络连接"
+        echo "   2. 手动克隆仓库并构建: git clone https://github.com/nevertiree/zhihusync.git"
+        echo "   3. 联系支持: https://github.com/nevertiree/zhihusync/issues"
+        exit 1
+    fi
+}
+
 # 启动服务
 start_service() {
     print_color "$YELLOW" "🚀 启动 zhihusync 服务..."
@@ -227,13 +330,36 @@ start_service() {
         -e ZHIHUSYNC_LOGGING_LEVEL=INFO \
         -e PLAYWRIGHT_BROWSER=chromium \
         -e PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 \
-        nevertiree26/zhihusync:latest; then
+        "$DOCKER_IMAGE"; then
         print_color "$RED" "❌ 服务启动失败"
         exit 1
     fi
 
     print_color "$GREEN" "✅ 服务启动成功！"
     echo ""
+}
+
+# 等待服务就绪
+wait_for_service() {
+    print_color "$YELLOW" "⏳ 等待服务启动..."
+
+    local max_attempts=30
+    local attempt=1
+
+    while [ $attempt -le $max_attempts ]; do
+        if curl -fsSL http://localhost:6067/api/stats > /dev/null 2>&1; then
+            print_color "$GREEN" "✅ 服务已就绪"
+            return 0
+        fi
+
+        echo "   等待中... ($attempt/$max_attempts)"
+        sleep 2
+        attempt=$((attempt + 1))
+    done
+
+    print_color "$YELLOW" "⚠️  服务启动超时，但容器已在运行"
+    print_color "$CYAN" "   请稍后手动访问: http://localhost:6067"
+    return 1
 }
 
 # 显示完成信息
@@ -265,6 +391,7 @@ show_completion() {
     echo "   查看日志: docker logs -f zhihusync"
     echo "   停止服务: docker stop zhihusync"
     echo "   启动服务: docker start zhihusync"
+    echo "   重启服务: docker restart zhihusync"
     echo ""
     print_color "$RED" "⚠️  重要提醒:"
     echo "   数据保存在: $DATA_DIR"
@@ -282,7 +409,9 @@ main() {
 
     configure_data_dir
     configure_zhihu
+    get_image
     start_service
+    wait_for_service
     show_completion
 }
 

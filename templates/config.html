@@ -45,112 +45,151 @@
     </button>
 </div>
 
-<!-- Cookie 配置 - 简化版 -->
+<!-- Cookie 配置 - 左右两栏布局 -->
 <div class="tab-content active" id="tab-cookie">
-    
-    <!-- 浏览器检测横幅 -->
-    <div id="browser-detection-banner" class="status-banner" style="display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 12px; margin-bottom: 20px;">
-        <div style="display: flex; align-items: center; gap: 12px;">
-            <span id="browser-icon" style="font-size: 24px;">🌐</span>
-            <div>
-                <div style="font-weight: 600; font-size: 15px;">检测到您正在使用 <span id="browser-name">浏览器</span></div>
-                <div style="font-size: 13px; opacity: 0.9;">请安装 EditThisCookie 扩展以快速获取 Cookie</div>
+    <!-- Cookie 信息卡片 -->
+    <div id="cookie-info-display" style="display: none; margin-bottom: 20px;">
+        <div class="card" id="cookie-info-card" style="border: 2px solid var(--success); background: linear-gradient(135deg, rgba(82, 196, 26, 0.05) 0%, rgba(82, 196, 26, 0.12) 100%);">
+            <div class="card-body" style="padding: 16px 20px;">
+                <div style="display: flex; align-items: center; gap: 16px;">
+                    <div id="cookie-status-icon" style="width: 48px; height: 48px; background: var(--success); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 24px;">✅</div>
+                    <div style="flex: 1;">
+                        <div style="font-weight: 600; color: var(--text-primary); font-size: 15px; margin-bottom: 4px;">
+                            <span id="cookie-card-title">Cookie 已配置</span>
+                        </div>
+                        <div style="color: var(--text-secondary); font-size: 13px; line-height: 1.6;">
+                            <div>
+                                <span style="color: var(--text-muted);">用户:</span>
+                                <span id="cookie-user-name" style="font-weight: 500; color: var(--text-primary);">-</span>
+                                <span id="cookie-user-id" style="color: var(--text-muted); margin-left: 8px;"></span>
+                            </div>
+                            <div style="margin-top: 2px;">
+                                <span style="color: var(--text-muted);">添加时间:</span>
+                                <span id="cookie-add-time" style="color: var(--text-secondary);">-</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div style="text-align: right;">
+                        <span id="cookie-verify-badge" class="badge badge-success" style="font-size: 12px;">已配置</span>
+                    </div>
+                </div>
             </div>
         </div>
-        <a id="browser-store-link" href="#" target="_blank" class="btn" style="background: white; color: #667eea; padding: 8px 16px; border-radius: 8px; text-decoration: none; font-weight: 500; white-space: nowrap;">
-            前往安装
-        </a>
     </div>
 
-    <!-- 简化的步骤卡片 -->
-    <div class="card" style="border: 2px solid var(--primary-color);">
-        <div class="card-header" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
-            <h3>🔌 使用 EditThisCookie 扩展获取 Cookie</h3>
-            <span class="badge" style="background: rgba(255,255,255,0.2); color: white;">推荐方法</span>
+    <!-- 两栏布局容器 -->
+    <div class="cookie-config-layout">
+        <!-- 左侧：Cookie 粘贴区域 -->
+        <div class="cookie-paste-section">
+            <div class="card">
+                <div class="card-header">
+                    <h3>📋 粘贴 Cookie 数据</h3>
+                    <span class="badge badge-warning" id="cookie-status-badge">未配置</span>
+                </div>
+                <div class="card-body compact">
+                    <!-- 格式选择 -->
+                    <div class="form-group" style="margin-bottom: 16px;">
+                        <label style="display: block; font-size: 14px; font-weight: 500; color: var(--text-primary); margin-bottom: 8px;">数据格式</label>
+                        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                            <label style="display: flex; align-items: center; padding: 8px 16px; background: var(--bg-tertiary); border-radius: 6px; cursor: pointer; border: 2px solid var(--primary-color);">
+                                <input type="radio" name="cookie-format" value="json" checked style="margin-right: 8px;">
+                                <span>JSON (EditThisCookie)</span>
+                            </label>
+                            <label style="display: flex; align-items: center; padding: 8px 16px; background: var(--bg-tertiary); border-radius: 6px; cursor: pointer; border: 2px solid transparent;">
+                                <input type="radio" name="cookie-format" value="auto" style="margin-right: 8px;">
+                                <span>自动检测</span>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <!-- 粘贴区域 -->
+                    <div class="form-group" style="margin-bottom: 16px;">
+                        <label style="display: block; font-size: 14px; font-weight: 500; color: var(--text-primary); margin-bottom: 8px;">
+                            Cookie 数据
+                            <span style="font-weight: normal; color: var(--text-muted); font-size: 12px;">（直接粘贴即可）</span>
+                        </label>
+                        <textarea class="form-textarea" id="cookie-input" rows="10" style="font-family: 'Consolas', monospace; font-size: 13px;"
+                            placeholder='[{"name": "z_c0", "value": "...", "domain": ".zhihu.com"}, ...]'></textarea>
+                    </div>
+                    
+                    <!-- 按钮组 - 靠右对齐 -->
+                    <div class="btn-group" style="display: flex; gap: 12px; justify-content: flex-end;">
+                        <button class="btn btn-danger" onclick="clearCookie()">
+                            <span>🗑️</span> 清除
+                        </button>
+                        <button class="btn btn-secondary" onclick="verifyCookie()">
+                            <span>🔍</span> 验证
+                        </button>
+                        <button class="btn btn-primary" id="save-cookie-btn" onclick="saveAndValidateCookie()">
+                            <span>💾</span> 保存并验证
+                        </button>
+                    </div>
+                    
+                    <!-- 验证结果 -->
+                    <div id="cookie-validation-result" style="display: none; margin-top: 16px; padding: 16px; border-radius: 8px;"></div>
+                </div>
+            </div>
         </div>
-        <div class="card-body compact">
-            <div class="step-list" style="counter-reset: step;">
-                <div class="step-item" style="display: flex; align-items: flex-start; margin-bottom: 16px; padding: 12px; background: var(--bg-tertiary); border-radius: 8px;">
-                    <div class="step-number" style="width: 28px; height: 28px; background: var(--primary-color); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 600; margin-right: 12px; flex-shrink: 0;">1</div>
-                    <div>
-                        <div style="font-weight: 500; margin-bottom: 4px;">安装 EditThisCookie 扩展</div>
-                        <div style="font-size: 13px; color: var(--text-muted);">点击上方"前往安装"按钮，或在浏览器扩展商店搜索 "EditThisCookie"</div>
-                    </div>
+
+        <!-- 右侧：使用指南 -->
+        <div class="cookie-guide-section">
+            <div class="card cookie-guide-card" style="border: 2px solid var(--primary-color);">
+                <div class="card-header" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                    <h3>🔌 使用指南</h3>
+                    <span class="badge" style="background: rgba(255,255,255,0.2); color: white;">推荐</span>
                 </div>
-                
-                <div class="step-item" style="display: flex; align-items: flex-start; margin-bottom: 16px; padding: 12px; background: var(--bg-tertiary); border-radius: 8px;">
-                    <div class="step-number" style="width: 28px; height: 28px; background: var(--primary-color); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 600; margin-right: 12px; flex-shrink: 0;">2</div>
-                    <div>
-                        <div style="font-weight: 500; margin-bottom: 4px;">打开知乎并登录</div>
-                        <div style="font-size: 13px; color: var(--text-muted);">访问 <a href="https://www.zhihu.com" target="_blank" style="color: var(--primary-color);">zhihu.com</a>，确保已登录账号</div>
-                    </div>
-                </div>
-                
-                <div class="step-item" style="display: flex; align-items: flex-start; margin-bottom: 16px; padding: 12px; background: var(--bg-tertiary); border-radius: 8px;">
-                    <div class="step-number" style="width: 28px; height: 28px; background: var(--primary-color); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 600; margin-right: 12px; flex-shrink: 0;">3</div>
-                    <div>
-                        <div style="font-weight: 500; margin-bottom: 4px;">导出 Cookie</div>
-                        <div style="font-size: 13px; color: var(--text-muted);">
-                            点击浏览器工具栏的 EditThisCookie 图标 → 选择 <code style="background: var(--bg-primary); padding: 2px 6px; border-radius: 4px;">.zhihu.com</code> → 点击 <strong>导出 Cookie</strong>
+                <div class="card-body compact cookie-guide-body">
+                    <div class="step-list cookie-step-list">
+                        <!-- EditThisCookie 提示（仅当已安装时显示） -->
+                        <div id="editthiscookie-installed-tip" class="step-item cookie-step-item" style="display: none;">
+                            <div class="step-content">
+                                <div style="font-weight: 500; color: var(--success); margin-bottom: 4px;">✅ 已检测到 EditThisCookie 扩展</div>
+                                <div class="step-desc">您可以直接使用扩展导出 Cookie</div>
+                            </div>
+                        </div>
+                        
+                        <!-- 未安装提示 -->
+                        <div id="editthiscookie-not-installed-tip" class="step-item cookie-step-item">
+                            <div class="step-content">
+                                <div style="font-weight: 500; margin-bottom: 6px;">📚 推荐使用 EditThisCookie 扩展</div>
+                                <div class="step-desc" style="margin-bottom: 8px;">安装此扩展可以快速导出知乎 Cookie</div>
+                                <a id="browser-store-link" href="#" target="_blank" class="btn btn-sm btn-primary" style="font-size: 12px; padding: 4px 12px;">
+                                    前往安装
+                                </a>
+                            </div>
+                        </div>
+                        
+                        <div class="step-item cookie-step-item">
+                            <div class="step-number">1</div>
+                            <div class="step-content">
+                                <div class="step-title">打开知乎并登录</div>
+                                <div class="step-desc">访问 <a href="https://www.zhihu.com" target="_blank" style="color: var(--primary-color);">zhihu.com</a>，确保已登录账号</div>
+                            </div>
+                        </div>
+                        
+                        <div class="step-item cookie-step-item">
+                            <div class="step-number">2</div>
+                            <div class="step-content">
+                                <div class="step-title">导出 Cookie</div>
+                                <div id="step-export-with-extension" class="step-desc" style="display: none;">
+                                    点击 EditThisCookie 图标 → 选择 <code>.zhihu.com</code> → 点击 <strong>导出</strong>
+                                </div>
+                                <div id="step-export-manual" class="step-desc">
+                                    F12 开发者工具 → Application → Cookies → 复制 z_c0
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="step-item cookie-step-item">
+                            <div class="step-number">3</div>
+                            <div class="step-content">
+                                <div class="step-title">粘贴并保存</div>
+                                <div class="step-desc">将导出的内容粘贴到左侧，点击保存</div>
+                            </div>
                         </div>
                     </div>
                 </div>
-                
-                <div class="step-item" style="display: flex; align-items: flex-start; padding: 12px; background: var(--bg-tertiary); border-radius: 8px;">
-                    <div class="step-number" style="width: 28px; height: 28px; background: var(--primary-color); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 600; margin-right: 12px; flex-shrink: 0;">4</div>
-                    <div>
-                        <div style="font-weight: 500; margin-bottom: 4px;">粘贴并保存</div>
-                        <div style="font-size: 13px; color: var(--text-muted);">将导出的 JSON 文本粘贴到下方的输入框中，然后点击保存</div>
-                    </div>
-                </div>
             </div>
-        </div>
-    </div>
-
-    <!-- Cookie 粘贴区域 -->
-    <div class="card" style="margin-top: 20px;">
-        <div class="card-header">
-            <h3>📋 粘贴 Cookie 数据</h3>
-            <span class="badge badge-warning" id="cookie-status-badge">未配置</span>
-        </div>
-        <div class="card-body compact">
-            <!-- 格式选择 -->
-            <div class="form-group" style="margin-bottom: 16px;">
-                <label style="display: block; font-size: 14px; font-weight: 500; color: var(--text-primary); margin-bottom: 8px;">数据格式</label>
-                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-                    <label style="display: flex; align-items: center; padding: 8px 16px; background: var(--bg-tertiary); border-radius: 6px; cursor: pointer; border: 2px solid var(--primary-color);">
-                        <input type="radio" name="cookie-format" value="json" checked style="margin-right: 8px;">
-                        <span>JSON (EditThisCookie)</span>
-                    </label>
-                    <label style="display: flex; align-items: center; padding: 8px 16px; background: var(--bg-tertiary); border-radius: 6px; cursor: pointer; border: 2px solid transparent;">
-                        <input type="radio" name="cookie-format" value="auto" style="margin-right: 8px;">
-                        <span>自动检测</span>
-                    </label>
-                </div>
-            </div>
-            
-            <!-- 粘贴区域 -->
-            <div class="form-group" style="margin-bottom: 16px;">
-                <label style="display: block; font-size: 14px; font-weight: 500; color: var(--text-primary); margin-bottom: 8px;">
-                    Cookie 数据
-                    <span style="font-weight: normal; color: var(--text-muted); font-size: 12px;">（直接粘贴即可）</span>
-                </label>
-                <textarea class="form-textarea" id="cookie-input" rows="6" style="font-family: 'Consolas', monospace; font-size: 13px;"
-                    placeholder='[{"name": "z_c0", "value": "...", "domain": ".zhihu.com"}, ...]'></textarea>
-            </div>
-            
-            <!-- 按钮组 -->
-            <div class="btn-group" style="display: flex; gap: 12px;">
-                <button class="btn btn-primary" id="save-cookie-btn" onclick="saveAndValidateCookie()" style="flex: 1;">
-                    <span>💾</span> 保存并验证
-                </button>
-                <button class="btn btn-danger" onclick="clearCookie()">
-                    <span>🗑️</span> 清除
-                </button>
-            </div>
-            
-            <!-- 验证结果 -->
-            <div id="cookie-validation-result" style="display: none; margin-top: 16px; padding: 16px; border-radius: 8px;"></div>
         </div>
     </div>
 
@@ -212,39 +251,71 @@
             };
         }
         
-        // 更新横幅显示
-        function updateBanner() {
-            const browser = detectBrowser();
-            const banner = document.getElementById('browser-detection-banner');
-            const nameEl = document.getElementById('browser-name');
-            const iconEl = document.getElementById('browser-icon');
-            const linkEl = document.getElementById('browser-store-link');
-            
-            if (banner && nameEl && iconEl && linkEl) {
-                nameEl.textContent = browser.name;
-                iconEl.textContent = browser.icon;
+        // 检测 EditThisCookie 扩展是否安装
+        function detectEditThisCookie() {
+            return new Promise((resolve) => {
+                // 检查是否是 Chrome/Edge 浏览器
+                const ua = navigator.userAgent.toLowerCase();
+                const isChrome = ua.indexOf('chrome') > -1 && ua.indexOf('edg') === -1;
+                const isEdge = ua.indexOf('edg') > -1;
                 
-                if (browser.isSupported) {
-                    linkEl.href = browser.storeUrl;
-                    linkEl.textContent = '前往安装';
-                    linkEl.style.display = 'inline-block';
-                    banner.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
-                } else {
-                    linkEl.style.display = 'none';
-                    banner.style.background = 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)';
-                    const subtitle = banner.querySelector('div > div > div:last-child');
-                    if (subtitle) {
-                        subtitle.textContent = browser.message;
-                    }
+                if (!isChrome && !isEdge) {
+                    resolve(false);
+                    return;
                 }
+                
+                // 尝试检测扩展
+                try {
+                    // 通过尝试访问扩展的特定元素来检测
+                    const testImg = document.createElement('img');
+                    testImg.src = 'chrome-extension://fngmhnnpilhplaeedifhccceomclgfbg/img/icon_128.png';
+                    testImg.onload = () => resolve(true);
+                    testImg.onerror = () => resolve(false);
+                    // 超时处理
+                    setTimeout(() => resolve(false), 1000);
+                } catch (e) {
+                    resolve(false);
+                }
+            });
+        }
+        
+        // 更新指南显示
+        async function updateGuide() {
+            const browser = detectBrowser();
+            const storeLink = document.getElementById('browser-store-link');
+            const installedTip = document.getElementById('editthiscookie-installed-tip');
+            const notInstalledTip = document.getElementById('editthiscookie-not-installed-tip');
+            const exportWithExt = document.getElementById('step-export-with-extension');
+            const exportManual = document.getElementById('step-export-manual');
+            
+            // 更新应用商店链接
+            if (storeLink && browser.isSupported) {
+                storeLink.href = browser.storeUrl;
+            }
+            
+            // 检测扩展是否安装
+            const isInstalled = await detectEditThisCookie();
+            
+            if (isInstalled) {
+                // 已安装：显示已安装提示，隐藏未安装提示
+                if (installedTip) installedTip.style.display = 'block';
+                if (notInstalledTip) notInstalledTip.style.display = 'none';
+                if (exportWithExt) exportWithExt.style.display = 'block';
+                if (exportManual) exportManual.style.display = 'none';
+            } else {
+                // 未安装：隐藏已安装提示，显示未安装提示（在指南中）
+                if (installedTip) installedTip.style.display = 'none';
+                if (notInstalledTip) notInstalledTip.style.display = 'block';
+                if (exportWithExt) exportWithExt.style.display = 'none';
+                if (exportManual) exportManual.style.display = 'block';
             }
         }
         
         // 页面加载完成后执行
         if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', updateBanner);
+            document.addEventListener('DOMContentLoaded', updateGuide);
         } else {
-            updateBanner();
+            updateGuide();
         }
     })();
     </script>
@@ -253,37 +324,22 @@
 <!-- 用户配置 -->
 <div class="tab-content" id="tab-user">
     <div class="card">
-        <div class="card-header">
-            <h3>👤 当前用户</h3>
-        </div>
-        <div class="card-body compact">
-            <div id="current-user-info" class="empty-state">
-                <p>尚未配置用户</p>
-            </div>
-        </div>
-    </div>
-
-    <div class="card">
-        <div class="card-header">
-            <h3>➕ 添加用户</h3>
-        </div>
-        <div class="card-body compact">
-            <div class="input-group">
-                <input type="text" class="form-input" id="new-user-id" placeholder="知乎用户 ID，例如: zhang-san-123">
-                <button class="btn btn-primary" onclick="addUser()">添加</button>
-            </div>
-            <p class="form-help">从知乎个人主页 URL 获取，/people/ 后面的部分</p>
-        </div>
-    </div>
-
-    <div class="card">
-        <div class="card-header">
+        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
             <h3>📋 用户列表</h3>
+            <div style="display: flex; gap: 8px; align-items: center;">
+                <div class="user-search-box" style="display: flex; gap: 8px;">
+                    <input type="text" id="user-search-input" class="form-input" placeholder="搜索用户名或ID..." style="width: 180px; padding: 6px 12px; font-size: 13px;">
+                    <button class="btn btn-sm btn-secondary" onclick="searchUsers()">搜索</button>
+                    <button class="btn btn-sm" onclick="clearUserSearch()" style="background: var(--bg-hover); color: var(--text-secondary);">重置</button>
+                </div>
+                <button class="btn btn-primary btn-sm" onclick="showAddUserModal()">➕ 添加用户</button>
+            </div>
         </div>
         <div class="card-body compact">
-            <div class="list-container" id="users-list">
+            <div class="user-list-container" id="users-list">
                 <div class="empty-state">暂无用户</div>
             </div>
+            <div id="user-search-result" style="display: none; margin-top: 12px; padding: 12px; background: var(--bg-tertiary); border-radius: 8px; font-size: 13px; color: var(--text-muted);"></div>
         </div>
     </div>
 </div>
@@ -403,6 +459,50 @@
         </div>
     </div>
 
+    <!-- 下载设置 -->
+    <div class="card">
+        <div class="card-header">
+            <h3>⬇️ 下载设置</h3>
+        </div>
+        <div class="card-body compact">
+            <form id="storage-form">
+                <div class="form-row-4">
+                    <div class="form-group">
+                        <label>下载图片</label>
+                        <select class="form-select" id="download-images">
+                            <option value="true">是</option>
+                            <option value="false">否</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>下载头像</label>
+                        <select class="form-select" id="download-avatars">
+                            <option value="true">是</option>
+                            <option value="false">否</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>压缩 HTML</label>
+                        <select class="form-select" id="compress-html">
+                            <option value="true">是</option>
+                            <option value="false" selected>否</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>保留原始数据</label>
+                        <select class="form-select" id="save-raw">
+                            <option value="true">是</option>
+                            <option value="false" selected>否</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">保存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <div class="card">
         <div class="card-header">
             <h3>🌐 浏览器设置</h3>
@@ -452,60 +552,67 @@
 
 <!-- 存储配置 -->
 <div class="tab-content" id="tab-storage">
-    <div class="card">
-        <div class="card-header">
-            <h3>📁 存储路径</h3>
+    <!-- Docker 存储配置 - 3列表格布局 -->
+    <div class="card" id="storage-config-card">
+        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+            <h3>🐳 Docker 存储配置</h3>
+            <button type="button" class="btn btn-sm btn-primary" id="storage-save-btn" onclick="saveStorageConfig()" disabled>保存</button>
         </div>
         <div class="card-body compact">
-            <div class="form-group">
-                <label>HTML 存储路径</label>
-                <input type="text" class="form-input" id="html-path" readonly>
-            </div>
-            <div class="form-group">
-                <label>数据库路径</label>
-                <input type="text" class="form-input" id="db-path" readonly>
-            </div>
-        </div>
-    </div>
-
-    <div class="card">
-        <div class="card-header">
-            <h3>⬇️ 下载设置</h3>
-        </div>
-        <div class="card-body compact">
-            <form id="storage-form">
-                <div class="form-row-4">
-                    <div class="form-group">
-                        <label>下载图片</label>
-                        <select class="form-select" id="download-images">
-                            <option value="true">是</option>
-                            <option value="false">否</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>下载头像</label>
-                        <select class="form-select" id="download-avatars">
-                            <option value="true">是</option>
-                            <option value="false">否</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>压缩 HTML</label>
-                        <select class="form-select" id="compress-html">
-                            <option value="true">是</option>
-                            <option value="false" selected>否</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>保留原始数据</label>
-                        <select class="form-select" id="save-raw">
-                            <option value="true">是</option>
-                            <option value="false" selected>否</option>
-                        </select>
-                    </div>
+            <form id="storage-path-form">
+                <!-- 3列表头 -->
+                <div style="display: grid; grid-template-columns: 120px 1fr 1fr; gap: 12px; padding: 10px 12px; background: var(--bg-tertiary); border-radius: 8px 8px 0 0; font-size: 13px; font-weight: 600; color: var(--text-secondary); border-bottom: 1px solid var(--border-color);">
+                    <span>存储项</span>
+                    <span>容器内路径</span>
+                    <span>宿主机路径</span>
                 </div>
-                <div class="form-actions">
-                    <button type="submit" class="btn btn-primary">保存</button>
+
+                <!-- HTML 存储 -->
+                <div class="storage-row" style="display: grid; grid-template-columns: 120px 1fr 1fr; gap: 12px; padding: 12px; background: var(--bg-secondary); border-bottom: 1px solid var(--border-color); align-items: center;">
+                    <span style="font-weight: 500; color: var(--text-primary);">📄 HTML</span>
+                    <input type="text" class="form-input storage-container-path" id="html-path" readonly style="font-family: monospace; font-size: 13px; background: var(--bg-tertiary);">
+                    <input type="text" class="form-input storage-host-path" id="html-host-path" style="font-family: monospace; font-size: 13px;" placeholder="例如: /home/user/data/html">
+                </div>
+
+                <!-- 数据库存储 -->
+                <div class="storage-row" style="display: grid; grid-template-columns: 120px 1fr 1fr; gap: 12px; padding: 12px; background: var(--bg-secondary); border-bottom: 1px solid var(--border-color); align-items: center;">
+                    <span style="font-weight: 500; color: var(--text-primary);">🗄️ 数据库</span>
+                    <input type="text" class="form-input storage-container-path" id="db-path" readonly style="font-family: monospace; font-size: 13px; background: var(--bg-tertiary);">
+                    <input type="text" class="form-input storage-host-path" id="db-host-path" style="font-family: monospace; font-size: 13px;" placeholder="例如: /home/user/data/meta">
+                </div>
+
+                <!-- 静态资源 -->
+                <div class="storage-row" style="display: grid; grid-template-columns: 120px 1fr 1fr; gap: 12px; padding: 12px; background: var(--bg-secondary); border-bottom: 1px solid var(--border-color); align-items: center;">
+                    <span style="font-weight: 500; color: var(--text-primary);">📦 静态资源</span>
+                    <input type="text" class="form-input storage-container-path" id="static-path" readonly style="font-family: monospace; font-size: 13px; background: var(--bg-tertiary);">
+                    <input type="text" class="form-input storage-host-path" id="static-host-path" style="font-family: monospace; font-size: 13px;" placeholder="例如: /home/user/data/static">
+                </div>
+
+                <!-- 图片存储 -->
+                <div class="storage-row" style="display: grid; grid-template-columns: 120px 1fr 1fr; gap: 12px; padding: 12px; background: var(--bg-secondary); border-bottom: 1px solid var(--border-color); align-items: center;">
+                    <span style="font-weight: 500; color: var(--text-primary);">🖼️ 图片</span>
+                    <input type="text" class="form-input storage-container-path" id="images-path" readonly style="font-family: monospace; font-size: 13px; background: var(--bg-tertiary);">
+                    <input type="text" class="form-input storage-host-path" id="images-host-path" style="font-family: monospace; font-size: 13px;" placeholder="例如: /home/user/data/images">
+                </div>
+
+                <!-- 数据根目录 -->
+                <div class="storage-row" style="display: grid; grid-template-columns: 120px 1fr 1fr; gap: 12px; padding: 12px; background: var(--bg-primary); border-radius: 0 0 8px 8px; align-items: center; border: 1px solid var(--border-color); border-top: none;">
+                    <span style="font-weight: 600; color: var(--text-primary);">📁 数据根目录</span>
+                    <input type="text" class="form-input storage-container-path" id="data-root-path" readonly style="font-family: monospace; font-size: 13px; background: var(--bg-tertiary);" value="/app/data">
+                    <input type="text" class="form-input storage-host-path" id="data-root-host-path" style="font-family: monospace; font-size: 13px;" placeholder="例如: /home/user/data">
+                </div>
+
+                <div style="margin-top: 16px; padding: 12px; background: var(--bg-secondary); border-radius: 8px; font-size: 13px; color: var(--text-secondary);">
+                    <strong>💡 说明：</strong>容器内路径是 Docker 内部使用的路径，宿主机路径是实际存储数据的位置。
+                    <br>修改宿主机路径后点击保存，会生成新的 Docker 启动命令，需要重启容器才能生效。
+                </div>
+
+                <!-- 保存操作区域 -->
+                <div id="storage-action-area" style="display: none; margin-top: 16px;">
+                    <div style="color: var(--warning); font-size: 13px; margin-bottom: 12px; padding: 12px; background: var(--bg-tertiary); border-radius: 8px;">
+                        <strong>⚠️ 提示：</strong>路径已修改，保存后将生成新的 Docker 启动命令。
+                    </div>
+                    <div id="docker-command-output" style="display: none; margin-top: 12px; padding: 12px; background: #1e1e1e; border-radius: 6px; font-family: 'Consolas', monospace; font-size: 12px; color: #d4d4d4; overflow-x: auto;"></div>
                 </div>
             </form>
         </div>
@@ -690,6 +797,40 @@
     </div>
 </div>
 
+<!-- 添加用户模态框 -->
+<div id="add-user-modal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 9999; align-items: center; justify-content: center;">
+    <div style="background: white; border-radius: 12px; width: 90%; max-width: 480px; max-height: 80vh; overflow: auto; position: relative;">
+        <div style="padding: 16px 20px; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center;">
+            <h3 style="margin: 0; font-size: 18px;">➕ 添加用户</h3>
+            <button onclick="closeAddUserModal()" style="width: 32px; height: 32px; border: none; background: #f3f4f6; border-radius: 6px; cursor: pointer; font-size: 18px; display: flex; align-items: center; justify-content: center;">✕</button>
+        </div>
+        <div style="padding: 20px;">
+            <div style="margin-bottom: 20px;">
+                <label style="display: block; font-size: 14px; font-weight: 500; color: var(--text-primary); margin-bottom: 8px;">知乎用户 ID</label>
+                <input type="text" id="modal-user-id" class="form-input" placeholder="例如: zhang-san-123" style="width: 100%; box-sizing: border-box;">
+            </div>
+            
+            <div style="background: var(--bg-tertiary); border-radius: 8px; padding: 16px; margin-bottom: 20px;">
+                <h4 style="margin: 0 0 12px 0; font-size: 14px; color: var(--text-primary);">📖 如何获取用户 ID</h4>
+                <ol style="margin: 0; padding-left: 20px; font-size: 13px; color: var(--text-secondary); line-height: 1.8;">
+                    <li>打开知乎并登录 <a href="https://www.zhihu.com" target="_blank">zhihu.com</a></li>
+                    <li>点击头像 → 我的主页</li>
+                    <li>查看地址栏 URL: <code style="background: var(--bg-secondary); padding: 2px 6px; border-radius: 4px;">zhihu.com/people/<b>xxxxx</b></code></li>
+                    <li><b>xxxxx</b> 就是用户 ID</li>
+                </ol>
+                <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border-color); font-size: 13px; color: var(--text-muted);">
+                    💡 示例: <code>zhang-san-123</code>、<code>wang-wu</code>
+                </div>
+            </div>
+            
+            <div style="display: flex; gap: 12px; justify-content: flex-end;">
+                <button class="btn" onclick="closeAddUserModal()" style="background: var(--bg-hover); color: var(--text-secondary);">取消</button>
+                <button class="btn btn-primary" onclick="addUserFromModal()">添加</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <style>
 /* 状态概览栏 */
 .status-bar {
@@ -708,6 +849,12 @@
     border-radius: 20px;
     font-size: 13px;
     box-shadow: var(--shadow);
+}
+
+/* 覆盖 admin.css 中的 opacity 设置 */
+.status-bar .status-text {
+    opacity: 1 !important;
+    transform: none !important;
 }
 
 .status-item.ok {
@@ -1076,7 +1223,313 @@
     margin-bottom: 4px;
 }
 
+/* Cookie 配置页面两栏布局 */
+.cookie-config-layout {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    align-items: stretch;
+}
+
+.cookie-paste-section {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.cookie-paste-section .card {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.cookie-paste-section .card-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.cookie-paste-section .form-group:has(textarea) {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.cookie-paste-section textarea {
+    flex: 1;
+    min-height: 120px;
+}
+
+.cookie-guide-section {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.cookie-guide-card {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.cookie-guide-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 12px 16px !important;
+}
+
+.cookie-step-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.cookie-step-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 12px;
+    background: var(--bg-tertiary);
+    border-radius: 8px;
+}
+
+.cookie-step-item .step-number {
+    width: 24px;
+    height: 24px;
+    background: var(--primary-color);
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 12px;
+    flex-shrink: 0;
+    margin-top: 1px;
+}
+
+.cookie-step-item .step-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.cookie-step-item .step-title {
+    font-weight: 500;
+    font-size: 13px;
+    margin-bottom: 2px;
+    color: var(--text-primary);
+}
+
+.cookie-step-item .step-desc {
+    font-size: 12px;
+    color: var(--text-muted);
+    line-height: 1.5;
+}
+
+.cookie-step-item code {
+    background: var(--bg-primary);
+    padding: 1px 4px;
+    border-radius: 3px;
+    font-size: 11px;
+}
+
+/* 用户卡片样式 */
+.user-list-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 16px;
+}
+
+.user-card {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 16px;
+    background: var(--bg-secondary);
+    border: 2px solid var(--border-color);
+    border-radius: 12px;
+    transition: all 0.25s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.user-card::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    background: transparent;
+    transition: background 0.25s ease;
+}
+
+.user-card:hover {
+    border-color: var(--primary-color);
+    box-shadow: 0 4px 16px rgba(0, 102, 255, 0.12);
+    transform: translateY(-2px);
+}
+
+.user-card.has-cookie {
+    background: linear-gradient(135deg, rgba(82, 196, 26, 0.06) 0%, rgba(82, 196, 26, 0.12) 100%);
+    border-color: var(--success);
+    box-shadow: 0 2px 8px rgba(82, 196, 26, 0.1);
+}
+
+.user-card.has-cookie::before {
+    background: var(--success);
+}
+
+.user-card.has-cookie:hover {
+    box-shadow: 0 4px 16px rgba(82, 196, 26, 0.2);
+    border-color: var(--success);
+}
+
+/* Cookie 标识标签 */
+.user-card .cookie-indicator {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 8px;
+    height: 8px;
+    background: var(--success);
+    border-radius: 50%;
+    box-shadow: 0 0 0 2px var(--bg-secondary), 0 0 0 4px rgba(82, 196, 26, 0.3);
+    animation: pulse-indicator 2s infinite;
+}
+
+@keyframes pulse-indicator {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.7; transform: scale(1.1); }
+}
+
+.user-card .user-avatar {
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 20px;
+    font-weight: 600;
+    flex-shrink: 0;
+    overflow: hidden;
+    border: 2px solid var(--bg-secondary);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.user-card.has-cookie .user-avatar {
+    border-color: rgba(82, 196, 26, 0.3);
+    box-shadow: 0 2px 8px rgba(82, 196, 26, 0.2);
+}
+
+.user-card .user-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.user-card .user-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.user-card .user-name {
+    font-weight: 600;
+    font-size: 15px;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.3;
+}
+
+.user-card .user-id {
+    font-size: 12px;
+    color: var(--text-muted);
+    font-family: 'SF Mono', Monaco, monospace;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.user-card .user-sync {
+    font-size: 11px;
+    color: var(--text-muted);
+    opacity: 0.8;
+}
+
+.user-card .user-badges {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 8px;
+    margin-left: 8px;
+}
+
+.user-card .user-badges .badge {
+    font-size: 11px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.user-card .user-badges .btn {
+    font-size: 11px;
+    padding: 4px 12px;
+    border-radius: 6px;
+    opacity: 0.8;
+    transition: opacity 0.2s;
+}
+
+.user-card:hover .user-badges .btn {
+    opacity: 1;
+}
+
+/* 搜索框样式 */
+.user-search-box {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.user-search-box .form-input {
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    transition: all 0.2s;
+}
+
+.user-search-box .form-input:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(0, 102, 255, 0.1);
+}
+
+/* 搜索结果提示 */
+#user-search-result {
+    text-align: center;
+    border-left: 3px solid var(--primary-color);
+}
+
 /* 响应式 */
+@media (max-width: 1024px) {
+    .cookie-config-layout {
+        grid-template-columns: 1fr;
+    }
+    
+    .cookie-guide-section {
+        order: -1;
+    }
+}
+
 @media (max-width: 768px) {
     .form-row-2,
     .form-row-3,
@@ -1170,10 +1623,9 @@ async function saveAndValidateCookie() {
     // 禁用按钮，显示加载状态
     saveBtn.disabled = true;
     saveBtn.innerHTML = '<span>⏳</span> 保存中...';
-    resultDiv.style.display = 'block';
-    resultDiv.style.background = '#e3f2fd';
-    resultDiv.style.border = '1px solid #2196f3';
-    resultDiv.innerHTML = '<p>🔄 正在保存 Cookie...</p>';
+    
+    // 显示耐心等待的提示框
+    showWaitingModal('正在验证 Cookie...', '请耐心等待，正在在线校验 Cookie 有效性，这可能需要几秒钟时间...');
     
     try {
         // 第一步：保存 Cookie
@@ -1186,6 +1638,8 @@ async function saveAndValidateCookie() {
         const saveData = await saveRes.json();
         
         if (!saveRes.ok) {
+            closeWaitingModal();
+            resultDiv.style.display = 'block';
             resultDiv.style.background = '#ffebee';
             resultDiv.style.border = '1px solid #f44336';
             resultDiv.innerHTML = `<p>❌ 保存失败: ${saveData.detail || '未知错误'}</p>`;
@@ -1194,16 +1648,29 @@ async function saveAndValidateCookie() {
         }
         
         // 第二步：自动验证
-        resultDiv.innerHTML = '<p>🔄 保存成功，正在验证 Cookie 有效性...</p>';
+        updateWaitingModal('正在验证 Cookie 有效性...', '请耐心等待，正在验证登录状态...');
         
         const testRes = await fetch('/api/cookies/test', { method: 'POST' });
         const testData = await testRes.json();
+        
+        // 关闭等待提示框
+        closeWaitingModal();
         
         // 更新状态显示
         updateCookieStatusBadge(testData.is_logged_in, testData.user_name);
         
         if (testData.is_logged_in) {
+            // 验证成功 - 自动添加用户
+            let autoAddSuccess = false;
+            if (testData.user_id) {
+                autoAddSuccess = await autoAddUser(testData.user_id, testData.user_name);
+            }
+            
+            // 显示 Cookie 信息在页面顶部（验证成功）
+            showCookieInfo(testData.user_name, testData.user_id, new Date().toISOString(), true);
+            
             // 验证成功
+            resultDiv.style.display = 'block';
             resultDiv.style.background = '#e8f5e9';
             resultDiv.style.border = '1px solid #4caf50';
             resultDiv.innerHTML = `
@@ -1212,13 +1679,18 @@ async function saveAndValidateCookie() {
                     <div>
                         <div style="font-weight: 600; color: #2e7d32; margin-bottom: 4px;">Cookie 验证成功</div>
                         <div style="font-size: 13px; color: #555;">用户: ${testData.user_name || '未知'} (${testData.user_id || ''})</div>
+                        ${autoAddSuccess ? '<div style="font-size: 12px; color: #4caf50; margin-top: 4px;">已自动添加到用户列表</div>' : ''}
                     </div>
                 </div>
             `;
             showToast('Cookie 保存并验证成功！', 'success');
             cookieInput.value = ''; // 清空输入框
+            
+            // 立即刷新用户列表
+            await loadUsers();
         } else {
             // 验证失败
+            resultDiv.style.display = 'block';
             resultDiv.style.background = '#fff3e0';
             resultDiv.style.border = '1px solid #ff9800';
             resultDiv.innerHTML = `
@@ -1235,6 +1707,8 @@ async function saveAndValidateCookie() {
         }
         
     } catch (e) {
+        closeWaitingModal();
+        resultDiv.style.display = 'block';
         resultDiv.style.background = '#ffebee';
         resultDiv.style.border = '1px solid #f44336';
         resultDiv.innerHTML = `<p>❌ 错误: ${e.message}</p>`;
@@ -1242,6 +1716,153 @@ async function saveAndValidateCookie() {
     } finally {
         saveBtn.disabled = false;
         saveBtn.innerHTML = '<span>💾</span> 保存并验证';
+    }
+}
+
+// 显示 Cookie 信息
+// 显示 Cookie 信息卡片
+function showCookieInfo(userName, userId, addedTime, isLoggedIn) {
+    const infoDiv = document.getElementById('cookie-info-display');
+    const card = document.getElementById('cookie-info-card');
+    const title = document.getElementById('cookie-card-title');
+    const icon = document.getElementById('cookie-status-icon');
+    const nameSpan = document.getElementById('cookie-user-name');
+    const idSpan = document.getElementById('cookie-user-id');
+    const timeSpan = document.getElementById('cookie-add-time');
+    const badge = document.getElementById('cookie-verify-badge');
+    
+    if (!infoDiv) return;
+    
+    // 区分已配置和已验证状态
+    // isLoggedIn === true: 验证成功
+    // isLoggedIn === false: 已保存但未验证或验证失败
+    
+    // 设置内容
+    nameSpan.textContent = userName || '未知用户';
+    idSpan.textContent = userId ? `(@${userId})` : '';
+    
+    // 格式化添加时间
+    if (addedTime) {
+        const date = new Date(addedTime);
+        timeSpan.textContent = date.toLocaleString('zh-CN', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+    } else {
+        timeSpan.textContent = '-';
+    }
+    
+    // 根据验证状态设置样式
+    if (isLoggedIn) {
+        // 已验证
+        card.style.borderColor = 'var(--success)';
+        card.style.background = 'linear-gradient(135deg, rgba(82, 196, 26, 0.05) 0%, rgba(82, 196, 26, 0.12) 100%)';
+        icon.style.background = 'var(--success)';
+        icon.textContent = '✅';
+        title.textContent = 'Cookie 已验证';
+        badge.className = 'badge badge-success';
+        badge.textContent = '已验证';
+    } else {
+        // 已配置但未验证（保存成功但验证未通过或未验证）
+        card.style.borderColor = 'var(--info)';
+        card.style.background = 'linear-gradient(135deg, rgba(24, 144, 255, 0.05) 0%, rgba(24, 144, 255, 0.1) 100%)';
+        icon.style.background = 'var(--info)';
+        icon.textContent = '🍪';
+        title.textContent = 'Cookie 已配置';
+        badge.className = 'badge badge-info';
+        badge.textContent = '已配置';
+    }
+    
+    infoDiv.style.display = 'block';
+}
+
+// 等待提示框相关函数
+function showWaitingModal(title, message) {
+    // 移除已存在的模态框
+    const existingModal = document.getElementById('waiting-modal');
+    if (existingModal) existingModal.remove();
+    
+    const modal = document.createElement('div');
+    modal.id = 'waiting-modal';
+    modal.innerHTML = `
+        <div style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 9999; display: flex; align-items: center; justify-content: center;">
+            <div style="background: white; border-radius: 12px; padding: 28px 32px; max-width: 420px; width: 90%; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,0.3);">
+                <div style="font-size: 48px; margin-bottom: 16px;">⏳</div>
+                <h3 id="waiting-title" style="margin: 0 0 12px 0; font-size: 18px; color: var(--text-primary);">${title}</h3>
+                <p id="waiting-message" style="margin: 0; font-size: 14px; color: var(--text-secondary); line-height: 1.6;">${message}</p>
+                <div style="margin-top: 20px;">
+                    <div style="width: 100%; height: 4px; background: #e0e0e0; border-radius: 2px; overflow: hidden;">
+                        <div style="width: 30%; height: 100%; background: var(--primary); border-radius: 2px; animation: loading-bar 1.5s infinite;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <style>
+            @keyframes loading-bar {
+                0% { transform: translateX(-100%); }
+                100% { transform: translateX(300%); }
+            }
+        </style>
+    `;
+    document.body.appendChild(modal);
+}
+
+function updateWaitingModal(title, message) {
+    const titleEl = document.getElementById('waiting-title');
+    const messageEl = document.getElementById('waiting-message');
+    if (titleEl) titleEl.textContent = title;
+    if (messageEl) messageEl.textContent = message;
+}
+
+function closeWaitingModal() {
+    const modal = document.getElementById('waiting-modal');
+    if (modal) modal.remove();
+}
+
+// 自动添加用户
+async function autoAddUser(userId, userName) {
+    if (!userId) return false;
+    
+    try {
+        console.log('开始自动添加用户:', userId);
+        
+        // 先检查是否已存在
+        const checkRes = await fetch('/api/users');
+        const checkData = await checkRes.json();
+        
+        console.log('当前用户列表:', checkData);
+        
+        const existingUser = checkData.users.find(u => u.user_id === userId);
+        if (existingUser) {
+            console.log('用户已存在:', userId);
+            return true; // 用户已存在也算成功
+        }
+        
+        // 添加用户
+        const res = await fetch('/api/users', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_id: userId })
+        });
+        
+        console.log('添加用户响应:', res.status);
+        
+        if (res.ok) {
+            const data = await res.json();
+            console.log('自动添加用户成功:', userId, data);
+            showToast(`已自动添加用户: ${userName || userId}`, 'success');
+            return true;
+        } else {
+            const errorData = await res.json().catch(() => ({}));
+            console.error('自动添加用户失败:', res.status, errorData);
+            return false;
+        }
+    } catch (e) {
+        console.error('自动添加用户异常:', e);
+        return false;
     }
 }
 
@@ -1314,7 +1935,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // 检查 Cookie 状态 - 页面加载时调用
 async function checkCookieStatus() {
     try {
-        // 先检查是否存在
+        // 只检查是否存在，不进行在线验证（避免刷新时延迟）
         const checkRes = await fetch('/api/cookies/check');
         const checkData = await checkRes.json();
         
@@ -1331,20 +1952,48 @@ async function checkCookieStatus() {
                 statusItem.className = 'status-item';
                 statusItem.innerHTML = '<span class="status-icon">🍪</span><span class="status-text">Cookie: 未配置</span>';
             }
+            // 隐藏 cookie 信息卡片
+            document.getElementById('cookie-info-display').style.display = 'none';
             return;
         }
         
-        // 存在则进行真实验证
+        // 存在则显示已配置状态，不进行在线验证
         if (badge) {
-            badge.className = 'badge';
-            badge.textContent = '验证中...';
+            badge.className = 'badge badge-success';
+            badge.textContent = '已配置';
+        }
+        if (statusItem) {
+            statusItem.className = 'status-item ok';
+            statusItem.innerHTML = '<span class="status-icon">✅</span><span class="status-text">Cookie: 已配置</span>';
         }
         
+        // 显示 cookie 信息卡片
+        showCookieInfo(
+            checkData.user_name,
+            checkData.user_id,
+            checkData.added_time,
+            checkData.is_logged_in
+        );
+    } catch (e) {
+        console.error('检查 Cookie 失败:', e);
+    }
+}
+
+// 手动验证 Cookie（用户点击验证按钮时调用）
+async function verifyCookie() {
+    const badge = document.getElementById('cookie-status-badge') || document.getElementById('cookie-badge');
+    const statusItem = document.getElementById('status-cookie');
+    
+    if (badge) {
+        badge.className = 'badge';
+        badge.textContent = '验证中...';
+    }
+    
+    try {
         const testRes = await fetch('/api/cookies/test', { method: 'POST' });
         const testData = await testRes.json();
         
         if (testData.is_logged_in) {
-            // 验证成功
             if (badge) {
                 badge.className = 'badge badge-success';
                 badge.textContent = '✅ 有效';
@@ -1353,8 +2002,11 @@ async function checkCookieStatus() {
                 statusItem.className = 'status-item ok';
                 statusItem.innerHTML = '<span class="status-icon">✅</span><span class="status-text">Cookie: 正常</span>';
             }
+            if (testData.user_name || testData.user_id) {
+                showCookieInfo(testData.user_name, testData.user_id, new Date().toISOString(), true);
+            }
+            showToast('Cookie 验证通过', 'success');
         } else {
-            // 验证失败
             if (badge) {
                 badge.className = 'badge badge-danger';
                 badge.textContent = '❌ 失效';
@@ -1363,9 +2015,11 @@ async function checkCookieStatus() {
                 statusItem.className = 'status-item warning';
                 statusItem.innerHTML = '<span class="status-icon">⚠️</span><span class="status-text">Cookie: 需更新</span>';
             }
+            showToast('Cookie 已失效，请重新配置', 'warning');
         }
     } catch (e) {
-        console.error('检查 Cookie 失败:', e);
+        console.error('验证 Cookie 失败:', e);
+        showToast('验证失败，请检查网络', 'error');
     }
 }
 
@@ -1396,53 +2050,228 @@ function showExtensionGuide() {
 }
 
 // 用户相关
+// 全局用户数据缓存
+let allUsers = [];
+let cookieUserId = null;
+
 async function loadUsers() {
     try {
-        const res = await fetch('/api/users');
-        const data = await res.json();
-
+        console.log('开始加载用户数据...');
         const list = document.getElementById('users-list');
-        const currentInfo = document.getElementById('current-user-info');
         const statusItem = document.getElementById('status-user');
+        
+        // 先显示加载中状态
+        if (list) list.innerHTML = '<div class="empty-state">加载中...</div>';
+        
+        const res = await fetch('/api/users');
+        if (!res.ok) {
+            throw new Error(`API 返回错误: ${res.status}`);
+        }
+        
+        const data = await res.json();
+        console.log('加载用户数据成功:', data);
 
-        if (data.users.length === 0) {
-            list.innerHTML = '<div class="empty-state">暂无用户</div>';
-            currentInfo.innerHTML = '<div class="empty-state"><p>尚未配置用户</p></div>';
-            statusItem.innerHTML = '<span class="status-icon">👤</span><span class="status-text">用户: 未配置</span>';
+        if (!data.users || data.users.length === 0) {
+            console.log('用户列表为空');
+            if (list) list.innerHTML = '<div class="empty-state">暂无用户</div>';
+            if (statusItem) statusItem.innerHTML = '<span class="status-icon">👤</span><span class="status-text">用户: 未配置</span>';
+            allUsers = [];
             return;
         }
 
+        // 保存用户数据到全局变量
+        allUsers = data.users;
+        console.log(`加载了 ${allUsers.length} 个用户`);
+
         const user = data.users[0];
-        statusItem.className = 'status-item ok';
-        statusItem.innerHTML = `<span class="status-icon">✅</span><span class="status-text">用户: ${user.name || user.user_id}</span>`;
+        if (statusItem) {
+            statusItem.className = 'status-item ok';
+            statusItem.innerHTML = `<span class="status-icon">✅</span><span class="status-text">用户: ${user.name || user.user_id}</span>`;
+        }
 
-        currentInfo.innerHTML = `
-            <div class="list-item">
-                <span>👤</span>
-                <div style="flex:1">
-                    <strong>${user.name || user.user_id}</strong>
-                    <p class="text-muted">上次同步: ${user.last_sync || '从未'}</p>
-                </div>
-                <span class="badge badge-success">监控中</span>
-            </div>
-        `;
+        // 检查是否有 Cookie 的用户
+        try {
+            const cookieRes = await fetch('/api/cookies/check');
+            const cookieData = await cookieRes.json();
+            cookieUserId = cookieData.user_id || null;
+            console.log('Cookie 数据:', cookieData);
+        } catch (cookieErr) {
+            console.warn('获取 Cookie 信息失败:', cookieErr);
+            cookieUserId = null;
+        }
 
-        list.innerHTML = data.users.map(u => `
-            <div class="list-item">
-                <span>👤</span>
-                <div style="flex:1">
-                    <strong>${u.name || u.user_id}</strong>
-                </div>
-                <button class="btn btn-sm btn-danger" onclick="removeUser('${u.user_id}')">删除</button>
-            </div>
-        `).join('');
+        // 渲染用户列表
+        renderUsers(allUsers);
     } catch (e) {
         console.error('加载用户失败:', e);
+        const list = document.getElementById('users-list');
+        const statusItem = document.getElementById('status-user');
+        if (list) list.innerHTML = `<div class="empty-state">加载失败: ${e.message}</div>`;
+        if (statusItem) statusItem.innerHTML = '<span class="status-icon">❌</span><span class="status-text">用户: 加载失败</span>';
     }
 }
 
+// 渲染用户列表
+function renderUsers(users) {
+    const list = document.getElementById('users-list');
+    const resultDiv = document.getElementById('user-search-result');
+    
+    console.log('渲染用户列表, 数据:', users);
+    
+    if (!users || users.length === 0) {
+        // 如果是初始加载（allUsers为空），显示加载中状态
+        if (allUsers.length === 0) {
+            list.innerHTML = '<div class="empty-state">加载中...</div>';
+        } else {
+            list.innerHTML = '<div class="empty-state">没有找到匹配的用户</div>';
+        }
+        if (resultDiv) resultDiv.style.display = 'none';
+        return;
+    }
+
+    // 使用新的用户卡片样式
+    list.innerHTML = users.map(u => {
+        const displayName = u.name || u.user_id;
+        const isCookieUser = u.user_id === cookieUserId;
+        
+        return `
+            <div class="user-card ${isCookieUser ? 'has-cookie' : ''}">
+                <div class="user-avatar">
+                    ${u.avatar_url ? 
+                        `<img src="${u.avatar_url}" alt="${displayName}" onerror="this.parentElement.innerHTML='${getUserInitial(displayName)}'">` : 
+                        getUserInitial(displayName)
+                    }
+                </div>
+                <div class="user-info">
+                    <div class="user-name" title="${displayName}">${displayName}</div>
+                    <div class="user-id" title="@${u.user_id}">@${u.user_id}</div>
+                    ${u.last_sync ? `<div class="user-sync">同步于: ${formatSyncTime(u.last_sync)}</div>` : ''}
+                </div>
+                <div class="user-badges">
+                    ${isCookieUser ? '<span class="badge badge-success" title="此用户已配置 Cookie">🍯 已验证</span>' : ''}
+                    <button class="btn btn-sm btn-danger" onclick="removeUser('${u.user_id}')">删除</button>
+                </div>
+            </div>
+        `;
+    }).join('');
+    
+    // 更新搜索结果提示
+    if (resultDiv) {
+        if (users.length < allUsers.length) {
+            resultDiv.textContent = `显示 ${users.length} / ${allUsers.length} 个用户`;
+            resultDiv.style.display = 'block';
+        } else {
+            resultDiv.style.display = 'none';
+        }
+    }
+}
+
+// 获取用户初始字母（用于头像占位符）
+function getUserInitial(name) {
+    if (!name) return '?';
+    // 提取第一个字符或字母
+    const first = name.charAt(0);
+    return first.toUpperCase();
+}
+
+// 格式化同步时间
+function formatSyncTime(syncTime) {
+    if (!syncTime) return '从未';
+    // 如果是时间戳或日期字符串，转换为相对时间
+    const date = new Date(syncTime);
+    if (!isNaN(date.getTime())) {
+        const now = new Date();
+        const diff = now - date;
+        const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+        if (days === 0) return '今天';
+        if (days === 1) return '昨天';
+        if (days < 30) return `${days}天前`;
+        if (days < 365) return `${Math.floor(days / 30)}个月前`;
+        return `${Math.floor(days / 365)}年前`;
+    }
+    return syncTime;
+}
+
+// 搜索用户
+function searchUsers() {
+    const searchInput = document.getElementById('user-search-input');
+    const keyword = searchInput.value.trim().toLowerCase();
+    
+    if (!keyword) {
+        renderUsers(allUsers);
+        return;
+    }
+    
+    const filtered = allUsers.filter(u => {
+        const nameMatch = (u.name || '').toLowerCase().includes(keyword);
+        const idMatch = (u.user_id || '').toLowerCase().includes(keyword);
+        return nameMatch || idMatch;
+    });
+    
+    renderUsers(filtered);
+}
+
+// 清除搜索
+function clearUserSearch() {
+    const searchInput = document.getElementById('user-search-input');
+    searchInput.value = '';
+    renderUsers(allUsers);
+}
+
+// 监听回车键搜索
+document.addEventListener('DOMContentLoaded', () => {
+    const searchInput = document.getElementById('user-search-input');
+    if (searchInput) {
+        searchInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                searchUsers();
+            }
+        });
+    }
+});
+
+// 添加用户模态框控制
+function showAddUserModal() {
+    document.getElementById('add-user-modal').style.display = 'flex';
+    // 自动聚焦输入框
+    setTimeout(() => document.getElementById('modal-user-id').focus(), 100);
+}
+
+function closeAddUserModal() {
+    document.getElementById('add-user-modal').style.display = 'none';
+    document.getElementById('modal-user-id').value = '';
+}
+
+async function addUserFromModal() {
+    const userId = document.getElementById('modal-user-id').value.trim();
+    if (!userId) {
+        showToast('请输入用户 ID', 'warning');
+        return;
+    }
+
+    try {
+        const res = await fetch('/api/users', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_id: userId })
+        });
+
+        if (res.ok) {
+            showToast('用户添加成功', 'success');
+            closeAddUserModal();
+            loadUsers();
+        } else {
+            const data = await res.json();
+            showToast(data.detail || '添加失败', 'error');
+        }
+    } catch (e) {
+        showToast('添加失败', 'error');
+    }
+}
+
+// 兼容旧版添加方式（从输入框）
 async function addUser() {
-    const userId = document.getElementById('new-user-id').value.trim();
+    const userId = document.getElementById('new-user-id')?.value.trim() || document.getElementById('modal-user-id')?.value.trim();
     if (!userId) return showToast('请输入用户 ID', 'warning');
 
     try {
@@ -1454,7 +2283,8 @@ async function addUser() {
 
         if (res.ok) {
             showToast('用户添加成功', 'success');
-            document.getElementById('new-user-id').value = '';
+            const oldInput = document.getElementById('new-user-id');
+            if (oldInput) oldInput.value = '';
             loadUsers();
         } else {
             const data = await res.json();
@@ -1494,8 +2324,13 @@ async function loadConfig() {
         // 存储
         document.getElementById('html-path').value = data.html_path || '/app/data/html';
         document.getElementById('db-path').value = data.db_path || '/app/data/meta/zhihusync.db';
+        document.getElementById('static-path').value = data.static_path || '/app/data/static';
+        document.getElementById('images-path').value = data.images_path || '/app/data/images';
         document.getElementById('download-images').value = String(data.download_images !== false);
         document.getElementById('download-avatars').value = String(data.download_avatars !== false);
+
+        // 加载 Docker 挂载信息
+        await loadStorageMounts();
 
         // 监控
         const monitorStatus = document.getElementById('status-monitor');
@@ -1635,5 +2470,131 @@ function createToastContainer() {
     document.body.appendChild(container);
     return container;
 }
+
+// ============ 存储路径管理 ============
+
+let storageMounts = {};
+let isStorageEditMode = false;
+
+// 加载 Docker 挂载信息
+// 存储原始值，用于比较变化
+let storageOriginalValues = {};
+
+async function loadStorageMounts() {
+    try {
+        const res = await fetch('/api/storage/mounts');
+        const data = await res.json();
+
+        storageMounts = data;
+
+        // 更新存储配置表单
+        if (data.mounts) {
+            // 容器内路径（只读）
+            document.getElementById('html-path').value = data.mounts.html?.container_path || '/app/data/html';
+            document.getElementById('db-path').value = data.mounts.db?.container_path || '/app/data/meta/zhihusync.db';
+            document.getElementById('static-path').value = data.mounts.static?.container_path || '/app/data/static';
+            document.getElementById('images-path').value = data.mounts.images?.container_path || '/app/data/images';
+            document.getElementById('data-root-path').value = data.mounts.data_root?.container_path || '/app/data';
+
+            // 宿主机路径
+            const hostPaths = {
+                'html-host-path': data.mounts.html?.host_path || '',
+                'db-host-path': data.mounts.db?.host_path || '',
+                'static-host-path': data.mounts.static?.host_path || '',
+                'images-host-path': data.mounts.images?.host_path || '',
+                'data-root-host-path': data.mounts.data_root?.host_path || ''
+            };
+
+            // 保存原始值
+            storageOriginalValues = { ...hostPaths };
+
+            // 设置输入框值
+            Object.entries(hostPaths).forEach(([id, value]) => {
+                const el = document.getElementById(id);
+                if (el) el.value = value;
+            });
+
+            // 重置保存按钮
+            resetStorageSaveButton();
+        }
+    } catch (e) {
+        console.error('加载存储挂载信息失败:', e);
+    }
+}
+
+// 监听存储路径输入框变化
+document.addEventListener('DOMContentLoaded', function() {
+    const hostPathInputs = document.querySelectorAll('.storage-host-path');
+    hostPathInputs.forEach(input => {
+        input.addEventListener('input', checkStorageChanges);
+    });
+});
+
+// 检查存储路径是否有变化
+function checkStorageChanges() {
+    const hostPathInputs = document.querySelectorAll('.storage-host-path');
+    let hasChanges = false;
+
+    hostPathInputs.forEach(input => {
+        const originalValue = storageOriginalValues[input.id] || '';
+        if (input.value !== originalValue) {
+            hasChanges = true;
+        }
+    });
+
+    const saveBtn = document.getElementById('storage-save-btn');
+    const actionArea = document.getElementById('storage-action-area');
+
+    if (hasChanges) {
+        saveBtn.disabled = false;
+        saveBtn.classList.remove('btn-disabled');
+        actionArea.style.display = 'block';
+    } else {
+        resetStorageSaveButton();
+    }
+}
+
+// 重置保存按钮状态
+function resetStorageSaveButton() {
+    const saveBtn = document.getElementById('storage-save-btn');
+    const actionArea = document.getElementById('storage-action-area');
+    const outputDiv = document.getElementById('docker-command-output');
+
+    saveBtn.disabled = true;
+    saveBtn.classList.add('btn-disabled');
+    actionArea.style.display = 'none';
+    outputDiv.style.display = 'none';
+}
+
+// 保存存储配置（生成Docker命令）
+function saveStorageConfig() {
+    const dataRootHost = document.getElementById('data-root-host-path').value.trim();
+    const configHost = '/path/to/config'; // 默认配置路径
+
+    if (!dataRootHost) {
+        showToast('请输入数据根目录的宿主机路径', 'warning');
+        return;
+    }
+
+    // 构建 docker run 命令
+    const dockerCmd = `docker run -d \\
+  --name zhihusync \\
+  -p 6067:6067 \\
+  -v "${dataRootHost}:/app/data" \\
+  -v "${configHost}:/app/config" \\
+  -e ZHIHUSYNC_ENV=docker \\
+  nevertiree26/zhihusync:latest`;
+
+    // 显示命令
+    const outputDiv = document.getElementById('docker-command-output');
+    outputDiv.textContent = '# 停止并删除旧容器\ndocker stop zhihusync && docker rm zhihusync\n\n# 使用新路径启动容器\n' + dockerCmd;
+    outputDiv.style.display = 'block';
+
+    showToast('Docker 命令已生成，请复制后执行', 'success');
+}
+
+// 存储配置相关函数已更新
+
+// 旧的迁移函数已移除，使用新的 saveStorageConfig 函数
 </script>
 {% endblock %}

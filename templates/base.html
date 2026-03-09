@@ -29,10 +29,6 @@
                     <span class="icon">📋</span>
                     <span class="nav-text">明细</span>
                 </a>
-                <a href="/config" class="nav-item {% if request.url.path == '/config' %}active{% endif %}" title="配置">
-                    <span class="icon">⚙️</span>
-                    <span class="nav-text">配置</span>
-                </a>
                 <a href="/logs" class="nav-item {% if request.url.path == '/logs' %}active{% endif %}" title="日志">
                     <span class="icon">📝</span>
                     <span class="nav-text">日志</span>
@@ -41,8 +37,15 @@
                     <span class="icon">📖</span>
                     <span class="nav-text">API 文档</span>
                 </a>
-
             </nav>
+
+            <!-- 设置固定在底部 -->
+            <div class="sidebar-settings">
+                <a href="/config" class="nav-item {% if request.url.path == '/config' %}active{% endif %}" title="设置">
+                    <span class="icon">⚙️</span>
+                    <span class="nav-text">设置</span>
+                </a>
+            </div>
 
             <div class="sidebar-footer">
                 <div class="sync-status" id="sidebar-status" title="同步状态">
@@ -78,7 +81,7 @@
         </div>
     </div>
 
-    <script src="/static/js/admin.js"></script>
+    <script src="/static/js/admin.js?v=2"></script>
     <script>
         // 打开 Swagger 模态框
         function openSwaggerModal() {

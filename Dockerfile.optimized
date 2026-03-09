@@ -1,0 +1,76 @@
+# zhihusync - 知乎点赞内容备份服务（优化版）
+# 优化点：
+# 1. 移除 fonts-noto-cjk（56MB，经常下载超时）
+# 2. 统一使用 bookworm 源，避免 trixie 混合
+# 3. 分层设计：基础层 -> Python层 -> 浏览器层 -> 代码层
+
+FROM python:3.11-slim-bookworm
+
+WORKDIR /app
+
+# ============================================
+# 层1: 系统基础依赖（变化最少）
+# ============================================
+RUN rm -f /etc/apt/sources.list.d/*.list && \
+    echo "deb http://mirrors.aliyun.com/debian bookworm main contrib non-free" > /etc/apt/sources.list && \
+    echo "deb http://mirrors.aliyun.com/debian bookworm-updates main contrib non-free" >> /etc/apt/sources.list && \
+    echo "deb http://mirrors.aliyun.com/debian-security bookworm-security main contrib non-free" >> /etc/apt/sources.list && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends \
+    # Chromium 运行必需
+    libglib2.0-0 libnss3 libnspr4 libatk1.0-0 libatk-bridge2.0-0 \
+    libcups2 libdrm2 libdbus-1-3 libxcb1 libxkbcommon0 libx11-6 \
+    libxcomposite1 libxdamage1 libxext6 libxfixes3 libxrandr2 libgbm1 \
+    libpango-1.0-0 libcairo2 libasound2 libatspi2.0-0 \
+    # 中文字体（精简版，不安装 fonts-noto-cjk）
+    fonts-wqy-zenhei fonts-wqy-microhei \
+    libfontconfig1 libfreetype6 \
+    # 工具
+    ca-certificates wget curl unzip \
+    && rm -rf /var/lib/apt/lists/* /var/cache/apt/* /tmp/*
+
+# ============================================
+# 层2: Python 依赖（requirements.txt 变化时重建）
+# ============================================
+COPY requirements.txt .
+RUN pip install --no-cache-dir -i https://pypi.tuna.tsinghua.edu.cn/simple --upgrade pip && \
+    pip install --no-cache-dir -i https://pypi.tuna.tsinghua.edu.cn/simple -r requirements.txt && \
+    rm -rf /root/.cache/pip/*
+
+# ============================================
+# 层3: Playwright 浏览器（很少变化）
+# ============================================
+ENV PLAYWRIGHT_DOWNLOAD_HOST=https://npmmirror.com/mirrors/playwright
+ENV PLAYWRIGHT_BROWSERS_PATH=/app/ms-playwright
+ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+
+RUN playwright install chromium && \
+    playwright install ffmpeg && \
+    rm -rf /root/.cache/pip/* && \
+    echo "✅ Chromium installed"
+
+# ============================================
+# 层4: 应用代码（变化最频繁，放在最后）
+# ============================================
+COPY src/ /app/src/
+COPY config/ /app/config/
+COPY templates/ /app/templates/
+COPY static/ /app/static/
+COPY entrypoint.sh /app/
+
+# 创建数据目录并设置权限
+RUN mkdir -p /app/data/html /app/data/meta /app/data/static/images && \
+    chmod +x /app/entrypoint.sh
+
+# 设置环境变量
+ENV PYTHONUNBUFFERED=1
+ENV ZHIHUSYNC_ENV=docker
+ENV PLAYWRIGHT_BROWSER=chromium
+
+EXPOSE 6067
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:6067/api/stats')" || exit 1
+
+ENTRYPOINT ["/app/entrypoint.sh"]
+CMD ["python", "-m", "src.app", "--mode", "both"]

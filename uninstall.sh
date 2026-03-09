@@ -17,6 +17,14 @@ print_color() {
     echo -e "${1}${2}${NC}"
 }
 
+# 可能的镜像名称
+DOCKER_IMAGES=(
+    "nevertiree26/zhihusync:latest"
+    "nevertiree26/zhihusync"
+    "zhihusync:latest"
+    "zhihusync"
+)
+
 # 显示警告
 show_warning() {
     printf '\033[2J\033[H' 2>/dev/null || echo ""
@@ -68,6 +76,21 @@ get_data_dir_from_container() {
     fi
 
     echo "$data_dir"
+}
+
+# 获取容器使用的镜像
+get_image_from_container() {
+    local container_id=$1
+    local image=""
+
+    if [ -n "$container_id" ]; then
+        image=$(docker inspect "$container_id" 2>/dev/null | \
+            grep -oE '"Image":\s*"[^"]+"' | \
+            head -1 | \
+            sed 's/.*"\([^"]*\)".*/\1/')
+    fi
+
+    echo "$image"
 }
 
 # 配置数据目录（优先从容器获取，用户确认）
@@ -133,6 +156,37 @@ configure_data_dir() {
     done
 }
 
+# 询问是否备份数据
+ask_for_backup() {
+    if [ -z "$DATA_DIR" ] || [ ! -d "$DATA_DIR" ]; then
+        return 0
+    fi
+
+    # 计算数据目录大小
+    local data_size
+    data_size=$(du -sh "$DATA_DIR" 2>/dev/null | cut -f1)
+
+    echo ""
+    print_color "$CYAN" "📦 数据目录大小: $data_size"
+    read -p "是否在卸载前备份数据? [y/N]: " backup_choice
+
+    if [[ "$backup_choice" =~ ^[Yy]$ ]]; then
+        local backup_dir="${DATA_DIR}.backup.$(date +%Y%m%d_%H%M%S)"
+        print_color "$BLUE" "📁 备份数据到: $backup_dir"
+
+        if cp -r "$DATA_DIR" "$backup_dir"; then
+            print_color "$GREEN" "✅ 数据备份成功"
+            BACKUP_DIR="$backup_dir"
+        else
+            print_color "$RED" "❌ 数据备份失败"
+            read -p "是否继续卸载? [y/N]: " continue_anyway
+            if [[ ! "$continue_anyway" =~ ^[Yy]$ ]]; then
+                exit 0
+            fi
+        fi
+    fi
+}
+
 # 最终确认
 final_confirm() {
     local container_id=$1
@@ -145,6 +199,11 @@ final_confirm() {
 
     if [ -n "$container_id" ]; then
         echo "🐳 Docker 容器: zhihusync ($container_id)"
+        local image
+        image=$(get_image_from_container "$container_id")
+        if [ -n "$image" ]; then
+            echo "🖼️  容器镜像: $image"
+        fi
     else
         echo "🐳 Docker 容器: 未找到运行中的容器"
     fi
@@ -152,6 +211,10 @@ final_confirm() {
     if [ -n "$DATA_DIR" ]; then
         echo "📁 数据目录: $DATA_DIR"
         echo "⚙️  配置目录: $CONFIG_DIR"
+    fi
+
+    if [ -n "$BACKUP_DIR" ]; then
+        echo "💾 备份位置: $BACKUP_DIR"
     fi
 
     echo ""
@@ -164,6 +227,55 @@ final_confirm() {
         print_color "$YELLOW" "❌ 卸载已取消"
         exit 0
     fi
+}
+
+# 查找并删除相关镜像
+find_and_remove_images() {
+    print_color "$BLUE" "🖼️  检查 Docker 镜像..."
+
+    local found_images=()
+
+    # 查找所有可能的镜像
+    for img in "${DOCKER_IMAGES[@]}"; do
+        if docker images --format "{{.Repository}}:{{.Tag}}" | grep -q "^${img}$"; then
+            found_images+=("$img")
+        fi
+    done
+
+    # 同时查找没有标签的镜像（ dangling ）
+    local dangling
+    dangling=$(docker images --filter "dangling=true" --format "{{.ID}}")
+
+    if [ ${#found_images[@]} -eq 0 ] && [ -z "$dangling" ]; then
+        print_color "$CYAN" "   未找到相关镜像"
+        return 0
+    fi
+
+    if [ ${#found_images[@]} -gt 0 ]; then
+        echo ""
+        print_color "$CYAN" "发现以下镜像:"
+        for img in "${found_images[@]}"; do
+            echo "   • $img"
+        done
+    fi
+
+    echo ""
+    read -p "是否删除这些 Docker 镜像? [y/N]: " delete_image
+    if [[ "$delete_image" =~ ^[Yy]$ ]]; then
+        for img in "${found_images[@]}"; do
+            print_color "$BLUE" "   删除: $img"
+            docker rmi "$img" 2>/dev/null || true
+        done
+
+        # 删除 dangling 镜像
+        if [ -n "$dangling" ]; then
+            print_color "$BLUE" "   清理悬空镜像..."
+            echo "$dangling" | xargs docker rmi 2>/dev/null || true
+        fi
+
+        print_color "$GREEN" "✅ Docker 镜像已删除"
+    fi
+    echo ""
 }
 
 # 执行卸载
@@ -182,16 +294,8 @@ perform_uninstall() {
         echo ""
     fi
 
-    # 询问是否删除镜像
-    if docker images | grep -q "nevertiree26/zhihusync"; then
-        read -p "是否删除 Docker 镜像? [y/N]: " delete_image
-        if [[ "$delete_image" =~ ^[Yy]$ ]]; then
-            print_color "$BLUE" "🖼️  删除 Docker 镜像..."
-            docker rmi nevertiree26/zhihusync:latest 2>/dev/null || true
-            print_color "$GREEN" "✅ Docker 镜像已删除"
-            echo ""
-        fi
-    fi
+    # 删除镜像
+    find_and_remove_images
 
     # 删除数据目录
     if [ -n "$DATA_DIR" ] && [ -d "$DATA_DIR" ]; then
@@ -208,9 +312,17 @@ perform_uninstall() {
 ╚═══════════════════════════════════════════════════════════╝
 "
     echo ""
+
+    if [ -n "$BACKUP_DIR" ]; then
+        print_color "$CYAN" "💾 数据已备份到:"
+        echo "   $BACKUP_DIR"
+        echo ""
+    fi
+
     print_color "$CYAN" "📋 残留检查清单:"
     echo "   • Docker 卷: docker volume ls | grep zhihusync"
     echo "   • 网络配置: docker network ls | grep zhihusync"
+    echo "   • 所有镜像: docker images | grep zhihusync"
     echo ""
     print_color "$YELLOW" "如需重新安装，请访问:"
     echo "   https://github.com/nevertiree/zhihusync"
@@ -236,6 +348,9 @@ main() {
         print_color "$YELLOW" "❌ 卸载已取消"
         exit 0
     fi
+
+    # 询问是否备份
+    ask_for_backup
 
     # 最终确认
     final_confirm "$CONTAINER_ID"

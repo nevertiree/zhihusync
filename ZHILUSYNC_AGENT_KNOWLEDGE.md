@@ -197,6 +197,76 @@ git push -u origin feature/your-feature-name
 3. **国内镜像**: 使用国内镜像源加速
 4. **版本锁定**: 明确指定基础镜像版本
 
+## 🔌 API 设计规范
+
+### 存储配置 API
+
+**获取挂载信息**:
+```
+GET /api/storage/mounts
+Response: {
+  "in_docker": true,
+  "hostname": "container_id",
+  "mounts": {
+    "html": {"container_path": "/app/data/html", "description": "HTML备份文件"},
+    "db": {"container_path": "/app/data/meta", "description": "数据库文件"},
+    "static": {"container_path": "/app/data/static", "description": "静态资源"},
+    "images": {"container_path": "/app/data/images", "description": "图片文件"}
+  },
+  "mount_info": [...]  // Docker 挂载详情
+}
+```
+
+**迁移存储路径**:
+```
+POST /api/storage/migrate
+Body: {
+  "html_path": "/new/path/html",
+  "db_path": "/new/path/db",
+  "static_path": "/new/path/static",
+  "images_path": "/new/path/images"
+}
+Response: {
+  "success": true,
+  "message": "数据迁移完成，服务即将重启",
+  "details": {
+    "html": {"from": "...", "to": "...", "files_copied": 10},
+    "db": {"from": "...", "to": "..."},
+    "static": {"from": "...", "to": "...", "files_copied": 5},
+    "images": {"from": "...", "to": "...", "files_copied": 20}
+  }
+}
+```
+
+**系统重启**:
+```
+POST /api/system/restart
+Response: {"success": true, "message": "服务正在重启..."}
+```
+
+### 前端存储页面实现
+
+**功能特点**:
+- 显示当前 Docker 容器内的挂载路径
+- 可编辑输入框修改存储路径
+- 迁移前确认对话框
+- 迁移进度显示
+- 自动重启并刷新页面
+
+**关键函数**:
+```javascript
+// 加载挂载信息
+async function loadStorageMounts()
+
+// 执行迁移
+async function migrateStorage()
+
+// 重启服务
+async function restartService()
+```
+
+---
+
 ### 一键安装脚本规范
 
 **安装脚本 (install.sh/install.ps1)**:

@@ -2,6 +2,8 @@
 
 import asyncio
 import json
+import os
+import signal
 from contextlib import asynccontextmanager
 from datetime import datetime
 from pathlib import Path
@@ -14,6 +16,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from loguru import logger
 from pydantic import BaseModel
+from sqlalchemy import or_
 
 from config_loader import load_config
 from crawler import ZhihuCrawler
@@ -30,6 +33,7 @@ app_state: dict[str, Any] = {
     "sync_message": "",
     "last_sync": None,
     "stop_requested": False,  # 停止请求标志
+    "cookie_info": None,  # 缓存的 cookie 验证信息
 }
 
 # 加载配置
@@ -49,6 +53,85 @@ def get_cookie_file_path() -> Path:
     db_path = Path(config.storage.db_path)
     meta_dir = db_path.parent
     return meta_dir / "cookies.json"
+
+
+def get_sync_user_id() -> str | None:
+    """获取用于同步的用户ID.
+
+    优先从数据库获取活跃用户，如果没有则使用配置文件中的user_id.
+
+    Returns:
+        str | None: 用户ID或None
+    """
+    from models import User
+
+    session = db.get_session()
+    try:
+        # 优先从数据库获取第一个活跃用户
+        user = session.query(User).filter_by(is_active=True).first()
+        if user:
+            return user.id
+    finally:
+        session.close()
+
+    # 如果没有数据库用户，使用配置文件中的
+    return config.zhihu.user_id or None
+
+
+def update_config_file(user_id: str | None = None, cookie_info: dict | None = None) -> bool:
+    """更新配置文件中的 user_id 和 cookie 信息.
+
+    Args:
+        user_id: 知乎用户ID，为None则不更新
+        cookie_info: Cookie相关信息，为None则不更新
+
+    Returns:
+        bool: 更新成功返回True
+    """
+    try:
+        # 确定配置文件路径
+        config_path = Path("/app/config/config.yaml")
+        if not config_path.exists():
+            config_path = Path("config/config.yaml")
+
+        import yaml
+
+        # 读取现有配置
+        if config_path.exists():
+            with open(config_path, encoding="utf-8") as f:
+                config_data = yaml.safe_load(f) or {}
+        else:
+            config_data = {}
+
+        # 确保 zhihu 段存在
+        if "zhihu" not in config_data:
+            config_data["zhihu"] = {}
+
+        # 更新 user_id
+        if user_id is not None:
+            config_data["zhihu"]["user_id"] = user_id
+
+        # 更新 cookie 信息（如果有）
+        if cookie_info is not None:
+            config_data["cookie_info"] = {
+                **cookie_info,
+                "updated_at": datetime.now().isoformat(),
+            }
+
+        # 写回文件
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(config_path, "w", encoding="utf-8") as f:
+            yaml.dump(config_data, f, allow_unicode=True, sort_keys=False)
+
+        # 更新内存中的配置
+        if user_id is not None:
+            config.zhihu.user_id = user_id
+
+        logger.info(f"配置文件已更新: {config_path}")
+        return True
+    except Exception as e:
+        logger.error(f"更新配置文件失败: {e}")
+        return False
 
 
 @asynccontextmanager
@@ -141,6 +224,15 @@ class ConfigUpdate(BaseModel):
     log_level: str = "INFO"
     console_output: bool = True
     log_sql: bool = False
+
+
+class StorageUpdate(BaseModel):
+    """存储路径更新请求模型."""
+
+    html_path: str
+    db_path: str
+    static_path: str
+    images_path: str
 
 
 class CookieUpdate(BaseModel):
@@ -252,13 +344,25 @@ async def get_stats():
 
 @app.get("/api/setup/status")
 async def get_setup_status():
-    """获取配置状态"""
+    """获取配置状态 - 检查数据库中是否有用户和cookie"""
     cookie_file = get_cookie_file_path()
     has_cookie = cookie_file.exists() and cookie_file.stat().st_size > 0
 
+    # 检查数据库中是否有活跃用户（而不是只看配置文件）
+    session = db.get_session()
+    try:
+        from models import User
+
+        has_user_in_db = session.query(User).filter_by(is_active=True).first() is not None
+    finally:
+        session.close()
+
+    # 使用数据库中的用户或配置文件中的用户
+    has_user = has_user_in_db or bool(config.zhihu.user_id)
+
     return {
-        "configured": bool(config.zhihu.user_id) and has_cookie,
-        "has_user_id": bool(config.zhihu.user_id),
+        "configured": has_user and has_cookie,
+        "has_user_id": has_user,
         "has_cookie": has_cookie,
         "user_id": config.zhihu.user_id or "",
     }
@@ -317,12 +421,18 @@ async def create_user(user_data: UserCreate):
                 # 重新激活
                 existing.is_active = True
                 session.commit()
+                # 同时更新配置文件
+                update_config_file(user_id=user_data.user_id)
                 return {"status": "success", "message": "用户已重新激活", "user_id": user_data.user_id}
 
         # 创建新用户
         user = User(id=user_data.user_id, name=user_data.name or user_data.user_id, is_active=True)
         session.add(user)
         session.commit()
+
+        # 同时更新配置文件
+        update_config_file(user_id=user_data.user_id)
+
         logger.info(f"添加用户: {user_data.user_id}")
         return {"status": "success", "message": "用户添加成功", "user_id": user_data.user_id}
     except HTTPException:
@@ -536,6 +646,36 @@ async def update_cookies(cookie_update: CookieUpdate):
 
         cookie_count = len(storage_state.get("cookies", []))
 
+        # 保存 cookie 信息到配置文件（包括域名等基本信息）
+        cookie_domains = set()
+        for cookie in storage_state.get("cookies", []):
+            domain = cookie.get("domain", "")
+            if domain:
+                cookie_domains.add(domain)
+
+        # 尝试从 cookie 中提取用户信息
+        # 注意：实际用户信息需要通过验证才能获取，这里先占位
+        user_id = ""
+        user_name = ""
+        for cookie in storage_state.get("cookies", []):
+            name = cookie.get("name", "")
+            if name in ["z_c0"]:
+                # z_c0 是知乎的关键认证 cookie
+                pass  # 无法直接从 cookie 值解析用户信息
+
+        update_config_file(
+            user_id=user_id or None,  # 如果为空则不更新 user_id
+            cookie_info={
+                "domains": list(cookie_domains),
+                "cookie_count": cookie_count,
+                "valid": is_valid,
+                "is_logged_in": False,  # 已保存但未验证
+                "added_time": datetime.now().isoformat(),
+                "user_id": user_id if user_id else None,
+                "user_name": user_name if user_name else None,
+            },
+        )
+
         # 构建响应消息
         message = (
             f"Cookie 已保存 ({cookie_count} 条) - {msg}"
@@ -561,25 +701,50 @@ async def update_cookies(cookie_update: CookieUpdate):
 
 @app.get("/api/cookies/check")
 async def check_cookies():
-    """检查 Cookie 是否存在"""
+    """检查 Cookie 是否存在，返回详细信息"""
     cookie_file = get_cookie_file_path()
     exists = cookie_file.exists()
 
-    if exists:
-        try:
-            with open(cookie_file, encoding="utf-8") as f:
-                data = json.load(f)
-            # 检查是否有 cookies (支持数组或对象格式)
-            has_cookies = False
-            if isinstance(data, list) and len(data) > 0:
-                has_cookies = True
-            elif isinstance(data, dict):
-                has_cookies = bool(data.get("cookies")) or bool(data.get("origins"))
-            return {"exists": True, "valid": has_cookies}
-        except Exception:
-            return {"exists": True, "valid": False}
+    if not exists:
+        return {"exists": False, "valid": False}
 
-    return {"exists": False, "valid": False}
+    try:
+        with open(cookie_file, encoding="utf-8") as f:
+            data = json.load(f)
+        # 检查是否有 cookies (支持数组或对象格式)
+        has_cookies = False
+        if isinstance(data, list) and len(data) > 0:
+            has_cookies = True
+        elif isinstance(data, dict):
+            has_cookies = bool(data.get("cookies")) or bool(data.get("origins"))
+
+        # 获取文件修改时间作为添加时间
+        stat = cookie_file.stat()
+        added_time = datetime.fromtimestamp(stat.st_mtime).isoformat()
+
+        # 从配置文件读取用户信息（持久化）
+        cookie_info = config.cookie_info or {}
+
+        # 如果配置文件中有 added_time，使用配置文件的，否则使用文件修改时间
+        config_added_time = cookie_info.get("added_time") or cookie_info.get("verified_at")
+
+        return {
+            "exists": True,
+            "valid": has_cookies,
+            "user_id": cookie_info.get("user_id"),
+            "user_name": cookie_info.get("user_name"),
+            "added_time": config_added_time or added_time,
+            "is_logged_in": cookie_info.get("is_logged_in", False),
+        }
+    except Exception:
+        return {
+            "exists": True,
+            "valid": False,
+            "user_id": None,
+            "user_name": None,
+            "added_time": None,
+            "is_logged_in": False,
+        }
 
 
 @app.post("/api/cookies/test")
@@ -615,14 +780,37 @@ async def test_cookies():
             result = await crawler.test_login()
 
             if result.get("is_logged_in"):
+                user_id = result.get("user_id")
+                user_name = result.get("user_name")
+
+                # 缓存 cookie 信息
+                app_state["cookie_info"] = {
+                    "user_id": user_id,
+                    "user_name": user_name,
+                    "is_logged_in": True,
+                }
+
+                # 同时更新配置文件
+                update_config_file(
+                    user_id=user_id,
+                    cookie_info={
+                        "user_id": user_id,
+                        "user_name": user_name,
+                        "is_logged_in": True,
+                        "verified_at": datetime.now().isoformat(),
+                    },
+                )
+
                 return {
                     "status": "success",
                     "is_logged_in": True,
-                    "user_name": result.get("user_name"),
-                    "user_id": result.get("user_id"),
+                    "user_name": user_name,
+                    "user_id": user_id,
                     "message": result.get("message", "登录有效"),
                 }
             else:
+                # 清除缓存
+                app_state["cookie_info"] = None
                 return {
                     "status": "error",
                     "is_logged_in": False,
@@ -635,6 +823,210 @@ async def test_cookies():
         raise HTTPException(status_code=500, detail=f"测试失败: {str(e)}")
 
 
+@app.get("/api/storage/mounts")
+async def get_storage_mounts():
+    """获取 Docker 存储挂载映射信息."""
+    import os
+
+    try:
+        # 尝试获取容器信息（如果在 Docker 中运行）
+        hostname = os.environ.get("HOSTNAME", "")
+
+        # 检查是否在 Docker 环境中
+        in_docker = Path("/.dockerenv").exists() or os.environ.get("ZHIHUSYNC_ENV") == "docker"
+
+        # 解析 mountinfo 获取挂载映射
+        mount_mappings = {}
+        if in_docker:
+            try:
+                with open("/proc/self/mountinfo", encoding="utf-8") as f:
+                    for line in f:
+                        parts = line.strip().split()
+                        if len(parts) >= 10:
+                            # mountinfo 格式: ID parentID major:minor root mount_point mount_options... separator fs_type source super_options
+                            mount_point = parts[4]
+                            root = parts[3]
+                            # 只关注 /app 相关的挂载
+                            if mount_point.startswith("/app/"):
+                                mount_mappings[mount_point] = root if root != "/" else mount_point
+            except Exception as e:
+                logger.warning(f"读取 mountinfo 失败: {e}")
+
+        # 构建存储路径映射（包含内外路径）
+        def get_host_path(container_path: str) -> str:
+            """根据容器路径获取宿主机路径."""
+            # 尝试找到匹配的挂载点
+            for container_mount, host_mount in sorted(mount_mappings.items(), key=lambda x: -len(x[0])):
+                if container_path.startswith(container_mount):
+                    relative = container_path[len(container_mount) :].lstrip("/")
+                    if relative:
+                        return f"{host_mount}/{relative}"
+                    return host_mount
+            return container_path
+
+        mounts = {
+            "html": {
+                "container_path": config.storage.html_path,
+                "host_path": get_host_path(config.storage.html_path),
+                "description": "HTML 文件存储",
+            },
+            "db": {
+                "container_path": config.storage.db_path,
+                "host_path": get_host_path(config.storage.db_path),
+                "description": "数据库文件",
+            },
+            "static": {
+                "container_path": config.storage.static_path,
+                "host_path": get_host_path(config.storage.static_path),
+                "description": "静态资源文件",
+            },
+            "images": {
+                "container_path": config.storage.images_path,
+                "host_path": get_host_path(config.storage.images_path),
+                "description": "图片文件",
+            },
+            "data_root": {
+                "container_path": "/app/data",
+                "host_path": mount_mappings.get("/app/data", "/app/data"),
+                "description": "数据根目录",
+            },
+            "config_root": {
+                "container_path": "/app/config",
+                "host_path": mount_mappings.get("/app/config", "/app/config"),
+                "description": "配置目录",
+            },
+        }
+
+        # 尝试从环境变量获取 Docker 挂载信息（用户自定义映射）
+        docker_mounts = {}
+        for key, value in os.environ.items():
+            if key.startswith("DOCKER_MOUNT_"):
+                mount_name = key.replace("DOCKER_MOUNT_", "").lower()
+                docker_mounts[mount_name] = value
+
+        return {
+            "in_docker": in_docker,
+            "mounts": mounts,
+            "docker_mounts": docker_mounts,
+            "mount_mappings": mount_mappings,
+            "hostname": hostname,
+        }
+    except Exception as e:
+        logger.error(f"获取存储挂载信息失败: {e}")
+        raise HTTPException(status_code=500, detail=f"获取挂载信息失败: {str(e)}")
+
+
+@app.post("/api/storage/migrate")
+async def migrate_storage(data: dict):
+    """迁移数据到新的存储位置."""
+    try:
+        new_html_path = data.get("html_path")
+        new_db_path = data.get("db_path")
+        new_static_path = data.get("static_path")
+        new_images_path = data.get("images_path")
+
+        if not all([new_html_path, new_db_path, new_static_path, new_images_path]):
+            raise HTTPException(status_code=400, detail="缺少必要的路径参数")
+
+        # 类型断言（已通过上面的检查确保不为 None）
+        new_html_path = str(new_html_path)
+        new_db_path = str(new_db_path)
+        new_static_path = str(new_static_path)
+        new_images_path = str(new_images_path)
+
+        # 创建新目录
+        Path(new_html_path).mkdir(parents=True, exist_ok=True)
+        Path(new_db_path).parent.mkdir(parents=True, exist_ok=True)
+        Path(new_static_path).mkdir(parents=True, exist_ok=True)
+        Path(new_images_path).mkdir(parents=True, exist_ok=True)
+
+        # 执行数据迁移（使用 shutil）
+        import shutil
+
+        # 迁移 HTML
+        if Path(config.storage.html_path).exists():
+            for item in Path(config.storage.html_path).iterdir():
+                dest = Path(new_html_path) / item.name
+                if item.is_dir():
+                    shutil.copytree(item, dest, dirs_exist_ok=True)
+                else:
+                    shutil.copy2(item, dest)
+
+        # 迁移数据库
+        if Path(config.storage.db_path).exists():
+            shutil.copy2(str(config.storage.db_path), new_db_path)
+
+        # 迁移静态资源
+        if Path(config.storage.static_path).exists():
+            for item in Path(config.storage.static_path).iterdir():
+                dest = Path(new_static_path) / item.name
+                if item.is_dir():
+                    shutil.copytree(item, dest, dirs_exist_ok=True)
+                else:
+                    shutil.copy2(item, dest)
+
+        # 迁移图片
+        if Path(config.storage.images_path).exists():
+            for item in Path(config.storage.images_path).iterdir():
+                dest = Path(new_images_path) / item.name
+                if item.is_dir():
+                    shutil.copytree(item, dest, dirs_exist_ok=True)
+                else:
+                    shutil.copy2(item, dest)
+
+        # 更新配置
+        update_config_file(
+            cookie_info={
+                "migrated_at": datetime.now().isoformat(),
+                "old_paths": {
+                    "html": config.storage.html_path,
+                    "db": config.storage.db_path,
+                    "static": config.storage.static_path,
+                    "images": config.storage.images_path,
+                },
+                "new_paths": {
+                    "html": new_html_path,
+                    "db": new_db_path,
+                    "static": new_static_path,
+                    "images": new_images_path,
+                },
+            }
+        )
+
+        return {
+            "status": "success",
+            "message": "数据迁移完成，需要重启服务以应用新配置",
+            "new_paths": {
+                "html": new_html_path,
+                "db": new_db_path,
+                "static": new_static_path,
+                "images": new_images_path,
+            },
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("数据迁移失败")
+        raise HTTPException(status_code=500, detail=f"数据迁移失败: {str(e)}")
+
+
+@app.post("/api/system/restart")
+async def restart_service():
+    """重启服务（通过退出进程让 Docker 重新启动容器）."""
+
+    async def do_restart():
+        await asyncio.sleep(2)  # 给前端响应时间
+        os.kill(os.getpid(), signal.SIGTERM)
+
+    # 启动异步任务来重启
+    asyncio.create_task(do_restart())
+
+    return {
+        "status": "restarting",
+        "message": "服务正在重启，请稍候刷新页面",
+    }
+
+
 async def do_sync(sync_type: str = "manual"):
     """执行同步任务.
 
@@ -645,8 +1037,13 @@ async def do_sync(sync_type: str = "manual"):
     app_state["sync_progress"] = 0
     app_state["sync_message"] = "正在初始化..."
 
+    # 获取同步用户ID
+    user_id = get_sync_user_id()
+    if not user_id:
+        raise RuntimeError("未配置用户ID")
+
     # 创建同步日志
-    log_id = db.create_sync_log(user_id=config.zhihu.user_id, sync_type=sync_type)
+    log_id = db.create_sync_log(user_id=user_id, sync_type=sync_type)
 
     try:
         # 停止检查回调
@@ -654,7 +1051,7 @@ async def do_sync(sync_type: str = "manual"):
             return app_state.get("stop_requested", False)
 
         async with ZhihuCrawler(
-            user_id=config.zhihu.user_id,
+            user_id=user_id,
             db_manager=db,
             storage_manager=storage,
             headless=True,
@@ -717,7 +1114,8 @@ async def start_sync():
     if app_state["sync_status"] == "running":
         return {"status": "running", "message": "同步任务已在运行中"}
 
-    if not config.zhihu.user_id:
+    # 检查是否有用户（数据库或配置文件）
+    if not get_sync_user_id():
         raise HTTPException(status_code=400, detail="未配置用户ID")
 
     # 创建异步任务，标记为手工同步
@@ -773,13 +1171,15 @@ async def start_init_sync():
     if app_state["sync_task"] and not app_state["sync_task"].done():
         return {"status": "error", "message": "已有同步任务在运行"}
 
-    if not config.zhihu.user_id:
+    # 获取同步用户ID
+    user_id = get_sync_user_id()
+    if not user_id:
         raise HTTPException(status_code=400, detail="未配置用户ID")
 
     async def do_init_sync():
         """执行初始化同步"""
         # 创建同步日志，标记为全量同步
-        log_id = db.create_sync_log(user_id=config.zhihu.user_id, sync_type="full")
+        log_id = db.create_sync_log(user_id=user_id, sync_type="full")
 
         try:
             app_state["sync_status"] = "running"
@@ -802,7 +1202,7 @@ async def start_init_sync():
                 return app_state.get("stop_requested", False)
 
             async with ZhihuCrawler(
-                user_id=config.zhihu.user_id,
+                user_id=user_id,
                 db_manager=db,
                 storage_manager=storage,
                 headless=True,
@@ -851,9 +1251,6 @@ async def start_init_sync():
     app_state["sync_task"] = asyncio.create_task(do_init_sync())
 
     return {"status": "started", "message": "全量同步已启动（将爬取全部历史数据）"}
-
-
-from sqlalchemy import or_
 
 
 @app.get("/api/answers")
