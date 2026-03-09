@@ -16,6 +16,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from loguru import logger
 from pydantic import BaseModel
+from sqlalchemy import or_
 
 from config_loader import load_config
 from crawler import ZhihuCrawler
@@ -1216,9 +1217,6 @@ async def start_init_sync():
     app_state["sync_task"] = asyncio.create_task(do_init_sync())
 
     return {"status": "started", "message": "全量同步已启动（将爬取全部历史数据）"}
-
-
-from sqlalchemy import or_
 
 
 @app.get("/api/answers")
