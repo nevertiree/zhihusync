@@ -212,19 +212,19 @@ python -m src.app
 ### 首页仪表盘
 显示统计信息、同步状态和快速操作
 
-![首页仪表盘](home-page-preview.png)
+![首页仪表盘](docs/images/home-page-preview.png)
 
 ### 配置页面
 可视化配置 Cookie、用户 ID 和同步选项
 
-![配置页面](config-page-preview.png)
+![配置页面](docs/images/config-page-preview.png)
 
 ### 内容浏览器
 查看、搜索和管理已备份的回答
 
-![用户列表](user-list-search.png)
+![用户列表](docs/images/user-list-search.png)
 
-![Cookie 配置](cookie-page-new.png)
+![Cookie 配置](docs/images/cookie-page-new.png)
 
 ---
 
@@ -354,7 +354,7 @@ zhihusync/
 | [CHANGELOG.md](CHANGELOG.md) | 版本更新记录 |
 | [VERSION.md](VERSION.md) | 版本管理规范 |
 | [AGENTS.md](AGENTS.md) | 开发规范与最佳实践 |
-| [DOCKER_BUILD_GUIDE.md](DOCKER_BUILD_GUIDE.md) | Docker 构建指南 |
+| [DOCKER_BUILD_GUIDE.md](docs/docker/DOCKER_BUILD_GUIDE.md) | Docker 构建指南 |
 
 ---
 
