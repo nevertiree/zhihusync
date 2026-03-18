@@ -2,6 +2,14 @@
 
 所有版本变更记录请参见 [Releases](https://github.com/nevertiree/zhihusync/releases)。
 
+## [Unreleased]
+
+### 🐛 Bug 修复
+
+- **install.ps1**: 修复 PowerShell 变量引用语法错误
+  - 修复 `${env:XXX}` 在 `irm ... | iex` 执行时的解析错误
+  - 修复 `$variable:/path` 被误解析为驱动器引用的问题
+
 ## [1.1.0] - 2026-03-08
 
 ### 🚀 Docker 构建优化
