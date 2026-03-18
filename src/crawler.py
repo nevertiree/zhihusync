@@ -958,11 +958,25 @@ class ZhihuCrawler:
                     logger.info(f"第 {consecutive_no_new} 次没有新内容 (滚动 {scroll_count} 次)")
 
                 if consecutive_no_new >= max_consecutive_no_new:
-                    logger.info(f"连续 {max_consecutive_no_new} 次没有新内容，停止滚动")
-                    break
+                    # 额外检查：再滚动一次确认真的到底了
+                    logger.info(f"连续 {max_consecutive_no_new} 次没有新内容，再确认一次...")
+                    await self.page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                    await asyncio.sleep(3)
+
+                    content = await self.page.content()
+                    activities = self._parse_activities_from_html(content)
+                    current_count = len(activities)
+
+                    if current_count > last_count:
+                        logger.info(f"确认后发现 {current_count - last_count} 条新内容，继续滚动")
+                        consecutive_no_new = 0
+                        continue
+                    else:
+                        logger.info("确认后仍无新内容，停止滚动")
+                        break
 
             # 小步滚动 - 模拟人类慢慢往下翻
-            scroll_amount = random.randint(800, 1200)  # 每次滚动800-1200px
+            scroll_amount = random.randint(500, 800)  # 每次滚动500-800px，更频繁触发懒加载
 
             if scroll_count % 10 == 0:
                 logger.debug(f"向下滚动 {scroll_amount}px...")
@@ -977,8 +991,8 @@ class ZhihuCrawler:
                 }}
             """)
 
-            # 等待内容加载（较长时间）
-            wait_time = random.uniform(4.0, 8.0)
+            # 等待内容加载
+            wait_time = random.uniform(2.0, 4.0)  # 减少等待时间，避免超时
             await asyncio.sleep(wait_time)
 
             # 偶尔随机向上滚动一点（模拟人类回滚查看）
