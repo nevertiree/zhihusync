@@ -1,4 +1,4 @@
-﻿<div align="center">
+<div align="center">
 
 # 🔄 zhihusync
 
@@ -8,355 +8,96 @@
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-009688.svg)](https://fastapi.tiangolo.com/)
 [![Docker](https://img.shields.io/badge/Docker-Ready-2496ED.svg)](https://www.docker.com/)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
 [English](README_EN.md) | 简体中文
 
 </div>
 
-## 🚀 一键安装（推荐）
+## 🚀 快速开始
 
-**只需一条命令，全自动安装 zhihusync：**
+### 一键安装
 
-### Linux / macOS / WSL2
 ```bash
+# Linux / macOS / WSL2
 curl -fsSL https://raw.githubusercontent.com/nevertiree/zhihusync/master/install.sh | bash
-```
 
-### Windows (PowerShell)
-```powershell
+# Windows (PowerShell)
 irm https://raw.githubusercontent.com/nevertiree/zhihusync/master/install.ps1 | iex
 ```
 
-### 安装过程
-✅ **自动检查 Docker**（如未安装会提示安装方法）
-✅ **交互式配置数据目录**（提供路径示例，必须用户确认）
-✅ **可选配置知乎用户 ID**（也可稍后在网页配置）
-✅ **自动拉取镜像并启动服务**
-
-**安装完成后访问：** http://localhost:6067
-
----
-
-## 🗑️ 一键卸载
-
-**如需完全删除 zhihusync 及所有数据：**
-
-### Linux / macOS / WSL2
-```bash
-curl -fsSL https://raw.githubusercontent.com/nevertiree/zhihusync/master/uninstall.sh | bash
-```
-
-### Windows (PowerShell)
-```powershell
-irm https://raw.githubusercontent.com/nevertiree/zhihusync/master/uninstall.ps1 | iex
-```
-
-### 卸载说明
-⚠️ **从 Docker 容器自动检测数据目录**（无需手动输入）
-⚠️ **必须用户确认数据目录**（即使目录存在也不会默认删除）
-⚠️ **需要输入 DELETE 最终确认**（防止误操作）
-✅ **自动停止并删除容器、数据目录**
-
----
-
-### 💾 关于数据目录
-
-**数据目录是你唯一需要关注的内容！** 所有备份数据都保存在这里：
-
-| 路径 | 说明 |
-|------|------|
-| `data/html/` | 备份的知乎回答 HTML 文件 |
-| `data/meta/` | 数据库（备份记录、元数据） |
-| `data/images/` | 下载的图片 |
-| `data/static/` | 静态资源（头像等） |
-
-**建议路径：**
-- **Windows**: `D:\zhihusync\data` 或 `E:\zhihusync\data`
-- **Linux**: `$HOME/zhihusync/data` 或 `/opt/zhihusync/data`
-- **NAS**: 挂载的共享文件夹
-
-⚠️ **请务必确保数据目录安全，定期备份！卸载时会删除此目录！**
-
----
+安装完成后访问 **http://localhost:6067**
 
 <details>
-<summary>📋 手动安装（高级用户）</summary>
+<summary>🐳 手动 Docker 部署</summary>
 
 ```bash
-# 1. 创建数据目录
-mkdir -p ~/zhihusync/data
-
-# 2. 直接运行（无需下载任何文件）
+# 使用 Docker Hub 镜像
 docker run -d \
   --name zhihusync \
-  --restart unless-stopped \
   -p 6067:6067 \
-  -v ~/zhihusync/data/html:/app/data/html \
-  -v ~/zhihusync/data/meta:/app/data/meta \
-  -v ~/zhihusync/data/images:/app/data/images \
-  -v ~/zhihusync/data/static:/app/data/static \
-  -v ~/zhihusync/config:/app/config \
+  -v ~/zhihusync/data:/app/data \
   nevertiree26/zhihusync:latest
 
-# 3. 访问 http://localhost:6067
+# 或使用 docker-compose
+docker compose up -d
 ```
 </details>
 
----
-
-## 📖 简介
-
-zhihusync 是一个自动备份知乎用户点赞内容的工具。它通过定时扫描你的知乎点赞记录，将回答和文章保存为本地 HTML 文件，即使原内容被删除或作者注销账号，你仍然可以查看备份的内容。
-
-### 为什么需要这个工具？
-
-- 📝 **内容消失** - 知乎回答经常被作者删除或账号注销
-- 🔒 **账号封禁** - 优质答主可能被封禁导致内容无法访问
-- 📚 **知识沉淀** - 将散落的知识整理成可本地浏览的档案
-- 🔍 **全文搜索** - 本地备份支持快速搜索关键信息
-
----
-
 ## ✨ 功能特性
 
-| 功能 | 描述 | 状态 |
-|------|------|------|
-| 🌐 **Web 管理界面** | 可视化操作，无需命令行 | ✅ |
-| 🔐 **Cookie 配置** | 通过网页粘贴 Cookie，一键保存 | ✅ |
-| 📊 **实时状态** | 查看同步进度和日志 | ✅ |
-| 📁 **内容浏览** | 查看、搜索、管理已备份内容 | ✅ |
-| ⏰ **自动同步** | 定时扫描新点赞内容 | ✅ |
-| 💾 **完整保存** | 保留回答内容和评论 | ✅ |
-| 🎨 **样式还原** | 保留知乎原生 CSS 样式 | ✅ |
-| 🏷️ **元数据记录** | 记录作者、点赞数、时间等 | ✅ |
-| 🖼️ **图片下载** | 自动下载图片到本地 | ✅ |
-| 🔄 **增量更新** | 只同步新内容，避免重复 | ✅ |
+| 功能 | 描述 |
+|------|------|
+| 🌐 **Web 界面** | 可视化配置和管理，无需命令行 |
+| 💾 **自动备份** | 定时同步点赞内容到本地 HTML |
+| 🔍 **全文搜索** | 快速查找已备份的回答 |
+| 🖼️ **图片下载** | 自动下载图片到本地 |
+| 🔄 **增量更新** | 只同步新内容，避免重复 |
 
----
+## 📖 使用文档
 
-## 📋 版本信息
-
-| 类型 | 版本/地址 |
-|------|----------|
-| **Git 版本** | v1.1.0 |
-| **Docker Image** | `nevertiree26/zhihusync:v1.1.0` |
-| **Docker Hub** | https://hub.docker.com/r/nevertiree26/zhihusync |
-| **GitHub Release** | https://github.com/nevertiree/zhihusync/releases |
-
----
-
-## 🚀 快速开始
-
-### 方式一：Docker Hub 直接部署（推荐）
-
-使用 Docker Hub 预构建镜像，无需克隆代码，一键启动：
-
-```bash
-# 创建目录
-mkdir zhihusync && cd zhihusync
-
-# 下载 docker-compose 配置
-curl -O https://raw.githubusercontent.com/nevertiree/zhihusync/master/docker-compose.hub.yml
-
-# 启动服务
-docker-compose -f docker-compose.hub.yml up -d
-
-# 访问 Web 界面
-# http://localhost:6067
-```
-
-### 方式二：本地构建部署（多种镜像方案）
-
-克隆项目并选择合适的镜像方案本地构建：
-
-```bash
-# 克隆项目
-git clone https://github.com/nevertiree/zhihusync.git
-cd zhihusync
-
-# 标准版构建（推荐，仅 Chromium，约 1.8GB）
-docker-compose up -d
-
-# 访问 Web 界面
-# http://localhost:6067
-```
-
-#### 📦 镜像方案对比
-
-| 方案 | 大小 | 构建命令 | 适用场景 |
-|------|------|----------|----------|
-| **标准版（推荐）** | ~1.8GB | `docker-compose up -d` | 仅 Chromium，推荐大多数用户使用 |
-| **完整版** | ~2.3GB | `docker-compose --profile full up -d` | Chromium + Firefox，需要备选浏览器 |
-| **精简版** | ~600MB | `docker-compose --profile minimal up -d` | 首次启动时下载浏览器，适合存储紧张 |
-
-### 方式三：本地运行
-
-```bash
-# 安装依赖
-pip install -r requirements.txt
-
-# 安装 Playwright 浏览器
-playwright install chromium
-
-# 启动服务
-python -m src.app
-
-# 访问 http://localhost:6067
-```
-
----
+| 文档 | 说明 |
+|------|------|
+| [安装指南](docs/INSTALL.md) | 详细安装方式（Docker/本地运行） |
+| [配置指南](docs/CONFIG.md) | Cookie 获取、用户 ID 设置 |
+| [常见问题](docs/FAQ.md) | Cookie 有效期、多账号等 |
+| [API 文档](docs/API.md) | REST API 接口说明 |
+| [Docker 构建](docs/docker/DOCKER_BUILD_GUIDE.md) | 镜像构建指南 |
 
 ## 📸 界面预览
 
-### 首页仪表盘
-显示统计信息、同步状态和快速操作
-
 ![首页仪表盘](docs/images/home-page-preview.png)
-
-### 配置页面
-可视化配置 Cookie、用户 ID 和同步选项
 
 ![配置页面](docs/images/config-page-preview.png)
 
-### 内容浏览器
-查看、搜索和管理已备份的回答
+更多截图见 [docs/images/](docs/images/)
 
-![用户列表](docs/images/user-list-search.png)
+## 🗑️ 卸载
 
-![Cookie 配置](docs/images/cookie-page-new.png)
+```bash
+# Linux / macOS / WSL2
+curl -fsSL https://raw.githubusercontent.com/nevertiree/zhihusync/master/uninstall.sh | bash
 
----
-
-## ⚙️ 配置指南
-
-### 1. 获取知乎 Cookie
-
-**使用 EditThisCookie 插件（推荐）：**
-
-1. 安装 [EditThisCookie](https://www.editthiscookie.com/) 浏览器扩展
-2. 登录 [知乎](https://www.zhihu.com)
-3. 点击扩展图标 → Export → Export as JSON
-4. 将 JSON 粘贴到 Web 界面的 Cookie 输入框
-
-**或使用浏览器开发者工具：**
-
-```javascript
-// 在 Console 中执行
-JSON.stringify(document.cookie.split(';').map(c => {
-  const [n, ...v] = c.trim().split('=');
-  return {name: n, value: v.join('='), domain: '.zhihu.com'};
-}))
+# Windows (PowerShell)
+irm https://raw.githubusercontent.com/nevertiree/zhihusync/master/uninstall.ps1 | iex
 ```
-
-### 2. 获取用户 ID
-
-1. 登录知乎，点击头像 → **我的主页**
-2. 地址栏 URL: `https://www.zhihu.com/people/xxx`
-3. `xxx` 就是你的用户 ID
-
-### 3. 高级配置
-
-| 配置项 | 说明 | 默认值 |
-|--------|------|--------|
-| 扫描间隔 | 自动同步时间间隔（分钟） | 30 |
-| 最大条目数 | 每次同步最多获取条数 | 50 |
-| 保存评论 | 是否备份评论内容 | true |
-| 无头模式 | 是否在后台运行浏览器 | true |
-
----
 
 ## 📂 项目结构
 
 ```
 zhihusync/
-├── 📁 config/                 # 配置文件
-│   └── config.yaml
-├── 📁 data/                   # 数据目录（持久化）
-│   ├── 📁 html/              # 备份的 HTML 文件
-│   ├── 📁 meta/              # 元数据和日志
-│   │   ├── zhihusync.db      # SQLite 数据库
-│   │   ├── zhihusync.log     # 日志文件
-│   │   └── cookies.json      # 登录凭证
-│   └── 📁 static/            # 图片等静态资源
-├── 📁 src/                    # 源代码
-│   ├── crawler.py            # 爬虫核心
-│   ├── web.py                # Web 服务
-│   ├── storage.py            # 存储管理
-│   ├── db.py                 # 数据库操作
-│   └── ...
-├── 📁 templates/              # Web 模板
-├── 📁 static/                 # Web 静态资源
-├── docker-compose.yml         # Docker 配置
-├── Dockerfile                 # 镜像定义
-└── README.md                  # 本文件
+├── data/           # 数据目录
+│   ├── html/      # 备份的 HTML 文件
+│   ├── meta/      # 数据库和日志
+│   └── static/    # 图片等资源
+├── config/        # 配置文件
+└── src/           # 源代码
 ```
-
----
-
-## 🔌 API 接口
-
-| 接口 | 方法 | 说明 |
-|------|------|------|
-| `/api/stats` | GET | 获取统计信息 |
-| `/api/setup/status` | GET | 获取配置状态 |
-| `/api/config` | GET/POST | 获取/更新配置 |
-| `/api/cookies` | POST | 更新 Cookie |
-| `/api/cookies/check` | GET | 检查 Cookie 状态 |
-| `/api/cookies/test` | POST | 测试 Cookie 登录 |
-| `/api/sync/start` | POST | 开始同步 |
-| `/api/sync/stop` | POST | 停止同步 |
-| `/api/sync/status` | GET | 同步状态 |
-| `/api/sync/history` | GET | 同步历史 |
-| `/api/answers` | GET | 获取回答列表 |
-| `/api/answers/{id}` | DELETE | 删除回答 |
-| `/api/logs` | GET | 获取日志 |
-
----
-
-## ❓ 常见问题
-
-### Cookie 有效期多久？
-
-知乎 Cookie 通常有效期为 1-3 个月，过期后需要重新配置。
-
-### 可以备份多个账号吗？
-
-目前一个实例只支持一个账号。如需备份多个账号，需要启动多个实例。
-
-### 备份的数据在哪里？
-
-- HTML 文件: `data/html/`
-- 数据库: `data/meta/zhihusync.db`
-- 图片: `data/static/images/`
-
-### 如何查看备份内容？
-
-1. 通过 Web 界面的"内容浏览"页面
-2. 直接打开 `data/html` 目录下的 HTML 文件
-
----
-
-## 🛠️ 技术栈
-
-- **后端**: [FastAPI](https://fastapi.tiangolo.com/) + [SQLAlchemy](https://www.sqlalchemy.org/)
-- **前端**: 原生 HTML/JS + [Tailwind CSS](https://tailwindcss.com/)
-- **爬虫**: [Playwright](https://playwright.dev/) + [BeautifulSoup4](https://www.crummy.com/software/BeautifulSoup/)
-- **调度**: [APScheduler](https://apscheduler.readthedocs.io/)
-- **容器**: [Docker](https://www.docker.com/) + [Docker Compose](https://docs.docker.com/compose/)
-
----
 
 ## 📚 相关文档
 
-| 文档 | 说明 |
-|------|------|
-| [CHANGELOG.md](CHANGELOG.md) | 版本更新记录 |
-| [VERSION.md](VERSION.md) | 版本管理规范 |
-| [AGENTS.md](AGENTS.md) | 开发规范与最佳实践 |
-| [DOCKER_BUILD_GUIDE.md](docs/docker/DOCKER_BUILD_GUIDE.md) | Docker 构建指南 |
-
----
+- [CHANGELOG.md](CHANGELOG.md) - 版本更新记录
+- [VERSION.md](VERSION.md) - 版本管理规范
+- [AGENTS.md](AGENTS.md) - 开发规范
 
 ## 📄 许可证
 
@@ -364,8 +105,8 @@ zhihusync/
 
 ---
 
-## 🙏 致谢
+<div align="center">
 
-- [Playwright](https://playwright.dev/) - 强大的浏览器自动化工具
-- [FastAPI](https://fastapi.tiangolo.com/) - 现代、快速的 Web 框架
-- [Tailwind CSS](https://tailwindcss.com/) - 实用的 CSS 框架
+**Star 🌟 如果这个项目对你有帮助！**
+
+</div>
