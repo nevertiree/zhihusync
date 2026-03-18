@@ -122,12 +122,12 @@ function Configure-DataDir {
     Write-Color "📋 路径参考示例：" "Blue"
     Write-Host '   Windows:'
     Write-Host '     • D:\zhihusync\data          (D盘)'
-    Write-Host "     • C:\Users\${env:USERNAME}\zhihusync  (用户目录)"
+    Write-Host "     • C:\Users\$($env:USERNAME)\zhihusync  (用户目录)"
     Write-Host '     • \\NAS\backup\zhihusync    (NAS 网络路径)'
     Write-Host ''
 
     # 默认路径
-    $defaultDir = "${env:USERPROFILE}\zhihusync\data"
+    $defaultDir = "$env:USERPROFILE\zhihusync\data"
 
     while ($true) {
         $dataDir = Read-Host "请输入数据保存目录 [默认: $defaultDir]"
@@ -232,7 +232,7 @@ function Build-ImageLocally {
     Write-Host ""
 
     # 创建临时目录
-    $buildDir = Join-Path ${env:TEMP} "zhihusync-build-$(Get-Random)"
+    $buildDir = Join-Path $env:TEMP "zhihusync-build-$(Get-Random)"
     New-Item -ItemType Directory -Path $buildDir -Force | Out-Null
 
     try {
@@ -352,11 +352,11 @@ function Start-ZhihuSyncService {
         "--name", "zhihusync"
         "--restart", "unless-stopped"
         "-p", "6067:6067"
-        "-v", "$dataDirDocker/html:/app/data/html"
-        "-v", "$dataDirDocker/meta:/app/data/meta"
-        "-v", "$dataDirDocker/images:/app/data/images"
-        "-v", "$dataDirDocker/static:/app/data/static"
-        "-v", "$configDirDocker:/app/config"
+        "-v", "${dataDirDocker}/html:/app/data/html"
+        "-v", "${dataDirDocker}/meta:/app/data/meta"
+        "-v", "${dataDirDocker}/images:/app/data/images"
+        "-v", "${dataDirDocker}/static:/app/data/static"
+        "-v", "${configDirDocker}:/app/config"
         "-e", "ZHIHUSYNC_ZHIHU_USER_ID=$script:ZHIHU_USER_ID"
         "-e", "ZHIHUSYNC_ZHIHU_SCAN_INTERVAL=60"
         "-e", "ZHIHUSYNC_BROWSER_HEADLESS=true"
