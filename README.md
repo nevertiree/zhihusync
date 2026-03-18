@@ -105,8 +105,6 @@ docker run -d \
 
 ---
 
----
-
 ## 📖 简介
 
 zhihusync 是一个自动备份知乎用户点赞内容的工具。它通过定时扫描你的知乎点赞记录，将回答和文章保存为本地 HTML 文件，即使原内容被删除或作者注销账号，你仍然可以查看备份的内容。
@@ -141,8 +139,8 @@ zhihusync 是一个自动备份知乎用户点赞内容的工具。它通过定�
 
 | 类型 | 版本/地址 |
 |------|----------|
-| **Git 版本** | v0.7.0 |
-| **Docker Image** | `nevertiree26/zhihusync:v0.7.0` |
+| **Git 版本** | v1.1.0 |
+| **Docker Image** | `nevertiree26/zhihusync:v1.1.0` |
 | **Docker Hub** | https://hub.docker.com/r/nevertiree26/zhihusync |
 | **GitHub Release** | https://github.com/nevertiree/zhihusync/releases |
 
@@ -211,14 +209,22 @@ python -m src.app
 
 ## 📸 界面预览
 
-### 仪表盘
+### 首页仪表盘
 显示统计信息、同步状态和快速操作
+
+![首页仪表盘](home-page-preview.png)
+
+### 配置页面
+可视化配置 Cookie、用户 ID 和同步选项
+
+![配置页面](config-page-preview.png)
 
 ### 内容浏览器
 查看、搜索和管理已备份的回答
 
-### 配置页面
-可视化配置 Cookie、用户 ID 和同步选项
+![用户列表](user-list-search.png)
+
+![Cookie 配置](cookie-page-new.png)
 
 ---
 
@@ -338,6 +344,17 @@ zhihusync/
 - **爬虫**: [Playwright](https://playwright.dev/) + [BeautifulSoup4](https://www.crummy.com/software/BeautifulSoup/)
 - **调度**: [APScheduler](https://apscheduler.readthedocs.io/)
 - **容器**: [Docker](https://www.docker.com/) + [Docker Compose](https://docs.docker.com/compose/)
+
+---
+
+## 📚 相关文档
+
+| 文档 | 说明 |
+|------|------|
+| [CHANGELOG.md](CHANGELOG.md) | 版本更新记录 |
+| [VERSION.md](VERSION.md) | 版本管理规范 |
+| [AGENTS.md](AGENTS.md) | 开发规范与最佳实践 |
+| [DOCKER_BUILD_GUIDE.md](DOCKER_BUILD_GUIDE.md) | Docker 构建指南 |
 
 ---
 
