@@ -150,6 +150,7 @@ class AppConfig(BaseSettings):
         """Pydantic配置类."""
 
         env_prefix = "ZHIHUSYNC_"
+        extra = "allow"  # 允许额外字段
 
 
 def load_config(config_path: str | None = None) -> AppConfig:

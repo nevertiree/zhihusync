@@ -114,14 +114,38 @@ class ZhihuSyncService:
             encoding="utf-8",
         )
 
+    def _get_sync_user_id(self) -> str | None:
+        """获取用于同步的用户ID.
+
+        优先从数据库获取活跃用户，如果没有则使用配置文件中的user_id.
+
+        Returns:
+            str | None: 用户ID或None
+        """
+        from models import User
+
+        session = self.db.get_session()
+        try:
+            # 优先从数据库获取第一个活跃用户
+            user = session.query(User).filter_by(is_active=True).first()
+            if user:
+                return user.id
+        finally:
+            session.close()
+
+        # 如果没有数据库用户，使用配置文件中的
+        return self.config.zhihu.user_id or None
+
     async def run_sync(self):
         """执行同步任务.
 
         扫描用户点赞内容，保存回答和评论元数据及 HTML。
         任务结果会记录到同步日志中。
         """
-        if not self.config.zhihu.user_id:
-            logger.error("未配置用户ID，请在 config.yaml 中设置 zhihu.user_id")
+        # 优先从数据库获取用户，支持 Web 界面添加的用户
+        user_id = self._get_sync_user_id()
+        if not user_id:
+            logger.error("未配置用户ID，请在设置页面添加用户或在 config.yaml 中设置 zhihu.user_id")
             return
 
         # 创建同步日志，标记为定时同步
@@ -131,7 +155,7 @@ class ZhihuSyncService:
             logger.info("开始定时同步任务...")
 
             async with ZhihuCrawler(
-                user_id=self.config.zhihu.user_id,
+                user_id=user_id,
                 db_manager=self.db,
                 storage_manager=self.storage,
                 headless=self.config.browser.headless,
